@@ -1,5 +1,5 @@
 {
- "actualizado": "2026-10-15T19:33:11.935Z",
+ "actualizado": "2026-10-15T20:06:09.792Z",
  "productos": [
   {
    "id": "H01",
@@ -627,7 +627,7 @@
    "marca": "Stallion 53",
    "presentacion": "Incluye spray de viaje de 20 ml",
    "notas": [],
-   "descripcion": "Tropical - frutal - dulce - encantador",
+   "descripcion": "Excelente alternativa al paradoxe de prada",
    "precios": {
     "detalle": {
      "cs": 1390,
@@ -643,6 +643,30 @@
    "etiqueta": null,
    "foto": "stallion53-paradise.webp",
    "orden": 7
+  },
+  {
+   "id": "D08",
+   "catalogo": "damas",
+   "nombre": "La furia",
+   "marca": "Stallion 53",
+   "presentacion": "Incluye spray de viaje de 20 ml",
+   "notas": [],
+   "descripcion": "Excelente alternativa a la bomba de Carolina herrera",
+   "precios": {
+    "detalle": {
+     "cs": 1390,
+     "usd": 38
+    },
+    "mayor": {
+     "cs": 885,
+     "usd": 24
+    }
+   },
+   "estado": "coming_soon",
+   "existencias": 0,
+   "etiqueta": null,
+   "foto": "stallion53-la-furia.webp",
+   "orden": 8
   }
  ]
 }
