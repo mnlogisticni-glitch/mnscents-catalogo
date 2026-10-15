@@ -17,7 +17,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
+      # Siempre la versión más reciente de main (también al usar "Re-run")
       - uses: actions/checkout@v4
+        with:
+          ref: main
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -34,5 +37,10 @@ jobs:
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
             git add data/productos.json
             git commit -m "Catálogo actualizado desde Google Sheets"
-            git push
+            # Si alguien subió algo mientras corría, se pone encima y reintenta
+            for intento in 1 2 3; do
+              git pull --rebase origin main && git push origin HEAD:main && exit 0
+              sleep 5
+            done
+            exit 1
           fi
