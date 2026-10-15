@@ -1,5 +1,5 @@
 {
- "actualizado": "2026-10-15T20:06:09.792Z",
+ "actualizado": "2026-10-15T20:50:59.759Z",
  "productos": [
   {
    "id": "H01",
@@ -459,6 +459,30 @@
    "orden": 16
   },
   {
+   "id": "H17",
+   "catalogo": "caballeros",
+   "nombre": "Imperial",
+   "marca": "Stallion 53",
+   "presentacion": "Incluye spray de viaje de 20 ml",
+   "notas": [],
+   "descripcion": "Excelente alternativa al Althair de perfums de marley",
+   "precios": {
+    "detalle": {
+     "cs": 1390,
+     "usd": 38
+    },
+    "mayor": {
+     "cs": 885,
+     "usd": 24
+    }
+   },
+   "estado": "coming_soon",
+   "existencias": 0,
+   "etiqueta": null,
+   "foto": "stallion53.imperial.png",
+   "orden": 17
+  },
+  {
    "id": "D01",
    "catalogo": "damas",
    "nombre": "9AM Pour Femme",
@@ -639,7 +663,7 @@
     }
    },
    "estado": "coming_soon",
-   "existencias": null,
+   "existencias": 0,
    "etiqueta": null,
    "foto": "stallion53-paradise.webp",
    "orden": 7
