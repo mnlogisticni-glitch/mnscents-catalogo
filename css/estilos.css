@@ -494,11 +494,14 @@ label.opcion input:focus-visible + span { outline: 2px solid var(--lila); outlin
 @media (min-width: 600px) {
   :root { --pad: 28px; }
   .rejilla { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
-  .cielo-texto { padding: 8px 0 104px; }
+  .cielo-texto { padding: 8px 190px 104px 0; }
   .crestas { height: 140px; }
-  .luna { width: 150px; height: 150px; right: 8%; top: 22px; }
-  .controles { display: grid; grid-template-columns: minmax(260px, 360px) 1fr; gap: 12px; align-items: center; }
-  .buscar { margin-top: 0; }
+  .luna { width: 150px; height: 150px; right: 6%; top: 22px; }
+}
+@media (min-width: 820px) {
+  .cielo-texto { padding-right: 0; }
+  .controles { display: grid; grid-template-columns: minmax(0, 360px) minmax(0, 1fr); gap: 12px; align-items: center; }
+  .buscar { margin-top: 0; min-width: 0; }
   .chips-activos { grid-column: 1 / -1; margin-top: 0; }
 }
 @media (min-width: 1000px) {
