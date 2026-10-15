@@ -1,5 +1,5 @@
 {
- "actualizado": "2026-10-15T16:30:03.534Z",
+ "actualizado": "2026-10-15T17:28:50.428Z",
  "productos": [
   {
    "id": "H01",
@@ -53,7 +53,7 @@
     }
    },
    "estado": "coming_soon",
-   "existencias": null,
+   "existencias": 0,
    "foto": "khamrah-qahwa.webp",
    "orden": 2
   },
@@ -80,7 +80,7 @@
     }
    },
    "estado": "disponible",
-   "existencias": null,
+   "existencias": 4,
    "foto": "afnan-9pm.webp",
    "orden": 3
   },
@@ -108,7 +108,7 @@
     }
    },
    "estado": "disponible",
-   "existencias": null,
+   "existencias": 3,
    "foto": "amber-oud-gold-edition.webp",
    "orden": 4
   },
@@ -135,7 +135,7 @@
     }
    },
    "estado": "disponible",
-   "existencias": null,
+   "existencias": 10,
    "foto": "club-de-nuit-intense-man.webp",
    "orden": 5
   },
@@ -158,7 +158,7 @@
     }
    },
    "estado": "disponible",
-   "existencias": null,
+   "existencias": 3,
    "foto": "uomo-intense.webp",
    "orden": 6
   },
@@ -214,7 +214,7 @@
     }
    },
    "estado": "disponible",
-   "existencias": null,
+   "existencias": 2,
    "foto": "badee-al-oud-for-glory.webp",
    "orden": 8
   },
@@ -242,7 +242,7 @@
     }
    },
    "estado": "disponible",
-   "existencias": null,
+   "existencias": 14,
    "foto": "9am-dive.webp",
    "orden": 9
   },
@@ -270,7 +270,7 @@
     }
    },
    "estado": "disponible",
-   "existencias": null,
+   "existencias": 6,
    "foto": "hawas-ice.webp",
    "orden": 10
   },
@@ -354,7 +354,7 @@
     }
    },
    "estado": "disponible",
-   "existencias": null,
+   "existencias": 6,
    "foto": "mandarin-sky-elixir.webp",
    "orden": 13
   },
@@ -410,7 +410,7 @@
     }
    },
    "estado": "disponible",
-   "existencias": null,
+   "existencias": 5,
    "foto": "asad-bourbon.webp",
    "orden": 15
   },
@@ -466,7 +466,7 @@
     }
    },
    "estado": "disponible",
-   "existencias": null,
+   "existencias": 4,
    "foto": "9am-pour-femme.webp",
    "orden": 1
   },
@@ -488,8 +488,8 @@
      "usd": 24.55
     }
    },
-   "estado": "disponible",
-   "existencias": null,
+   "estado": "agotado",
+   "existencias": 0,
    "foto": "donna-intense.webp",
    "orden": 2
   },
@@ -571,7 +571,7 @@
     }
    },
    "estado": "disponible",
-   "existencias": null,
+   "existencias": 3,
    "foto": "yara-tous.webp",
    "orden": 5
   },
@@ -594,7 +594,7 @@
     }
    },
    "estado": "disponible",
-   "existencias": null,
+   "existencias": 3,
    "foto": "set-yara-4-piezas.webp",
    "orden": 6
   }
