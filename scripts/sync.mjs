@@ -138,6 +138,15 @@ export async function convertir(texto, { comprobarFotos = true } = {}) {
       if (cs && usd) { const tc = cs / usd; if (tc < 34 || tc > 39.5) avisos.push(`${pref}: el precio ${tipo} en C$ y en US$ no parecen coincidir (C$${cs} / $${usd}). Revísalo.`); }
     }
 
+    // Existencias (columna opcional): vacío = sin límite; 0 = se muestra como Agotado
+    let existencias = null;
+    if ('existencias' in col && g('existencias') !== '') {
+      const n = numero(g('existencias'));
+      if (!Number.isInteger(n) || n < 0) errores.push(`${pref}: en "existencias" escribe un número entero (0, 1, 2…) o déjalo vacío.`);
+      else existencias = n;
+    }
+    const estadoFinal = existencias === 0 && est === 'disponible' ? 'agotado' : est;
+
     let foto = g('foto') || null;
     if (foto && comprobarFotos) {
       try { await access(path.join(CARPETA_FOTOS, foto)); }
@@ -148,7 +157,7 @@ export async function convertir(texto, { comprobarFotos = true } = {}) {
     if (mostrar !== false) productos.push({
       id, catalogo, nombre, marca: g('marca'), presentacion: g('presentacion'),
       notas: g('notas').split(/\s*[·•|\-]\s*/).filter(Boolean),
-      descripcion: g('descripcion'), precios, estado: est, foto, orden,
+      descripcion: g('descripcion'), precios, estado: estadoFinal, existencias, foto, orden,
     });
   }
   productos.sort((a, b) => a.catalogo.localeCompare(b.catalogo) || a.orden - b.orden || a.nombre.localeCompare(b.nombre));

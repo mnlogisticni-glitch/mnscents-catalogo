@@ -4,7 +4,10 @@
 export const UMBRAL_MAYOREO = 6;
 export const WHATSAPP = '50584735485'; // +505 8473-5485
 
-export const esComprable = p => !!p && p.estado === 'disponible';
+export const MAX_POR_PRODUCTO = 99;
+export const esComprable = p => !!p && p.estado === 'disponible' && p.existencias !== 0;
+// Unidades que se pueden pedir de un producto: sus existencias si están registradas, si no 99.
+export const maxPedido = p => (Number.isInteger(p?.existencias) ? Math.min(p.existencias, MAX_POR_PRODUCTO) : MAX_POR_PRODUCTO);
 
 // Dólares en centavos enteros para no acumular errores de coma flotante.
 const aCentavos = usd => Math.round(usd * 100);
@@ -29,7 +32,9 @@ export function calcular(items, catalogo) {
     const qty = Math.max(0, Math.floor(Number(it.qty) || 0));
     if (!qty) continue;
     if (!esComprable(p)) { noDisponibles.push({ id: it.id, producto: p || null, qty }); continue; }
-    lineas.push({ producto: p, qty });
+    const max = maxPedido(p);
+    // Nunca se cobra ni se cuenta más de lo que hay en existencias
+    lineas.push({ producto: p, qty: Math.min(qty, max), pedida: qty, ajustada: qty > max, max });
   }
   const unidades = lineas.reduce((s, l) => s + l.qty, 0);
   const nivel = unidades >= UMBRAL_MAYOREO ? 'mayor' : 'detalle';

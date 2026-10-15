@@ -1,5 +1,5 @@
 // MN Scents — catálogo, filtros, ficha, pedido y WhatsApp.
-import { calcular, mensajeWhatsApp, enlaceWhatsApp, fmtCS, fmtUSD, esComprable, UMBRAL_MAYOREO } from './precios.js';
+import { calcular, mensajeWhatsApp, enlaceWhatsApp, fmtCS, fmtUSD, esComprable, maxPedido, UMBRAL_MAYOREO } from './precios.js';
 
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
@@ -14,6 +14,7 @@ const estado = {
   filtros: { estado: 'todos', marcas: new Set(), precio: 'todos', orden: 'recomendado' },
   carrito: cargarCarrito(),
   nivelPrevio: null,
+  ajustados: new Set(),   // productos cuya cantidad se redujo por existencias
 };
 
 // ---------- utilidades ----------
@@ -28,15 +29,25 @@ function cargarCarrito() {
 }
 function guardarCarrito() { try { localStorage.setItem(CLAVE_CARRITO, JSON.stringify(estado.carrito)); } catch {} }
 const qtyEnCarrito = id => estado.carrito.find(x => x.id === id)?.qty || 0;
+// Devuelve la cantidad que realmente quedó (nunca más que las existencias)
 function fijarQty(id, qty) {
-  qty = Math.max(0, Math.min(99, qty | 0));
+  const p = estado.porId.get(id);
+  const max = maxPedido(p);
+  estado.ajustados.delete(id);
+  qty = Math.max(0, qty | 0);
+  if (qty > max) {
+    qty = max;
+    anunciar(max === 1 ? `Solo hay 1 unidad disponible de ${p.nombre}.` : `Solo hay ${max} unidades disponibles de ${p.nombre}.`);
+  }
   const i = estado.carrito.findIndex(x => x.id === id);
   if (qty === 0) { if (i >= 0) estado.carrito.splice(i, 1); }
   else if (i >= 0) estado.carrito[i].qty = qty;
   else estado.carrito.push({ id, qty });
   guardarCarrito();
   actualizarTodo();
+  return qty;
 }
+const textoTope = n => (n === 1 ? 'Solo hay 1 disponible' : `Solo hay ${n} disponibles`);
 
 // Distancia de edición con tolerancia 1 para palabras de 4+ letras (búsqueda tolerante)
 function casi(a, b) {
@@ -94,6 +105,8 @@ function filtrar(cat, conBusqueda = true) {
 function etiquetaEstado(p) {
   if (p.estado === 'coming_soon') return '<span class="estado coming">Coming soon</span>';
   if (p.estado === 'agotado') return '<span class="estado agotado">Agotado</span>';
+  if (esComprable(p) && Number.isInteger(p.existencias) && p.existencias <= 3)
+    return `<span class="estado pocas">${p.existencias === 1 ? 'Última unidad' : `Quedan ${p.existencias}`}</span>`;
   return '';
 }
 function foto(p, clase = '') {
@@ -105,10 +118,12 @@ function controlAgregar(p) {
   if (!esComprable(p)) return `<button class="btn-agregar" type="button" disabled>${p.estado === 'agotado' ? 'Agotado' : 'Próximamente'}</button>`;
   const q = qtyEnCarrito(p.id);
   if (!q) return `<button class="btn-agregar" type="button" data-accion="agregar" data-id="${esc(p.id)}">${ico('plus')}Agregar</button>`;
+  const max = maxPedido(p), lleno = q >= max;
   return `<div class="paso" role="group" aria-label="Cantidad de ${esc(p.nombre)}">
     <button type="button" data-accion="menos" data-id="${esc(p.id)}" aria-label="Quitar una unidad">${ico('minus')}</button>
     <output aria-live="polite">${q}</output>
-    <button type="button" data-accion="mas" data-id="${esc(p.id)}" aria-label="Agregar una unidad">${ico('plus')}</button></div>`;
+    <button type="button" data-accion="mas" data-id="${esc(p.id)}" aria-label="Agregar una unidad" ${lleno ? 'disabled' : ''}>${ico('plus')}</button></div>
+    ${lleno && max < 99 ? `<p class="tope">${textoTope(max)}</p>` : ''}`;
 }
 function tarjeta(p, nivel) {
   const pr = p.precios;
@@ -237,12 +252,14 @@ for (const d of $$('dialog.hoja')) {
 }
 
 // ---------- ficha ----------
-let fichaQty = 1;
+let fichaQty = 1, fichaMax = 99;
 function abrirFicha(id) {
   const p = estado.porId.get(id); if (!p) return;
   fichaQty = 1;
   const ped = calcular(estado.carrito, estado.porId);
   const enCarrito = qtyEnCarrito(id);
+  const maxP = maxPedido(p);
+  fichaMax = Math.max(0, maxP - enCarrito);
   const d = $('#hoja-ficha');
   d.querySelector('.hoja-cuerpo').innerHTML = `
     <div class="ficha-foto">${etiquetaEstado(p)}${foto(p).replace('loading="lazy"', 'loading="eager"')}
@@ -258,13 +275,17 @@ function abrirFicha(id) {
       <div class="${ped.nivel === 'detalle' ? 'activa' : ''}"><dt>Precio al detalle<small>De 1 a 5 unidades en total</small></dt><dd><b>${fmtCS(p.precios.detalle.cs)}</b><span>${fmtUSD(p.precios.detalle.usd)}</span></dd></div>
       <div class="fila-mayor ${ped.nivel === 'mayor' ? 'activa' : ''}"><dt>Precio por mayor<small>Con ${UMBRAL_MAYOREO} unidades o más en tu pedido</small></dt><dd><b>${fmtCS(p.precios.mayor.cs)}</b><span>${fmtUSD(p.precios.mayor.usd)}</span></dd></div>
     </dl>
-    ${esComprable(p)
+    ${esComprable(p) && fichaMax === 0
+      ? `<p class="ficha-aviso">Ya tienes en tu pedido ${enCarrito === 1 ? 'la única unidad disponible' : `las ${enCarrito} unidades disponibles`}.</p>
+         <div class="ficha-acciones una"><button class="btn sec" type="button" data-accion="ver-pedido">Ver mi pedido</button></div>`
+    : esComprable(p)
       ? `${enCarrito ? `<p class="ficha-aviso">Ya tienes ${enCarrito} en tu pedido.</p>` : ''}
+        ${maxP < 99 ? `<p class="ficha-aviso">${textoTope(maxP)}.</p>` : ''}
         <div class="ficha-acciones">
           <div class="paso" role="group" aria-label="Cantidad a agregar">
             <button type="button" data-accion="ficha-menos" aria-label="Menos">${ico('minus')}</button>
             <output class="ficha-qty" aria-live="polite">1</output>
-            <button type="button" data-accion="ficha-mas" aria-label="Más">${ico('plus')}</button>
+            <button type="button" data-accion="ficha-mas" aria-label="Más" ${fichaMax <= 1 ? 'disabled' : ''}>${ico('plus')}</button>
           </div>
           <button class="btn pri" type="button" data-accion="ficha-agregar" data-id="${esc(p.id)}">Agregar al pedido</button>
         </div>`
@@ -287,6 +308,11 @@ function faseLuna(p, r = 15, c = 20) {
 
 function pintarPedido() {
   const ped = calcular(estado.carrito, estado.porId);
+  // Si las existencias bajaron desde la última visita, el pedido guardado se ajusta (y se avisa en la línea)
+  if (ped.lineas.some(l => l.ajustada)) {
+    for (const l of ped.lineas) if (l.ajustada) { const it = estado.carrito.find(x => x.id === l.producto.id); if (it) it.qty = l.max; estado.ajustados.add(l.producto.id); }
+    guardarCarrito();
+  }
   const mayor = ped.nivel === 'mayor';
   const fase = faseLuna(ped.progreso);
   for (const path of $$('.lp-luz')) path.setAttribute('d', fase);
@@ -334,10 +360,12 @@ function pintarPedido() {
         <div class="paso" role="group" aria-label="Cantidad de ${esc(p.nombre)}">
           <button type="button" data-accion="menos" data-id="${esc(p.id)}" aria-label="Quitar una unidad de ${esc(p.nombre)}">${ico('minus')}</button>
           <output>${l.qty}</output>
-          <button type="button" data-accion="mas" data-id="${esc(p.id)}" aria-label="Agregar una unidad de ${esc(p.nombre)}">${ico('plus')}</button>
+          <button type="button" data-accion="mas" data-id="${esc(p.id)}" aria-label="Agregar una unidad de ${esc(p.nombre)}" ${l.qty >= l.max ? 'disabled' : ''}>${ico('plus')}</button>
         </div>
         <button class="l-quitar" type="button" data-accion="quitar" data-id="${esc(p.id)}">${ico('trash')}Eliminar</button>
-      </div></li>`;
+      </div>
+      ${estado.ajustados.has(p.id) ? `<p class="l-tope">Ajustamos la cantidad a ${l.max}: es lo que hay disponible.</p>`
+        : l.qty >= l.max && l.max < 99 ? `<p class="l-tope">${textoTope(l.max)}</p>` : ''}</li>`;
   }).join('');
 
   const nd = $('.no-disp', h);
@@ -408,8 +436,15 @@ document.addEventListener('click', e => {
     }
     case 'quitar': fijarQty(id, 0); anunciar('Producto eliminado del pedido.'); break;
     case 'ficha': abrirFicha(id); break;
-    case 'ficha-mas': fichaQty = Math.min(99, fichaQty + 1); $('.ficha-qty').textContent = fichaQty; break;
-    case 'ficha-menos': fichaQty = Math.max(1, fichaQty - 1); $('.ficha-qty').textContent = fichaQty; break;
+    case 'ficha-mas':
+      fichaQty = Math.min(fichaMax, fichaQty + 1); $('.ficha-qty').textContent = fichaQty;
+      b.disabled = fichaQty >= fichaMax;
+      break;
+    case 'ficha-menos':
+      fichaQty = Math.max(1, fichaQty - 1); $('.ficha-qty').textContent = fichaQty;
+      $('[data-accion="ficha-mas"]').disabled = fichaQty >= fichaMax;
+      break;
+    case 'ver-pedido': cerrar($('#hoja-ficha')); pintarPedido(); abrir($('#hoja-pedido')); break;
     case 'ficha-agregar': {
       fijarQty(id, qtyEnCarrito(id) + fichaQty);
       cerrar($('#hoja-ficha'));
@@ -512,8 +547,8 @@ async function iniciar() {
       $('.actualizado').textContent = `Catálogo actualizado el ${f.toLocaleDateString('es-NI', { day: 'numeric', month: 'long', year: 'numeric' })}.`;
     }
     pintarFiltrosFijos();
+    pintarPedido();   // primero: ajusta un pedido guardado a las existencias actuales
     ponerCat(location.hash.slice(1) || 'caballeros');
-    pintarPedido();
   } catch {
     rej.setAttribute('aria-busy', 'false');
     rej.innerHTML = `<div class="error-carga"><h3>No pudimos cargar el catálogo</h3><p>Revisa tu conexión a internet e intenta de nuevo.</p>

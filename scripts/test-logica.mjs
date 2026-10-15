@@ -97,5 +97,23 @@ prueba('Detecta estado inválido e id repetido; "No" oculta', () => { assert.ok(
 const r4 = await convertir(cab.replace('foto,', 'imagen,') + 'X1,Damas,P,M,,,,1,1,1,1,Disponible,,Sí,1\n', { comprobarFotos: false }).catch(e => e);
 prueba('Detecta columnas renombradas', () => assert.ok(String(r4.message).includes('Faltan columnas')));
 
+console.log('\nExistencias');
+prueba('Hawas Elixir: piden 10, se cobra 1 (hay 1)', () => {
+  const r = t([{ id: 'H12', qty: 10 }]);
+  assert.equal(r.lineas[0].qty, 1); assert.equal(r.lineas[0].ajustada, true); assert.equal(r.unidades, 1); assert.equal(r.totalCS, 1690);
+});
+prueba('El tope cuenta para el mayoreo con las unidades reales', () => {
+  const r = t([{ id: 'H12', qty: 3 }, { id: 'H03', qty: 4 }]); // 1 + 4 = 5 → detalle
+  assert.equal(r.unidades, 5); assert.equal(r.nivel, 'detalle');
+});
+prueba('Sin existencias registradas no hay tope (hasta 99)', () => { const r = t([{ id: 'H03', qty: 40 }]); assert.equal(r.lineas[0].qty, 40); assert.equal(r.lineas[0].ajustada, false); });
+const cabE = cab.trim() + ',existencias\n';
+const r5 = await convertir(cabE + 'X1,Damas,P,M,,,,1390,38,905,24.55,Disponible,,Sí,1,0\nX2,Damas,Q,M,,,,1390,38,905,24.55,Disponible,,Sí,2,2\n', { comprobarFotos: false });
+prueba('Existencias 0 se publica como Agotado; 2 queda Disponible', () => { assert.equal(r5.errores.length, 0); assert.equal(r5.productos[0].estado, 'agotado'); assert.equal(r5.productos[1].existencias, 2); assert.equal(r5.productos[1].estado, 'disponible'); });
+const r6 = await convertir(cabE + 'X1,Damas,P,M,,,,1390,38,905,24.55,Disponible,,Sí,1,dos\n', { comprobarFotos: false });
+prueba('Existencias inválidas se rechazan', () => assert.ok(r6.errores.some(e => e.includes('existencias'))));
+const r7 = await convertir(cab + 'X1,Damas,P,M,,,,1390,38,905,24.55,Disponible,,Sí,1\n', { comprobarFotos: false });
+prueba('La columna existencias es opcional', () => { assert.equal(r7.errores.length, 0); assert.equal(r7.productos[0].existencias, null); });
+
 console.log(`\n${ok} pruebas correctas, ${fallos} fallidas.`);
 process.exit(fallos ? 1 : 0);
