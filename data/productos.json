@@ -1,5 +1,5 @@
 {
- "actualizado": "2026-10-15T17:28:50.428Z",
+ "actualizado": "2026-10-15T19:29:16.962Z",
  "productos": [
   {
    "id": "H01",
@@ -26,6 +26,7 @@
    },
    "estado": "disponible",
    "existencias": 8,
+   "etiqueta": "top",
    "foto": "mandarin-sky.webp",
    "orden": 1
   },
@@ -54,6 +55,7 @@
    },
    "estado": "coming_soon",
    "existencias": 0,
+   "etiqueta": null,
    "foto": "khamrah-qahwa.webp",
    "orden": 2
   },
@@ -80,7 +82,8 @@
     }
    },
    "estado": "disponible",
-   "existencias": 4,
+   "existencias": 13,
+   "etiqueta": null,
    "foto": "afnan-9pm.webp",
    "orden": 3
   },
@@ -109,6 +112,7 @@
    },
    "estado": "disponible",
    "existencias": 3,
+   "etiqueta": null,
    "foto": "amber-oud-gold-edition.webp",
    "orden": 4
   },
@@ -136,6 +140,7 @@
    },
    "estado": "disponible",
    "existencias": 10,
+   "etiqueta": null,
    "foto": "club-de-nuit-intense-man.webp",
    "orden": 5
   },
@@ -159,6 +164,7 @@
    },
    "estado": "disponible",
    "existencias": 3,
+   "etiqueta": null,
    "foto": "uomo-intense.webp",
    "orden": 6
   },
@@ -187,6 +193,7 @@
    },
    "estado": "coming_soon",
    "existencias": null,
+   "etiqueta": null,
    "foto": "nautica-voyage.webp",
    "orden": 7
   },
@@ -215,6 +222,7 @@
    },
    "estado": "disponible",
    "existencias": 2,
+   "etiqueta": null,
    "foto": "badee-al-oud-for-glory.webp",
    "orden": 8
   },
@@ -243,6 +251,7 @@
    },
    "estado": "disponible",
    "existencias": 14,
+   "etiqueta": null,
    "foto": "9am-dive.webp",
    "orden": 9
   },
@@ -271,6 +280,7 @@
    },
    "estado": "disponible",
    "existencias": 6,
+   "etiqueta": "top",
    "foto": "hawas-ice.webp",
    "orden": 10
   },
@@ -299,6 +309,7 @@
    },
    "estado": "agotado",
    "existencias": null,
+   "etiqueta": null,
    "foto": "hawas-tropical.webp",
    "orden": 11
   },
@@ -327,6 +338,7 @@
    },
    "estado": "disponible",
    "existencias": 1,
+   "etiqueta": null,
    "foto": "hawas-elixir.webp",
    "orden": 12
   },
@@ -355,6 +367,7 @@
    },
    "estado": "disponible",
    "existencias": 6,
+   "etiqueta": null,
    "foto": "mandarin-sky-elixir.webp",
    "orden": 13
   },
@@ -383,6 +396,7 @@
    },
    "estado": "coming_soon",
    "existencias": null,
+   "etiqueta": null,
    "foto": "jean-lowe-vibe.webp",
    "orden": 14
   },
@@ -411,6 +425,7 @@
    },
    "estado": "disponible",
    "existencias": 5,
+   "etiqueta": null,
    "foto": "asad-bourbon.webp",
    "orden": 15
   },
@@ -439,6 +454,7 @@
    },
    "estado": "coming_soon",
    "existencias": null,
+   "etiqueta": null,
    "foto": "club-de-nuit-iconic.webp",
    "orden": 16
   },
@@ -467,6 +483,7 @@
    },
    "estado": "disponible",
    "existencias": 4,
+   "etiqueta": "top",
    "foto": "9am-pour-femme.webp",
    "orden": 1
   },
@@ -490,6 +507,7 @@
    },
    "estado": "agotado",
    "existencias": 0,
+   "etiqueta": null,
    "foto": "donna-intense.webp",
    "orden": 2
   },
@@ -517,6 +535,7 @@
    },
    "estado": "coming_soon",
    "existencias": null,
+   "etiqueta": null,
    "foto": "delilah-pour-femme.webp",
    "orden": 3
   },
@@ -544,6 +563,7 @@
    },
    "estado": "coming_soon",
    "existencias": null,
+   "etiqueta": null,
    "foto": "odyssey-candee.webp",
    "orden": 4
   },
@@ -572,6 +592,7 @@
    },
    "estado": "disponible",
    "existencias": 3,
+   "etiqueta": null,
    "foto": "yara-tous.webp",
    "orden": 5
   },
@@ -595,8 +616,33 @@
    },
    "estado": "disponible",
    "existencias": 3,
+   "etiqueta": null,
    "foto": "set-yara-4-piezas.webp",
    "orden": 6
+  },
+  {
+   "id": "D07",
+   "catalogo": "damas",
+   "nombre": "Paradise",
+   "marca": "Stallion 53",
+   "presentacion": "Incluye spray de viaje de 20 ml",
+   "notas": [],
+   "descripcion": "Tropical - frutal - dulce - encantador",
+   "precios": {
+    "detalle": {
+     "cs": 1390,
+     "usd": 38
+    },
+    "mayor": {
+     "cs": 885,
+     "usd": 24
+    }
+   },
+   "estado": "coming_soon",
+   "existencias": null,
+   "etiqueta": null,
+   "foto": "stallion53-paradise.webp",
+   "orden": 7
   }
  ]
 }
