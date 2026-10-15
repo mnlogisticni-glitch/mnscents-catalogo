@@ -147,6 +147,15 @@ export async function convertir(texto, { comprobarFotos = true } = {}) {
     }
     const estadoFinal = existencias === 0 && est === 'disponible' ? 'agotado' : est;
 
+    // Etiqueta (columna opcional): Nuevo o Más vendido
+    let etiqueta = null;
+    if ('etiqueta' in col && g('etiqueta') !== '') {
+      const k = clave(g('etiqueta'));
+      if (k === 'nuevo' || k === 'nueva') etiqueta = 'nuevo';
+      else if (['mas_vendido', 'mas_vendida', 'destacado', 'top', 'mas_vendidos'].includes(k)) etiqueta = 'top';
+      else avisos.push(`${pref}: etiqueta "${g('etiqueta')}" no reconocida (usa Nuevo o Más vendido). Se publica sin etiqueta.`);
+    }
+
     let foto = g('foto') || null;
     if (foto && comprobarFotos) {
       try { await access(path.join(CARPETA_FOTOS, foto)); }
@@ -157,7 +166,7 @@ export async function convertir(texto, { comprobarFotos = true } = {}) {
     if (mostrar !== false) productos.push({
       id, catalogo, nombre, marca: g('marca'), presentacion: g('presentacion'),
       notas: g('notas').split(/\s*[·•|\-]\s*/).filter(Boolean),
-      descripcion: g('descripcion'), precios, estado: estadoFinal, existencias, foto, orden,
+      descripcion: g('descripcion'), precios, estado: estadoFinal, existencias, etiqueta, foto, orden,
     });
   }
   productos.sort((a, b) => a.catalogo.localeCompare(b.catalogo) || a.orden - b.orden || a.nombre.localeCompare(b.nombre));

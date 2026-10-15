@@ -115,5 +115,17 @@ prueba('Existencias inválidas se rechazan', () => assert.ok(r6.errores.some(e =
 const r7 = await convertir(cab + 'X1,Damas,P,M,,,,1390,38,905,24.55,Disponible,,Sí,1\n', { comprobarFotos: false });
 prueba('La columna existencias es opcional', () => { assert.equal(r7.errores.length, 0); assert.equal(r7.productos[0].existencias, null); });
 
+console.log('\nEtiquetas');
+const cabT = cab.trim() + ',existencias,etiqueta\n';
+const r8 = await convertir(cabT + 'X1,Damas,P,M,,,,1390,38,905,24.55,Disponible,,Sí,1,,Más vendido\nX2,Damas,Q,M,,,,1390,38,905,24.55,Disponible,,Sí,2,,nuevo\nX3,Damas,R,M,,,,1390,38,905,24.55,Disponible,,Sí,3,,oferta\n', { comprobarFotos: false });
+prueba('Más vendido / Nuevo se reconocen; otra palabra solo avisa', () => {
+  assert.equal(r8.errores.length, 0);
+  assert.deepEqual(r8.productos.map(p => p.etiqueta), ['top', 'nuevo', null]);
+  assert.ok(r8.avisos.some(a => a.includes('oferta')));
+});
+prueba('Los más vendidos del dueño están marcados', () => {
+  assert.deepEqual(datos.productos.filter(p => p.etiqueta === 'top').map(p => p.id).sort(), ['D01', 'H01', 'H10']);
+});
+
 console.log(`\n${ok} pruebas correctas, ${fallos} fallidas.`);
 process.exit(fallos ? 1 : 0);

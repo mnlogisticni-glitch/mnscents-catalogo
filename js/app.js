@@ -14,7 +14,8 @@ const estado = {
   filtros: { estado: 'todos', marcas: new Set(), precio: 'todos', orden: 'recomendado' },
   carrito: cargarCarrito(),
   nivelPrevio: null,
-  ajustados: new Set(),   // productos cuya cantidad se redujo por existencias
+  ajustados: new Set(),
+  aroma: null,            // nota olfativa elegida en los chips   // productos cuya cantidad se redujo por existencias
 };
 
 // ---------- utilidades ----------
@@ -62,7 +63,7 @@ function casi(a, b) {
 }
 function coincide(p, q) {
   if (!q) return true;
-  const texto = norm(`${p.nombre} ${p.marca} ${p.notas.join(' ')}`);
+  const texto = norm(`${p.nombre} ${p.marca} ${p.notas.join(' ')} ${p.descripcion || ''} ${p.presentacion || ''}`);
   const palabras = texto.split(' ');
   return norm(q).split(' ').filter(Boolean).every(t =>
     texto.includes(t) || (t.length >= 4 && palabras.some(w => casi(t, w.slice(0, t.length + 1)) || casi(t, w))));
@@ -83,6 +84,9 @@ const ORDENES = [
   { id: 'precio-desc', txt: 'Precio: mayor a menor' }, { id: 'nombre', txt: 'Nombre A–Z' },
 ];
 const pesoEstado = { disponible: 0, coming_soon: 1, agotado: 2 };
+const pesoEtiqueta = p => (p.etiqueta === 'top' ? 0 : p.etiqueta === 'nuevo' ? 1 : 2);
+const etiquetaMarca = p => (p.etiqueta === 'top' ? '<span class="etq top">Más vendido</span>'
+  : p.etiqueta === 'nuevo' ? '<span class="etq nuevo">Nuevo</span>' : '');
 
 function filtrar(cat, conBusqueda = true) {
   const f = estado.filtros;
@@ -91,13 +95,14 @@ function filtrar(cat, conBusqueda = true) {
     && (f.estado === 'todos' || p.estado === f.estado)
     && (!f.marcas.size || f.marcas.has(p.marca))
     && rango.ok(p)
+    && (!estado.aroma || p.notas.some(n => norm(n) === estado.aroma))
     && (!conBusqueda || coincide(p, estado.q)));
   const o = f.orden;
   lista = lista.slice().sort((a, b) =>
     o === 'precio-asc' ? a.precios.detalle.cs - b.precios.detalle.cs
     : o === 'precio-desc' ? b.precios.detalle.cs - a.precios.detalle.cs
     : o === 'nombre' ? a.nombre.localeCompare(b.nombre, 'es')
-    : (pesoEstado[a.estado] - pesoEstado[b.estado]) || a.orden - b.orden);
+    : (pesoEstado[a.estado] - pesoEstado[b.estado]) || (pesoEtiqueta(a) - pesoEtiqueta(b)) || a.orden - b.orden);
   return lista;
 }
 
@@ -129,7 +134,7 @@ function tarjeta(p, nivel) {
   const pr = p.precios;
   return `<article class="tarjeta${esComprable(p) ? '' : ' no-disp'}" data-id="${esc(p.id)}">
     <button class="t-abrir" type="button" data-accion="ficha" data-id="${esc(p.id)}" aria-label="Ver detalles de ${esc(p.nombre)}">
-      <div class="t-foto">${etiquetaEstado(p)}${foto(p)}</div>
+      <div class="t-foto">${etiquetaEstado(p)}${etiquetaMarca(p)}${foto(p)}</div>
       <div class="t-info">
         <span class="t-marca">${esc(p.marca)}</span>
         <h3 class="t-nombre">${esc(p.nombre)}</h3>
@@ -175,7 +180,7 @@ function actualizarControlesTarjetas() {
 }
 
 // ---------- pestañas ----------
-function ponerCat(cat, { foco = false } = {}) {
+function ponerCat(cat, { foco = false, conHash = true } = {}) {
   if (cat !== 'caballeros' && cat !== 'damas') cat = 'caballeros';
   estado.cat = cat;
   $('.segmento').dataset.activo = cat;
@@ -184,9 +189,25 @@ function ponerCat(cat, { foco = false } = {}) {
     t.setAttribute('aria-selected', sel); t.tabIndex = sel ? 0 : -1;
     if (sel && foco) t.focus();
   }
-  if (location.hash.slice(1) !== cat) history.replaceState(null, '', `#${cat}`);
+  if (conHash && location.hash.slice(1) !== cat) history.replaceState(null, '', `#${cat}`);
   pintarMarcas();
+  pintarAromas();
   pintarCatalogo();
+}
+
+// ---------- chips de aroma (salen de las notas de la hoja) ----------
+const capital = t => t.charAt(0).toUpperCase() + t.slice(1);
+function pintarAromas() {
+  const cuenta = new Map();
+  for (const p of estado.productos) if (p.catalogo === estado.cat)
+    for (const n of p.notas) { const k = norm(n); const v = cuenta.get(k) || { txt: n, c: 0 }; v.c++; cuenta.set(k, v); }
+  const top = [...cuenta.entries()].filter(([, v]) => v.c >= 2).sort((a, b) => b[1].c - a[1].c).slice(0, 8);
+  if (estado.aroma && !cuenta.has(estado.aroma)) estado.aroma = null;
+  const caja = $('.aromas');
+  caja.hidden = top.length < 2;
+  caja.innerHTML = `<span class="aromas-titulo">Aroma</span>`
+    + [['', { txt: 'Todos' }], ...top].map(([k, v]) =>
+      `<button type="button" class="aroma" data-accion="aroma" data-aroma="${esc(k)}" aria-pressed="${(estado.aroma || '') === k}">${esc(capital(v.txt))}</button>`).join('');
 }
 
 // ---------- filtros ----------
@@ -262,11 +283,12 @@ function abrirFicha(id) {
   fichaMax = Math.max(0, maxP - enCarrito);
   const d = $('#hoja-ficha');
   d.querySelector('.hoja-cuerpo').innerHTML = `
-    <div class="ficha-foto">${etiquetaEstado(p)}${foto(p).replace('loading="lazy"', 'loading="eager"')}
+    <div class="ficha-foto">${etiquetaEstado(p)}${etiquetaMarca(p)}${foto(p).replace('loading="lazy"', 'loading="eager"')}
       <button class="btn-ico cerrar" type="button" aria-label="Cerrar">${ico('close')}</button></div>
     <div class="ficha-info">
       <span class="ficha-marca">${esc(p.marca)}</span>
       <h2 id="ficha-nombre">${esc(p.nombre)}</h2>
+      <button class="btn-compartir" type="button" data-accion="compartir" data-id="${esc(p.id)}">${ico('share')}Compartir este perfume</button>
       ${p.presentacion ? `<p class="ficha-pres">${esc(p.presentacion)}</p>` : ''}
       ${p.descripcion ? `<p class="ficha-desc">${esc(p.descripcion)}</p>` : ''}
       ${p.notas.length ? `<ul class="notas" aria-label="Notas">${p.notas.map(n => `<li>${esc(n)}</li>`).join('')}</ul>` : ''}
@@ -294,7 +316,23 @@ function abrirFicha(id) {
   `;
   abrir(d);
   d.querySelector('.hoja-cuerpo').scrollTop = 0;
+  history.replaceState(null, '', `#p-${p.id}`);
 }
+
+// Compartir: menú nativo del teléfono si existe; si no, WhatsApp
+async function compartir(id) {
+  const p = estado.porId.get(id); if (!p) return;
+  const url = `${location.origin}${location.pathname}#p-${encodeURIComponent(p.id)}`;
+  const texto = `${p.nombre}${p.marca ? ' de ' + p.marca : ''} en MN Scents: ${fmtCS(p.precios.detalle.cs)} (${fmtUSD(p.precios.detalle.usd)})`;
+  if (navigator.share) {
+    try { await navigator.share({ title: `${p.nombre} · MN Scents`, text: texto, url }); return; }
+    catch (e) { if (e && e.name === 'AbortError') return; }
+  }
+  window.open(`https://wa.me/?text=${encodeURIComponent(texto + '\n' + url)}`, '_blank', 'noopener');
+}
+$('#hoja-ficha').addEventListener('close', () => {
+  if (location.hash.startsWith('#p-')) history.replaceState(null, '', `#${estado.cat}`);
+});
 
 // ---------- pedido ----------
 // Dibuja la fase de la luna: p=0 nueva, p=1 llena (creciente desde la derecha)
@@ -467,8 +505,15 @@ document.addEventListener('click', e => {
       pintarFiltrosFijos(); pintarMarcas();
       break;
     case 'aplicar-filtros': leerFiltros(); pintarChips(); pintarCatalogo(); cerrar($('#hoja-filtros')); break;
+    case 'aroma':
+      estado.aroma = b.dataset.aroma || null;
+      for (const c of $$('.aroma')) c.setAttribute('aria-pressed', c === b);
+      pintarCatalogo();
+      break;
+    case 'compartir': compartir(id); break;
     case 'limpiar-todo':
       estado.q = ''; $('#q').value = ''; $('.limpiar-q').hidden = true;
+      estado.aroma = null; pintarAromas();
       estado.filtros = { estado: 'todos', marcas: new Set(), precio: 'todos', orden: 'recomendado' };
       pintarFiltrosFijos(); pintarMarcas(); pintarCatalogo();
       break;
@@ -522,7 +567,15 @@ $('.limpiar-q').addEventListener('click', () => {
   const q = $('#q'); q.value = ''; estado.q = ''; $('.limpiar-q').hidden = true; pintarCatalogo(); q.focus();
 });
 
-window.addEventListener('hashchange', () => { const c = location.hash.slice(1); if (c && c !== estado.cat) ponerCat(c); });
+function irAHash() {
+  const h = decodeURIComponent(location.hash.slice(1));
+  if (h.startsWith('p-')) {
+    const p = estado.porId.get(h.slice(2));
+    if (p) { if (p.catalogo !== estado.cat || !$('.tarjeta')) ponerCat(p.catalogo, { conHash: false }); abrirFicha(p.id); return true; }
+  } else if (h && h !== estado.cat) { ponerCat(h); return true; }
+  return false;
+}
+window.addEventListener('hashchange', irAHash);
 // borde de la barra superior al desplazar
 const centinela = $('.cielo');
 new IntersectionObserver(([en]) => $('.barra-sup').classList.toggle('con-borde', !en.isIntersecting), { rootMargin: '-64px 0px 0px 0px' }).observe(centinela);
@@ -548,7 +601,7 @@ async function iniciar() {
     }
     pintarFiltrosFijos();
     pintarPedido();   // primero: ajusta un pedido guardado a las existencias actuales
-    ponerCat(location.hash.slice(1) || 'caballeros');
+    if (!irAHash()) ponerCat(estado.cat || 'caballeros');
   } catch {
     rej.setAttribute('aria-busy', 'false');
     rej.innerHTML = `<div class="error-carga"><h3>No pudimos cargar el catálogo</h3><p>Revisa tu conexión a internet e intenta de nuevo.</p>
@@ -557,3 +610,38 @@ async function iniciar() {
   }
 }
 iniciar();
+
+// ---------- tienda: abierto o cerrado ahora (hora de Nicaragua) ----------
+const HORARIO = { 1: [9, 19], 2: [9, 19], 3: [9, 19], 4: [9, 19], 5: [9, 19], 6: [9, 15] }; // 0 = domingo, cerrado
+function pintarAbierto() {
+  const el = $('.abierto'); if (!el) return;
+  let dia, hora;
+  try {
+    const partes = new Intl.DateTimeFormat('en-US', { timeZone: 'America/Managua', weekday: 'short', hour: 'numeric', minute: 'numeric', hour12: false }).formatToParts(new Date());
+    const v = t => partes.find(x => x.type === t)?.value;
+    dia = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].indexOf(v('weekday'));
+    hora = (Number(v('hour')) % 24) + Number(v('minute')) / 60;
+  } catch { el.textContent = ''; return; }
+  const h = HORARIO[dia];
+  const abierto = h && hora >= h[0] && hora < h[1];
+  el.className = 'abierto ' + (abierto ? 'si' : 'no');
+  el.textContent = abierto ? `Abierto ahora · cierra a las ${h[1] - 12}:00 p. m.` : 'Cerrado ahora';
+}
+pintarAbierto();
+setInterval(pintarAbierto, 60000);
+
+// ---------- app instalable ----------
+if ('serviceWorker' in navigator && location.protocol === 'https:') {
+  window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+}
+let avisoInstalar = null;
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault(); avisoInstalar = e; $('.btn-instalar').hidden = false;
+});
+$('.btn-instalar').addEventListener('click', async () => {
+  if (!avisoInstalar) return;
+  avisoInstalar.prompt();
+  try { await avisoInstalar.userChoice; } catch {}
+  avisoInstalar = null; $('.btn-instalar').hidden = true;
+});
+window.addEventListener('appinstalled', () => { $('.btn-instalar').hidden = true; });

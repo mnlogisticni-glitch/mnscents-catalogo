@@ -302,6 +302,58 @@ main { outline: none; }
 .cond-lista h3 { font: 700 15px/1.3 var(--texto); margin: 2px 0 4px; }
 .cond-lista p { color: var(--tinta-2); font-size: 14px; max-width: 60ch; }
 
+/* ---------- Aromas ---------- */
+.aromas { display: flex; align-items: center; gap: 6px; overflow-x: auto; scrollbar-width: none; margin: 12px 0 0; padding: 0 var(--pad); }
+.aromas::-webkit-scrollbar { display: none; }
+.aromas-titulo { flex: none; font: 500 11px/1 var(--display); letter-spacing: 0.08em; text-transform: uppercase; color: var(--tinta-3); margin-right: 2px; }
+.aroma { flex: none; height: 34px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--linea); background: var(--noche-2); color: var(--tinta-2); font-size: 13.5px; cursor: pointer; transition: background-color 160ms, color 160ms, border-color 160ms, transform 120ms var(--ease); }
+.aroma:active { transform: scale(0.96); }
+.aroma[aria-pressed="true"] { background: var(--lila); border-color: var(--lila); color: var(--noche-0); font-weight: 700; }
+
+/* ---------- Etiquetas de marca ---------- */
+.etq { position: absolute; z-index: 2; right: 10px; top: 10px; padding: 5px 9px; border-radius: 999px; font: 700 10.5px/1 var(--display); letter-spacing: 0.06em; text-transform: uppercase; }
+.etq.top { background: var(--oro); color: #2a1c08; }
+.etq.nuevo { background: var(--luna); color: var(--noche-0); }
+.ficha-foto .etq { right: 64px; top: 20px; }
+@media (max-width: 400px) { .tarjeta .estado ~ .etq { top: 38px; } }
+
+/* ---------- Compartir ---------- */
+.btn-compartir { justify-self: start; display: inline-flex; align-items: center; gap: 6px; min-height: 40px; margin-top: 4px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--linea); background: var(--noche-2); color: var(--tinta); font-size: 14px; font-weight: 500; cursor: pointer; transition: transform 120ms var(--ease); }
+.btn-compartir .ico { width: 18px; height: 18px; color: var(--lila); }
+.btn-compartir:active { transform: scale(0.97); }
+
+/* ---------- Fidelidad ---------- */
+.fidelidad { margin: 20px var(--pad) 0; padding: 26px 20px; border-radius: var(--r-l); border: 1px solid rgb(242 211 138 / 0.35); background: linear-gradient(150deg, #2c1f2a, var(--noche-2) 60%); display: grid; gap: 20px; }
+.fidelidad h2 { font: 700 21px/1.2 var(--display); margin-bottom: 10px; }
+.fid-texto p { color: var(--tinta-2); font-size: 15px; max-width: 46ch; }
+.fid-texto strong { color: var(--tinta); }
+.fid-regalo { margin-top: 8px; }
+.fid-regalo strong { color: var(--oro) !important; }
+.sellos { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; max-width: 340px; }
+.sellos li { aspect-ratio: 1; border-radius: 50%; border: 1.5px dashed rgb(242 211 138 / 0.45); display: grid; place-items: center; }
+.sellos li.regalo { border: 0; background: radial-gradient(circle at 38% 36%, #fff6dc, var(--oro) 70%); }
+.sellos li.premio { border: 1.5px solid var(--oro); background: var(--oro-fondo); color: var(--oro); }
+.sellos .ico { width: 55%; height: 55%; }
+
+/* ---------- Tienda ---------- */
+.tienda { margin: 20px var(--pad) 0; padding: 26px 20px; border-radius: var(--r-l); border: 1px solid var(--linea-suave); background: var(--noche-2); }
+.tienda h2 { font: 700 21px/1.2 var(--display); margin-bottom: 18px; }
+.tienda-grid { display: grid; gap: 22px; }
+.tienda h3 { font: 700 13px/1 var(--display); letter-spacing: 0.06em; text-transform: uppercase; color: var(--tinta-3); margin-bottom: 10px; }
+.tienda p { color: var(--tinta-2); font-size: 15px; }
+.tienda .btn { margin-top: 14px; }
+.horario { margin: 0; display: grid; gap: 6px; }
+.horario div { display: flex; justify-content: space-between; gap: 12px; font-size: 15px; border-bottom: 1px solid var(--linea-suave); padding-bottom: 6px; }
+.horario dt { color: var(--tinta-2); }
+.horario dd { margin: 0; color: var(--tinta); font-variant-numeric: tabular-nums; }
+.abierto { margin-top: 12px !important; font-size: 14px !important; font-weight: 700; }
+.abierto:empty { display: none; }
+.abierto.si { color: #9be7b4 !important; }
+.abierto.no { color: var(--rosa) !important; }
+.abierto::before { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: currentColor; margin-right: 8px; vertical-align: 1px; }
+
+.btn-instalar { margin-top: 4px; }
+
 /* ---------- Pie ---------- */
 .pie { padding: 36px var(--pad) 28px; display: grid; justify-items: center; gap: 16px; text-align: center; }
 .pie img { width: 56px; opacity: 0.9; }
@@ -514,6 +566,10 @@ label.opcion input:focus-visible + span { outline: 2px solid var(--lila); outlin
   .condiciones { margin-left: var(--pad); margin-right: var(--pad); padding: 36px 40px; }
   .cond-lista { grid-template-columns: repeat(4, 1fr); gap: 28px; }
   .cond-lista li { grid-template-columns: 1fr; }
+  .fidelidad { margin-left: var(--pad); margin-right: var(--pad); padding: 36px 40px; grid-template-columns: 1fr auto; align-items: center; gap: 40px; }
+  .sellos { width: 340px; }
+  .tienda { margin-left: var(--pad); margin-right: var(--pad); padding: 36px 40px; }
+  .tienda-grid { grid-template-columns: 1fr 1fr; gap: 40px; }
   .bp-boton { max-width: 560px; }
   dialog.hoja { inset: 0 0 0 auto; margin: 0; max-width: 460px; height: 100dvh; max-height: 100dvh; border-radius: var(--r-l) 0 0 var(--r-l); border-bottom: 1px solid var(--linea); }
   dialog.hoja[open] { animation-name: entrar-lado; }
@@ -536,7 +592,8 @@ label.opcion input:focus-visible + span { outline: 2px solid var(--lila); outlin
 @media (hover: hover) and (pointer: fine) {
   .t-abrir:hover .t-foto img { transform: translateY(-4px) scale(1.02); }
   .btn-agregar:not(:disabled):hover { background: var(--lila); color: var(--noche-0); }
-  .btn-ico:hover, .btn-filtros:hover, .redes a:hover { border-color: var(--lila); }
+  .btn-ico:hover, .btn-filtros:hover, .redes a:hover, .btn-compartir:hover { border-color: var(--lila); }
+  .aroma:not([aria-pressed="true"]):hover { border-color: var(--lila); color: var(--tinta); }
   .btn.pri:hover { background: #d3b8ff; }
   .btn.sec:hover { border-color: var(--lila); }
   .bp-boton:hover { border-color: var(--lila); }
