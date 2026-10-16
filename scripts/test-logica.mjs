@@ -130,6 +130,36 @@ prueba('Más vendido / Nuevo se reconocen; otra palabra solo avisa', () => {
   assert.deepEqual(r8.productos.map(p => p.etiqueta), ['top', 'nuevo', null]);
   assert.ok(r8.avisos.some(a => a.includes('oferta')));
 });
+// ---------- Comparar ----------
+const { comparar, candidatos, leerComparar } = await import('../js/comparar.js');
+prueba('Comparar: notas en común y precio más económico salen de la hoja', () => {
+  const a = cat.get('H10'), b = cat.get('H09');   // Hawas Ice y 9AM Dive
+  const c = comparar(a, b);
+  for (const n of c.comunes) assert.ok(a.notas.includes(n) && b.notas.some(x => x.toLowerCase() === n.toLowerCase()));
+  assert.equal(c.difDetalleCS, Math.abs(a.precios.detalle.cs - b.precios.detalle.cs));
+  const barato = a.precios.detalle.cs < b.precios.detalle.cs ? 'H10' : b.precios.detalle.cs < a.precios.detalle.cs ? 'H09' : null;
+  assert.equal(c.masBaratoDetalle, barato);
+  assert.equal(c.comunes.length + c.soloA.length, a.notas.length);
+});
+prueba('Comparar: mismo precio no marca a ninguno como más económico', () => {
+  const a = { id: 'A', notas: [], precios: { detalle: { cs: 100 }, mayor: { cs: 80 } } };
+  const b = { id: 'B', notas: [], precios: { detalle: { cs: 100 }, mayor: { cs: 70 } } };
+  const c = comparar(a, b);
+  assert.equal(c.masBaratoDetalle, null); assert.equal(c.masBaratoMayor, 'B');
+});
+prueba('Comparar: candidatos excluyen el elegido y empiezan por su catálogo', () => {
+  const a = cat.get('H10'); const l = candidatos(datos.productos, a);
+  assert.ok(!l.some(p => p.id === 'H10'));
+  assert.equal(l.length, datos.productos.length - 1);
+  assert.equal(l[0].catalogo, 'caballeros');
+});
+prueba('Comparar: el enlace se lee sin confiar en él', () => {
+  assert.deepEqual(leerComparar('H10,H09'), ['H10', 'H09']);
+  assert.deepEqual(leerComparar('H10,H10'), ['H10']);
+  assert.deepEqual(leerComparar('<img>,H09,D01'), ['H09']);
+  assert.deepEqual(leerComparar('../x,'), []);
+});
+
 // ---------- Verificación del pedido ----------
 const { leerPedidoEnlace, enlaceVerificacion } = await import('../js/precios.js');
 prueba('Verificación: el mensaje incluye el enlace con códigos y cantidades', () => {

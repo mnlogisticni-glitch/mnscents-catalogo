@@ -2,6 +2,7 @@
 import { calcular, mensajeWhatsApp, enlaceWhatsApp, fmtCS, fmtUSD, esComprable, maxPedido, UMBRAL_MAYOREO, leerPedidoEnlace } from './precios.js';
 import { PREGUNTAS, recomendar, opcionesAroma, perfil } from './recomendar.js';
 import { imagenPerfil } from './tarjeta-perfil.js';
+import { comparar, candidatos, leerComparar } from './comparar.js';
 
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
@@ -19,6 +20,7 @@ const estado = {
   ajustados: new Set(),
   aroma: null,            // nota olfativa elegida en los chips
   quiz: { paso: 0, r: {}, dir: 'adelante' },  // "Encuentra tu perfume"
+  comparar: { a: null, b: null, q: '' },  // comparar dos perfumes
   cajaVista: 0,           // frascos que el cliente ya vio en su caja (para animar solo los nuevos)
 };
 
@@ -177,9 +179,10 @@ function pintarCatalogo() {
 }
 
 function actualizarControlesTarjetas() {
-  for (const art of $$('.tarjeta, .rec')) {
+  for (const art of $$('.tarjeta, .rec, .cmp-col')) {
     const p = estado.porId.get(art.dataset.id);
-    if (p) art.querySelector('.t-accion').innerHTML = controlAgregar(p);
+    const accion = art.querySelector('.t-accion');   // la cabecera de la comparación no tiene botón
+    if (p && accion) accion.innerHTML = controlAgregar(p);
   }
 }
 
@@ -292,7 +295,10 @@ function abrirFicha(id) {
     <div class="ficha-info">
       <span class="ficha-marca">${esc(p.marca)}</span>
       <h2 id="ficha-nombre">${esc(p.nombre)}</h2>
-      <button class="btn-compartir" type="button" data-accion="compartir" data-id="${esc(p.id)}">${ico('share')}Compartir este perfume</button>
+      <div class="ficha-botones">
+        <button class="btn-compartir" type="button" data-accion="compartir" data-id="${esc(p.id)}">${ico('share')}Compartir</button>
+        <button class="btn-compartir" type="button" data-accion="cmp-abrir" data-id="${esc(p.id)}">${ico('comparar')}Comparar</button>
+      </div>
       ${p.presentacion ? `<p class="ficha-pres">${esc(p.presentacion)}</p>` : ''}
       ${p.descripcion ? `<p class="ficha-desc">${esc(p.descripcion)}</p>` : ''}
       ${p.notas.length ? `<ul class="notas" aria-label="Notas">${p.notas.map(n => `<li>${esc(n)}</li>`).join('')}</ul>` : ''}
@@ -494,6 +500,110 @@ function pintarSugeridos(ped, h) {
     </li>`).join('');
 }
 
+// ---------- Comparar dos perfumes ----------
+function abrirComparar(a, b = null) {
+  if (!estado.porId.has(a)) return;
+  estado.comparar = { a, b: b && b !== a && estado.porId.has(b) ? b : null, q: '' };
+  for (const d of ['#hoja-ficha', '#hoja-quiz']) if ($(d).open) cerrar($(d));
+  pintarComparar();
+  abrir($('#hoja-comparar'));
+}
+function filaCandidato(p) {
+  return `<li><button class="cmp-opcion" type="button" data-accion="cmp-elegir" data-id="${esc(p.id)}">
+      <span class="cmp-mini">${p.foto ? `<img src="${FOTOS}${esc(p.foto)}" alt="" loading="lazy" width="56" height="56">` : ''}</span>
+      <span class="cmp-op-texto"><b>${esc(p.nombre)}</b><span>${esc(p.marca)}${p.notas.length ? ' · ' + esc(p.notas.slice(0, 3).join(' · ')) : ''}</span></span>
+      <span class="cmp-op-precio">${fmtCS(p.precios.detalle.cs)}</span>
+    </button></li>`;
+}
+function pintarCandidatos() {
+  const { a, q } = estado.comparar;
+  const pa = estado.porId.get(a);
+  const lista = candidatos(estado.productos, pa).filter(p => coincide(p, q));
+  $('.cmp-lista').innerHTML = lista.length ? lista.map(filaCandidato).join('')
+    : `<li class="cmp-vacio">No encontramos perfumes para “${esc(q)}”.</li>`;
+}
+function disponibilidad(p) {
+  if (p.estado === 'coming_soon') return '<span class="cmp-estado coming">Coming soon</span>';
+  if (p.estado === 'agotado' || p.existencias === 0) return '<span class="cmp-estado agotado">Agotado</span>';
+  if (Number.isInteger(p.existencias) && p.existencias <= 3) return `<span class="cmp-estado pocas">${p.existencias === 1 ? 'Última unidad' : `Quedan ${p.existencias}`}</span>`;
+  return '<span class="cmp-estado si">Disponible</span>';
+}
+function pintarComparar({ foco = false } = {}) {
+  const { a, b } = estado.comparar;
+  const pa = estado.porId.get(a), pb = b ? estado.porId.get(b) : null;
+  const caja = $('#hoja-comparar .comparar');
+  if (!pb) {
+    caja.innerHTML = `<div class="cmp-elegido">
+        <span class="cmp-mini">${pa.foto ? `<img src="${FOTOS}${esc(pa.foto)}" alt="" width="56" height="56">` : ''}</span>
+        <span class="cmp-op-texto"><span>Comparar</span><b>${esc(pa.nombre)}</b></span>
+      </div>
+      <h3 class="cmp-pregunta" tabindex="-1">¿Con cuál lo comparas?</h3>
+      <label class="campo-buscar cmp-buscar"><svg class="ico" aria-hidden="true"><use href="#i-search"/></svg>
+        <span class="sr">Buscar perfume para comparar</span>
+        <input id="cmp-q" type="search" placeholder="Buscar perfume o marca" autocomplete="off" autocapitalize="none" spellcheck="false" enterkeyhint="search" value="${esc(estado.comparar.q)}">
+      </label>
+      <ul class="cmp-lista" aria-label="Perfumes para comparar"></ul>`;
+    pintarCandidatos();
+    $('#cmp-q').addEventListener('input', e => { estado.comparar.q = e.target.value.trim(); pintarCandidatos(); });
+    if (location.hash.startsWith('#comparar=')) history.replaceState(null, '', `#comparar=${encodeURIComponent(a)}`);
+  } else {
+    const c = comparar(pa, pb);
+    const comunes = new Set(c.comunes.map(n => n.toLowerCase()));
+    const col = (p, segundo) => `<div class="cmp-col" data-id="${esc(p.id)}">
+        <button class="cmp-foto" type="button" data-accion="ficha" data-id="${esc(p.id)}" aria-label="Ver detalles de ${esc(p.nombre)}">
+          ${p.foto ? `<img src="${FOTOS}${esc(p.foto)}" alt="" width="200" height="200">` : `<span class="sin-foto">${esc(p.nombre)}</span>`}</button>
+        <span class="cmp-marca">${esc(p.marca)}</span>
+        <span class="cmp-nombre">${esc(p.nombre)}</span>
+        ${segundo ? `<button class="btn-texto cmp-cambiar" type="button" data-accion="cmp-cambiar">Cambiar</button>` : ''}
+      </div>`;
+    const celda = (p, contenido) => `<div class="cmp-celda">${contenido(p)}</div>`;
+    const fila = (titulo, contenido, clase = '') => `<div class="cmp-fila ${clase}"><span class="cmp-etq">${titulo}</span>${celda(pa, contenido)}${celda(pb, contenido)}</div>`;
+    const precio = nivel => p => {
+      const mejor = (nivel === 'detalle' ? c.masBaratoDetalle : c.masBaratoMayor) === p.id;
+      return `<b>${fmtCS(p.precios[nivel].cs)}</b><small>${fmtUSD(p.precios[nivel].usd)}</small>${mejor ? '<span class="cmp-mejor">Más económico</span>' : ''}`;
+    };
+    const notas = p => p.notas.length
+      ? `<ul class="cmp-notas">${p.notas.map(n => `<li class="${comunes.has(n.toLowerCase()) ? 'comun' : ''}">${esc(n)}</li>`).join('')}</ul>`
+      : '<span class="cmp-nada">Sin notas registradas</span>';
+    const resumen = [
+      c.comunes.length ? `Tienen en común: <b>${esc(c.comunes.join(' · ').toLowerCase())}</b>.` : 'No comparten notas: son estilos distintos.',
+      c.difDetalleCS ? `Al detalle, ${esc(estado.porId.get(c.masBaratoDetalle).nombre)} cuesta ${fmtCS(c.difDetalleCS)} menos.` : 'Tienen el mismo precio al detalle.',
+    ].join(' ');
+    caja.innerHTML = `<div class="cmp-tabla">
+        <div class="cmp-cabeza">${col(pa, false)}${col(pb, true)}</div>
+        <p class="cmp-resumen" tabindex="-1">${resumen}</p>
+        ${fila('Precio al detalle', precio('detalle'))}
+        ${fila('Precio por mayor <small>desde 6 unidades</small>', precio('mayor'), 'mayor')}
+        ${pa.presentacion || pb.presentacion ? fila('Presentación', p => p.presentacion ? esc(p.presentacion) : '<span class="cmp-nada">—</span>') : ''}
+        ${fila('Notas', notas)}
+        ${fila('Disponibilidad', disponibilidad)}
+        <div class="cmp-fila cmp-acciones">${[pa, pb].map(p => `<div class="cmp-col" data-id="${esc(p.id)}"><div class="t-accion">${controlAgregar(p)}</div></div>`).join('')}</div>
+      </div>
+      <div class="cmp-pie">
+        <button class="btn sec" type="button" data-accion="cmp-invertir">Intercambiar</button>
+        <button class="btn pri" type="button" data-accion="cmp-compartir">${ico('share')}Compartir</button>
+      </div>`;
+    history.replaceState(null, '', `#comparar=${encodeURIComponent(pa.id)},${encodeURIComponent(pb.id)}`);
+  }
+  $('#hoja-comparar .hoja-cuerpo').scrollTop = 0;
+  if (foco) requestAnimationFrame(() => $('#hoja-comparar .cmp-pregunta, #hoja-comparar .cmp-resumen')?.focus({ preventScroll: true }));
+}
+async function compartirComparacion() {
+  const { a, b } = estado.comparar;
+  const pa = estado.porId.get(a), pb = estado.porId.get(b);
+  if (!pa || !pb) return;
+  const url = `${location.origin}${location.pathname}#comparar=${encodeURIComponent(a)},${encodeURIComponent(b)}`;
+  const texto = `${pa.nombre} vs ${pb.nombre} en MN Scents`;
+  if (navigator.share) {
+    try { await navigator.share({ title: texto, text: texto, url }); return; }
+    catch (e) { if (e?.name === 'AbortError') return; }
+  }
+  window.open(`https://wa.me/?text=${encodeURIComponent(texto + '\n' + url)}`, '_blank', 'noopener');
+}
+$('#hoja-comparar').addEventListener('close', () => {
+  if (location.hash.startsWith('#comparar=')) history.replaceState(null, '', `#${estado.cat}`);
+});
+
 // ---------- Verificar un pedido recibido (enlace "#pedido=H01-2,D05-1") ----------
 // El texto de WhatsApp se puede editar; aquí los precios salen siempre del catálogo publicado.
 function abrirVerificacion(enlace) {
@@ -592,7 +702,8 @@ function pintarQuiz({ foco = false } = {}) {
       </section>
       <h4 class="recs-titulo">${hay ? (res.principales.length === 1 ? 'Tu perfume ideal' : 'Tus perfumes ideales') : 'Te ayudamos por WhatsApp'}</h4>
       ${hay
-        ? `${res.exacto ? '' : '<p class="q-nota">No hay uno exacto disponible ahora; estos son los que más se acercan.</p>'}<ol class="recs">${recs}</ol>`
+        ? `${res.exacto ? '' : '<p class="q-nota">No hay uno exacto disponible ahora; estos son los que más se acercan.</p>'}<ol class="recs">${recs}</ol>
+          ${res.principales.length >= 2 ? `<button class="btn sec q-comparar" type="button" data-accion="cmp-abrir" data-id="${esc(res.principales[0].producto.id)}" data-b="${esc(res.principales[1].producto.id)}">${ico('comparar')}Comparar los dos primeros</button>` : ''}`
         : '<p class="q-nota">Ahora mismo no tenemos disponible un perfume con ese estilo. Escríbenos y te recomendamos uno.</p>'}
       ${pronto}
       <a class="q-wa" href="${enlaceWhatsApp(textoWA)}" target="_blank" rel="noopener">${ico('chat')}¿Prefieres que te aconsejemos? Escríbenos</a>`;
@@ -724,6 +835,11 @@ document.addEventListener('click', e => {
       pintarCatalogo();
       break;
     case 'compartir': compartir(id); break;
+    case 'cmp-abrir': abrirComparar(id, b.dataset.b || null); break;
+    case 'cmp-elegir': estado.comparar.b = id; pintarComparar({ foco: true }); break;
+    case 'cmp-cambiar': estado.comparar.b = null; estado.comparar.q = ''; pintarComparar({ foco: true }); break;
+    case 'cmp-invertir': { const c = estado.comparar; [c.a, c.b] = [c.b, c.a]; pintarComparar(); break; }
+    case 'cmp-compartir': compartirComparacion(); break;
     case 'limpiar-todo':
       estado.q = ''; $('#q').value = ''; $('.limpiar-q').hidden = true;
       estado.aroma = null; pintarAromas();
@@ -783,6 +899,14 @@ $('.limpiar-q').addEventListener('click', () => {
 function irAHash() {
   let h = '';
   try { h = decodeURIComponent(location.hash.slice(1)); } catch { h = ''; }   // un enlace mal escrito no rompe la página
+  if (h.startsWith('comparar=')) {
+    const [a, b2] = leerComparar(h.slice(9));
+    if (a && estado.porId.has(a)) {
+      if (!$('.tarjeta')) ponerCat(estado.porId.get(a).catalogo, { conHash: false });
+      abrirComparar(a, estado.porId.has(b2) ? b2 : null);
+      return true;
+    }
+  }
   if (h.startsWith('pedido=')) {
     if (!$('.tarjeta')) ponerCat(estado.cat, { conHash: false });
     abrirVerificacion(h.slice(7));
