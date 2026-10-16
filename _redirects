@@ -1,0 +1,4 @@
+# Archivos internos del proyecto: no forman parte de la web (siguen en el repositorio de GitHub)
+/scripts/*    /    301
+/.github/*    /    301
+/LEEME.md     /    301

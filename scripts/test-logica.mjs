@@ -108,6 +108,13 @@ prueba('El tope cuenta para el mayoreo con las unidades reales', () => {
 });
 prueba('Sin existencias registradas no hay tope (hasta 99)', () => { const r = t([{ id: 'H03', qty: 40 }]); assert.equal(r.lineas[0].qty, 40); assert.equal(r.lineas[0].ajustada, false); });
 const cabE = cab.trim() + ',existencias\n';
+const rf = await convertir(cab + 'X1,Damas,P,M,,,,1390,38,905,24.55,Disponible,../../etc/passwd,Sí,1\nX2,Damas,Q,M,,,,1390,38,905,24.55,Disponible,"x.webp"" onerror=""alert(1)",Sí,2\nX3,Damas,R,M,,,,1390,38,905,24.55,Disponible,buena-foto.webp,Sí,3\n', { comprobarFotos: false });
+prueba('Foto: solo acepta un nombre de archivo de imagen (sin carpetas ni código)', () => {
+  assert.equal(rf.productos.find(p => p.id === 'X1').foto, null);
+  assert.equal(rf.productos.find(p => p.id === 'X2').foto, null);
+  assert.equal(rf.productos.find(p => p.id === 'X3').foto, 'buena-foto.webp');
+  assert.equal(rf.avisos.filter(a => a.includes('no es un nombre de archivo válido')).length, 2);
+});
 const r5 = await convertir(cabE + 'X1,Damas,P,M,,,,1390,38,905,24.55,Disponible,,Sí,1,0\nX2,Damas,Q,M,,,,1390,38,905,24.55,Disponible,,Sí,2,2\n', { comprobarFotos: false });
 prueba('Existencias 0 se publica como Agotado; 2 queda Disponible', () => { assert.equal(r5.errores.length, 0); assert.equal(r5.productos[0].estado, 'agotado'); assert.equal(r5.productos[1].existencias, 2); assert.equal(r5.productos[1].estado, 'disponible'); });
 const r6 = await convertir(cabE + 'X1,Damas,P,M,,,,1390,38,905,24.55,Disponible,,Sí,1,dos\n', { comprobarFotos: false });

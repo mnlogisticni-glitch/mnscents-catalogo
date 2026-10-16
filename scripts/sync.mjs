@@ -157,6 +157,10 @@ export async function convertir(texto, { comprobarFotos = true } = {}) {
     }
 
     let foto = g('foto') || null;
+    if (foto && !/^[A-Za-z0-9][A-Za-z0-9._-]*\.(webp|png|jpe?g|avif)$/i.test(foto)) {
+      avisos.push(`${pref}: la foto "${foto}" no es un nombre de archivo válido (ej.: mi-perfume.webp). Se mostrará sin foto.`);
+      foto = null;
+    }
     if (foto && comprobarFotos) {
       try { await access(path.join(CARPETA_FOTOS, foto)); }
       catch { avisos.push(`${pref}: no encontré la foto "${foto}" en img/productos. Se mostrará sin foto.`); foto = null; }

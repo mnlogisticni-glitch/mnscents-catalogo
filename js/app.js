@@ -751,7 +751,8 @@ $('.limpiar-q').addEventListener('click', () => {
 });
 
 function irAHash() {
-  const h = decodeURIComponent(location.hash.slice(1));
+  let h = '';
+  try { h = decodeURIComponent(location.hash.slice(1)); } catch { h = ''; }   // un enlace mal escrito no rompe la página
   if (h === 'encuentra') {
     if (!$('.tarjeta')) ponerCat(estado.cat, { conHash: false });
     if (!$('#hoja-quiz').open) abrirQuiz();

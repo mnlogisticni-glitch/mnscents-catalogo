@@ -742,3 +742,10 @@ label.opcion input:focus-visible + span { outline: 2px solid var(--lila); outlin
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 1ms !important; animation-iteration-count: 1 !important; transition-duration: 1ms !important; }
 }
+
+/* ---------- Página 404 ---------- */
+.pagina-404 { padding-bottom: 0; }
+.no-existe { min-height: 100svh; display: grid; place-content: center; justify-items: center; gap: 14px; padding: 32px var(--pad); text-align: center; }
+.no-existe h1 { font: 700 24px/1.2 var(--display); }
+.no-existe p { color: var(--tinta-2); max-width: 34ch; }
+.no-existe .btn { margin-top: 8px; }
