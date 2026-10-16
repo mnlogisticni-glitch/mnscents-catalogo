@@ -4,17 +4,21 @@ S=sys.argv[1]; URL='http://localhost:8765/'
 res=[]; errs=[]
 def ok(n,c,extra=''):
     res.append((n,bool(c))); print(('  ✓ ' if c else '  ✗ ')+n+(' '+str(extra) if not c and extra else ''))
+D=json.load(open('data/productos.json'))['productos']
+NC=sum(1 for x in D if x['catalogo']=='caballeros'); ND=sum(1 for x in D if x['catalogo']=='damas')
+CS=sum(1 for x in D if x['catalogo']=='caballeros' and x['estado']=='coming_soon'); AG=sum(1 for x in D if x['catalogo']=='caballeros' and x['estado']=='agotado')
+NODISP=sum(1 for x in D if x['catalogo']=='caballeros' and not (x['estado']=='disponible' and x.get('existencias')!=0))
 with sync_playwright() as p:
     b=p.chromium.launch()
     ctx=b.new_context(viewport={'width':390,'height':844}, device_scale_factor=2, is_mobile=True, has_touch=True)
     pg=ctx.new_page(); pg.on('console', lambda m: m.type=='error' and errs.append(m.text)); pg.on('pageerror', lambda e: errs.append(str(e)))
     pg.goto(URL); pg.wait_for_selector('.tarjeta')
     pg.screenshot(path=f'{S}/shots/m1-inicio.png')
-    ok('Caballeros muestra 16', pg.locator('.tarjeta').count()==16)
-    ok('Coming soon y Agotado visibles', pg.locator('.estado.coming').count()==4 and pg.locator('.estado.agotado').count()==1)
-    ok('Botones de no disponibles desactivados', pg.locator('.tarjeta.no-disp .btn-agregar:disabled').count()==5)
+    ok(f'Caballeros muestra {NC}', pg.locator('.tarjeta').count()==NC)
+    ok('Coming soon y Agotado visibles', pg.locator('.estado.coming').count()==CS and pg.locator('.estado.agotado').count()==AG)
+    ok('Botones de no disponibles desactivados', pg.locator('.tarjeta.no-disp .btn-agregar:disabled').count()==NODISP)
     pg.click('#tab-damas'); pg.wait_for_timeout(300)
-    ok('Damas muestra 6', pg.locator('.tarjeta').count()==6)
+    ok(f'Damas muestra {ND}', pg.locator('.tarjeta').count()==ND)
     pg.click('#tab-caballeros')
     pg.fill('#q','hawas'); pg.wait_for_timeout(300)
     ok('Búsqueda "hawas" → 3', pg.locator('.tarjeta').count()==3)
@@ -32,7 +36,7 @@ with sync_playwright() as p:
     pg.click('[data-accion=aplicar-filtros]'); pg.wait_for_timeout(450)
     ok('Filtro Disponibles + Rasasi → 2', pg.locator('.tarjeta').count()==2, pg.locator('.tarjeta').count())
     pg.click('[data-accion=quitar-filtro][data-tipo=marca]'); pg.click('[data-accion=quitar-filtro][data-tipo=estado]'); pg.wait_for_timeout(200)
-    ok('Quitar filtros → 16', pg.locator('.tarjeta').count()==16)
+    ok(f'Quitar filtros → {NC}', pg.locator('.tarjeta').count()==NC)
     # carrito
     def add(id): pg.click(f'.tarjeta[data-id="{id}"] [data-accion=agregar]')
     def mas(id): pg.click(f'.tarjeta[data-id="{id}"] [data-accion=mas]')

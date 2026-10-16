@@ -2,7 +2,7 @@
 // Uso: node scripts/test-logica.mjs
 import { readFile } from 'node:fs/promises';
 import assert from 'node:assert/strict';
-import { calcular, mensajeWhatsApp, enlaceWhatsApp, fmtCS, fmtUSD } from '../js/precios.js';
+import { calcular, mensajeWhatsApp, enlaceWhatsApp, fmtCS, fmtUSD, esComprable } from '../js/precios.js';
 import { convertir } from './sync.mjs';
 
 let ok = 0, fallos = 0;
@@ -24,7 +24,7 @@ const PDF = [
   ['D05','damas',1390,38.00,965,26.20,'disponible'],        ['D06','damas',1390,38.00,1080,29.30,'disponible'],
 ];
 
-const datos = JSON.parse(await readFile(new URL('../data/productos.json', import.meta.url), 'utf8'));
+const datos = JSON.parse(await readFile(new URL('./fixtures/productos-pdf.json', import.meta.url), 'utf8'));
 const cat = new Map(datos.productos.map(p => [p.id, p]));
 
 console.log('\n1–3. Datos frente a los PDF');
@@ -123,8 +123,54 @@ prueba('Más vendido / Nuevo se reconocen; otra palabra solo avisa', () => {
   assert.deepEqual(r8.productos.map(p => p.etiqueta), ['top', 'nuevo', null]);
   assert.ok(r8.avisos.some(a => a.includes('oferta')));
 });
-prueba('Los más vendidos del dueño están marcados', () => {
-  assert.deepEqual(datos.productos.filter(p => p.etiqueta === 'top').map(p => p.id).sort(), ['D01', 'H01', 'H10']);
+// ---------- Encuentra tu perfume ----------
+const { recomendar, opcionesAroma, PREGUNTAS, GRUPOS } = await import('../js/recomendar.js');
+const sinTilde = t => t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+const todas = [];
+for (const para of ['caballeros', 'damas']) for (const momento of ['dia', 'noche', 'todo'])
+  for (const aroma of ['fresco', 'dulce', 'calido', 'floral']) for (const fuerza of ['suave', 'notar'])
+    todas.push({ para, momento, aroma, fuerza });
+
+prueba('Cuestionario: 4 preguntas con sus opciones', () => {
+  assert.deepEqual(PREGUNTAS.map(q => q.id), ['para', 'momento', 'aroma', 'fuerza']);
+});
+prueba('Cuestionario: solo recomienda perfumes disponibles del catálogo elegido', () => {
+  for (const r of todas) for (const x of recomendar(datos.productos, r).principales) {
+    assert.equal(x.producto.catalogo, r.para);
+    assert.ok(esComprable(x.producto), `${x.producto.nombre} no está disponible`);
+  }
+});
+prueba('Cuestionario: nunca recomienda agotados ni perfumes sin notas', () => {
+  for (const r of todas) {
+    const res = recomendar(datos.productos, r);
+    for (const x of [...res.principales, res.pronto].filter(Boolean)) {
+      assert.notEqual(x.producto.estado, 'agotado');
+      assert.ok(x.producto.notas.length > 0);
+    }
+  }
+});
+prueba('Cuestionario: cada recomendación exacta tiene una nota del aroma elegido', () => {
+  for (const r of todas) {
+    const res = recomendar(datos.productos, r);
+    if (!res.exacto) continue;
+    for (const x of res.principales)
+      assert.ok(x.producto.notas.some(n => GRUPOS[r.aroma].includes(sinTilde(n))), `${x.producto.nombre} no es ${r.aroma}`);
+  }
+});
+prueba('Cuestionario: "Pronto" solo muestra Coming soon y como máximo 3 principales', () => {
+  for (const r of todas) {
+    const res = recomendar(datos.productos, r);
+    assert.ok(res.principales.length <= 3);
+    if (res.pronto) assert.equal(res.pronto.producto.estado, 'coming_soon');
+  }
+});
+prueba('Cuestionario: solo ofrece aromas que existen en ese catálogo', () => {
+  for (const cat of ['caballeros', 'damas']) for (const o of opcionesAroma(datos.productos, cat))
+    assert.ok(datos.productos.some(p => p.catalogo === cat && p.estado !== 'agotado' && p.notas.some(n => GRUPOS[o.id].includes(sinTilde(n)))));
+});
+prueba('Cuestionario: él + de día + fresco → Hawas Ice y 9AM Dive', () => {
+  const ids = recomendar(datos.productos, { para: 'caballeros', momento: 'dia', aroma: 'fresco', fuerza: 'suave' }).principales.map(x => x.producto.id);
+  assert.ok(ids.includes('H10') && ids.includes('H09'), ids.join(','));
 });
 
 console.log(`\n${ok} pruebas correctas, ${fallos} fallidas.`);

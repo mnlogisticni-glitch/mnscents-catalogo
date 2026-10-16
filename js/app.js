@@ -1,5 +1,6 @@
 // MN Scents — catálogo, filtros, ficha, pedido y WhatsApp.
 import { calcular, mensajeWhatsApp, enlaceWhatsApp, fmtCS, fmtUSD, esComprable, maxPedido, UMBRAL_MAYOREO } from './precios.js';
+import { PREGUNTAS, recomendar, opcionesAroma } from './recomendar.js';
 
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
@@ -15,7 +16,9 @@ const estado = {
   carrito: cargarCarrito(),
   nivelPrevio: null,
   ajustados: new Set(),
-  aroma: null,            // nota olfativa elegida en los chips   // productos cuya cantidad se redujo por existencias
+  aroma: null,            // nota olfativa elegida en los chips
+  quiz: { paso: 0, r: {} },  // "Encuentra tu perfume"
+  cajaVista: 0,           // frascos que el cliente ya vio en su caja (para animar solo los nuevos)
 };
 
 // ---------- utilidades ----------
@@ -173,7 +176,7 @@ function pintarCatalogo() {
 }
 
 function actualizarControlesTarjetas() {
-  for (const art of $$('.tarjeta')) {
+  for (const art of $$('.tarjeta, .rec')) {
     const p = estado.porId.get(art.dataset.id);
     if (p) art.querySelector('.t-accion').innerHTML = controlAgregar(p);
   }
@@ -353,7 +356,7 @@ function pintarPedido() {
   }
   const mayor = ped.nivel === 'mayor';
   const fase = faseLuna(ped.progreso);
-  for (const path of $$('.lp-luz')) path.setAttribute('d', fase);
+  for (const path of $$('.barra-pedido .lp-luz, #hoja-pedido .lp-luz')) path.setAttribute('d', fase);
 
   // barra fija
   const barra = $('.barra-pedido');
@@ -377,10 +380,8 @@ function pintarPedido() {
     ? `Tienes ${ped.unidades} unidades: todos los perfumes de tu pedido van a precio por mayor. Si bajas de ${UMBRAL_MAYOREO}, vuelven al precio al detalle.`
     : ped.unidades === 0 ? 'Cuentan todas las unidades de perfumes disponibles, puedes combinarlos.'
     : `Agrega ${ped.faltan} ${ped.faltan === 1 ? 'unidad más' : 'unidades más'} (cualquier perfume disponible) y todo tu pedido pasa a precio por mayor.`;
-  const barraP = $('.pm-barra', h);
-  barraP.style.setProperty('--p', ped.progreso);
-  barraP.setAttribute('aria-valuenow', Math.min(ped.unidades, UMBRAL_MAYOREO));
-  barraP.setAttribute('aria-valuetext', `${Math.min(ped.unidades, UMBRAL_MAYOREO)} de ${UMBRAL_MAYOREO}`);
+  pintarCaja(ped, h);
+  pintarSugeridos(ped, h);
 
   const ul = $('.lineas', h);
   ul.classList.toggle('mayor-activo', mayor);
@@ -443,6 +444,137 @@ function pintarPedido() {
   return ped;
 }
 
+// ---------- caja de 6: cada unidad es un frasco en su espacio ----------
+function pintarCaja(ped, h) {
+  const caja = $('.caja', h);
+  const frascos = ped.lineas.flatMap(l => Array.from({ length: l.qty }, () => l.producto));
+  const llenos = Math.min(frascos.length, UMBRAL_MAYOREO);
+  // solo se animan los frascos que el cliente todavía no ha visto caer en su caja
+  const desde = Math.min(estado.cajaVista, llenos);
+  if (h.open) estado.cajaVista = llenos;
+  $$('.caja-slot', caja).forEach((slot, i) => {
+    const p = frascos[i];
+    slot.classList.toggle('lleno', !!p);
+    slot.classList.toggle('nuevo', !!p && i >= desde);
+    slot.style.setProperty('--i', Math.max(0, i - desde));
+    slot.innerHTML = p
+      ? (p.foto ? `<img src="${FOTOS}${esc(p.foto)}" alt="" width="64" height="64">` : `<span>${esc(p.nombre.slice(0, 1))}</span>`)
+      : `<span class="caja-num">${i + 1}</span>`;
+  });
+  const extra = frascos.length - UMBRAL_MAYOREO;
+  const ex = $('.caja-extra', caja);
+  ex.hidden = extra <= 0;
+  ex.textContent = extra > 0 ? `+${extra} ${extra === 1 ? 'frasco más' : 'frascos más'}` : '';
+  caja.classList.toggle('caja-llena', llenos >= UMBRAL_MAYOREO);
+  caja.setAttribute('aria-valuenow', llenos);
+  caja.setAttribute('aria-valuetext', `${llenos} de ${UMBRAL_MAYOREO} frascos${frascos.length ? ': ' + [...new Set(frascos.map(p => p.nombre))].join(', ') : ''}`);
+}
+
+// Perfumes disponibles para completar la caja (los más vendidos y del mismo catálogo primero)
+function pintarSugeridos(ped, h) {
+  const caja = $('.completa', h);
+  const faltan = ped.unidades > 0 && ped.nivel !== 'mayor';
+  const enPedido = new Set(estado.carrito.map(x => x.id));
+  const cats = ped.lineas.map(l => l.producto.catalogo);
+  const catPrincipal = cats.filter(c => c === 'damas').length > cats.length / 2 ? 'damas' : 'caballeros';
+  const lista = !faltan ? [] : estado.productos
+    .filter(p => esComprable(p) && !enPedido.has(p.id))
+    .sort((a, b) => ((b.catalogo === catPrincipal) - (a.catalogo === catPrincipal))
+      || (pesoEtiqueta(a) - pesoEtiqueta(b)) || (a.orden - b.orden))
+    .slice(0, 6);
+  caja.hidden = !lista.length;
+  $('.sugeridos', h).innerHTML = lista.map(p => `<li class="sug">
+      <button class="sug-abrir" type="button" data-accion="ficha" data-id="${esc(p.id)}" aria-label="Ver ${esc(p.nombre)}">
+        <span class="sug-foto">${p.foto ? `<img src="${FOTOS}${esc(p.foto)}" alt="" loading="lazy" width="96" height="96">` : ''}</span>
+        <span class="sug-nombre">${esc(p.nombre)}</span>
+        <span class="sug-precio">${fmtCS(p.precios.detalle.cs)}</span>
+      </button>
+      <button class="sug-agregar" type="button" data-accion="agregar" data-id="${esc(p.id)}" aria-label="Agregar ${esc(p.nombre)} a tu caja">${ico('plus')}Agregar</button>
+    </li>`).join('');
+}
+
+// ---------- Encuentra tu perfume ----------
+const textoOpcion = (pid, oid) => PREGUNTAS.find(q => q.id === pid)?.opciones.find(o => o.id === oid)?.t || '';
+function opcionesDe(i) {
+  const q = PREGUNTAS[i];
+  return q.id === 'aroma' ? opcionesAroma(estado.productos, estado.quiz.r.para || 'caballeros') : q.opciones;
+}
+function lunaQuiz(p) {
+  return `<span class="luna-progreso q-luna${p >= 1 ? ' llena' : ''}" aria-hidden="true"><svg viewBox="0 0 40 40"><circle class="lp-fondo" cx="20" cy="20" r="15"/><path class="lp-luz" d="${faseLuna(p)}"/><circle class="lp-aro" cx="20" cy="20" r="18.5"/></svg></span>`;
+}
+function abrirQuiz() {
+  estado.quiz = { paso: 0, r: {} };
+  pintarQuiz();
+  abrir($('#hoja-quiz'));
+  history.replaceState(null, '', '#encuentra');
+}
+function pintarQuiz({ foco = false } = {}) {
+  const { paso, r } = estado.quiz;
+  const d = $('#hoja-quiz');
+  const cuerpo = $('.quiz', d), pie = $('.quiz-pie', d);
+  const total = PREGUNTAS.length;
+  if (paso < total) {
+    const q = PREGUNTAS[paso];
+    cuerpo.innerHTML = `<div class="q-cabeza">${lunaQuiz((paso + 1) / (total + 1))}<p class="q-paso">Pregunta ${paso + 1} de ${total}</p></div>
+      <h3 class="q-titulo" tabindex="-1">${esc(q.titulo)}</h3>
+      <div class="q-opciones" role="group" aria-label="${esc(q.titulo)}">
+        ${opcionesDe(paso).map(o => `<button class="q-op" type="button" data-accion="quiz-op" data-valor="${esc(o.id)}" aria-pressed="${r[q.id] === o.id}">
+          <b>${esc(o.t)}</b><span>${esc(o.s)}</span></button>`).join('')}
+      </div>`;
+    pie.innerHTML = paso > 0 ? `<button class="btn sec" type="button" data-accion="quiz-atras">${ico('arrow')}Anterior</button>` : '';
+    pie.hidden = paso === 0;
+  } else {
+    const res = recomendar(estado.productos, r);
+    const resumen = PREGUNTAS.map(q => textoOpcion(q.id, r[q.id])).filter(Boolean).join(' · ');
+    const textoWA = `Hola MN Scents, quiero que me recomienden un perfume: ${PREGUNTAS.map(q => textoOpcion(q.id, r[q.id]).toLowerCase()).join(', ')}.`;
+    const recs = res.principales.map((x, i) => {
+      const p = x.producto;
+      return `<li class="rec${i === 0 ? ' mejor' : ''}" data-id="${esc(p.id)}">
+        <button class="rec-abrir" type="button" data-accion="ficha" data-id="${esc(p.id)}" aria-label="Ver detalles de ${esc(p.nombre)}">
+          <span class="rec-foto">${p.foto ? `<img src="${FOTOS}${esc(p.foto)}" alt="" width="96" height="96">` : ''}</span>
+          <span class="rec-info">
+            ${i === 0 ? '<span class="rec-mejor">Tu mejor opción</span>' : ''}
+            <span class="rec-marca">${esc(p.marca)}</span>
+            <span class="rec-nombre">${esc(p.nombre)}</span>
+            ${x.razones.length ? `<span class="rec-por">Coincide en ${esc(x.razones.join(' · ').toLowerCase())}</span>` : ''}
+            <span class="rec-precio">${fmtCS(p.precios.detalle.cs)} <small>${fmtUSD(p.precios.detalle.usd)}</small></span>
+          </span>
+        </button>
+        <div class="t-accion">${controlAgregar(p)}</div>
+      </li>`;
+    }).join('');
+    const pronto = res.pronto ? `<button class="rec-pronto" type="button" data-accion="ficha" data-id="${esc(res.pronto.producto.id)}">
+        <span class="estado coming">Coming soon</span><span>También va contigo <b>${esc(res.pronto.producto.nombre)}</b>, llega pronto.</span>${ico('arrow')}</button>` : '';
+    cuerpo.innerHTML = `<div class="q-cabeza">${lunaQuiz(1)}<p class="q-paso">${esc(resumen)}</p></div>
+      <h3 class="q-titulo" tabindex="-1">${res.principales.length ? (res.principales.length === 1 ? 'Tu perfume ideal' : 'Tus perfumes ideales') : 'Te ayudamos por WhatsApp'}</h3>
+      ${res.principales.length
+        ? `${res.exacto ? '' : '<p class="q-nota">No hay uno exacto disponible ahora; estos son los que más se acercan.</p>'}<ol class="recs">${recs}</ol>`
+        : '<p class="q-nota">Ahora mismo no tenemos disponible un perfume con ese estilo. Escríbenos y te recomendamos uno.</p>'}
+      ${pronto}
+      <a class="q-wa" href="${enlaceWhatsApp(textoWA)}" target="_blank" rel="noopener">${ico('chat')}¿Prefieres que te aconsejemos? Escríbenos</a>`;
+    const cat = r.para === 'damas' ? 'Damas' : 'Caballeros';
+    pie.innerHTML = `<button class="btn sec" type="button" data-accion="quiz-reiniciar">Volver a empezar</button>
+      <button class="btn pri" type="button" data-accion="quiz-catalogo" data-cat="${esc(r.para)}">Ver ${cat}</button>`;
+    pie.hidden = false;
+  }
+  $('.hoja-cuerpo', d).scrollTop = 0;
+  if (foco) requestAnimationFrame(() => $('.q-titulo', d)?.focus({ preventScroll: true }));
+}
+let tQuiz;
+function elegirQuiz(b) {
+  const q = PREGUNTAS[estado.quiz.paso]; if (!q) return;
+  clearTimeout(tQuiz);
+  estado.quiz.r[q.id] = b.dataset.valor;
+  if (q.id === 'para') delete estado.quiz.r.aroma;   // las opciones de aroma dependen del catálogo
+  for (const o of $$('.q-op')) o.setAttribute('aria-pressed', o === b);
+  // un instante para ver la opción marcada, luego la siguiente pregunta
+  tQuiz = setTimeout(() => { estado.quiz.paso++; pintarQuiz({ foco: true }); }, 220);
+}
+$('#hoja-quiz').addEventListener('close', () => {
+  clearTimeout(tQuiz);
+  if (location.hash === '#encuentra') history.replaceState(null, '', `#${estado.cat}`);
+});
+
 function actualizarTodo() {
   pintarPedido();
   actualizarControlesTarjetas();
@@ -461,7 +593,7 @@ document.addEventListener('click', e => {
       const p = estado.porId.get(id);
       const ped = calcular(estado.carrito, estado.porId);
       anunciar(`${p.nombre} agregado. ${ped.unidades} ${ped.unidades === 1 ? 'unidad' : 'unidades'} en tu pedido.`);
-      const art = b.closest('.tarjeta');
+      const art = b.closest('.tarjeta, .rec');
       requestAnimationFrame(() => art?.querySelector('.paso [data-accion="mas"]')?.focus());
       break;
     }
@@ -482,7 +614,16 @@ document.addEventListener('click', e => {
       fichaQty = Math.max(1, fichaQty - 1); $('.ficha-qty').textContent = fichaQty;
       $('[data-accion="ficha-mas"]').disabled = fichaQty >= fichaMax;
       break;
-    case 'ver-pedido': cerrar($('#hoja-ficha')); pintarPedido(); abrir($('#hoja-pedido')); break;
+    case 'ver-pedido': cerrar($('#hoja-ficha')); abrir($('#hoja-pedido')); pintarPedido(); break;
+    case 'abrir-quiz': abrirQuiz(); break;
+    case 'quiz-op': elegirQuiz(b); break;
+    case 'quiz-atras': clearTimeout(tQuiz); estado.quiz.paso = Math.max(0, estado.quiz.paso - 1); pintarQuiz({ foco: true }); break;
+    case 'quiz-reiniciar': estado.quiz = { paso: 0, r: {} }; pintarQuiz({ foco: true }); break;
+    case 'quiz-catalogo':
+      cerrar($('#hoja-quiz'));
+      ponerCat(b.dataset.cat);
+      window.scrollTo({ top: $('#catalogo').offsetTop - 70, behavior: 'smooth' });
+      break;
     case 'ficha-agregar': {
       fijarQty(id, qtyEnCarrito(id) + fichaQty);
       cerrar($('#hoja-ficha'));
@@ -542,7 +683,7 @@ function saltoBarra() {
   b.classList.remove('salto'); void b.offsetWidth; b.classList.add('salto');
 }
 
-$('.bp-boton').addEventListener('click', () => { pintarPedido(); abrir($('#hoja-pedido')); });
+$('.bp-boton').addEventListener('click', () => { abrir($('#hoja-pedido')); pintarPedido(); });
 $('.btn-filtros').addEventListener('click', () => { pintarFiltrosFijos(); pintarMarcas(); abrir($('#hoja-filtros')); });
 $('.btn-enviar').addEventListener('click', e => { if (e.currentTarget.getAttribute('aria-disabled') === 'true') e.preventDefault(); });
 
@@ -569,6 +710,11 @@ $('.limpiar-q').addEventListener('click', () => {
 
 function irAHash() {
   const h = decodeURIComponent(location.hash.slice(1));
+  if (h === 'encuentra') {
+    if (!$('.tarjeta')) ponerCat(estado.cat, { conHash: false });
+    if (!$('#hoja-quiz').open) abrirQuiz();
+    return true;
+  }
   if (h.startsWith('p-')) {
     const p = estado.porId.get(h.slice(2));
     if (p) { if (p.catalogo !== estado.cat || !$('.tarjeta')) ponerCat(p.catalogo, { conHash: false }); abrirFicha(p.id); return true; }

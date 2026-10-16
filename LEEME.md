@@ -11,3 +11,8 @@ Web estática para Cloudflare Pages (plan gratuito). Sin compilación: el direct
 Reglas de precios: con 6 unidades o más de perfumes disponibles, todo el pedido usa el precio por mayor; con menos, el precio al detalle. Agotado y Coming soon no se pueden pedir ni cuentan para el mayoreo.
 
 WhatsApp de pedidos: +505 8473-5485 (en `js/precios.js`).
+
+## Encuentra tu perfume y caja de 6
+- `js/recomendar.js`: las 4 preguntas y la recomendación. Solo usa la columna `notas` de la hoja: un perfume sin notas no aparece en el cuestionario. Enlace directo: `https://mnscents.pages.dev/#encuentra`.
+- La caja de 6 del pedido y las sugerencias para completarla están en `js/app.js` (`pintarCaja`, `pintarSugeridos`).
+- Pruebas: `node scripts/test-logica.mjs` (usa una copia fija de los datos del PDF en `scripts/fixtures/`), `python3 scripts/test-navegador.py <carpeta>` y `python3 scripts/test-quiz-caja.py <carpeta>` con un servidor local.
