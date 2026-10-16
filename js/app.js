@@ -1,6 +1,7 @@
 // MN Scents — catálogo, filtros, ficha, pedido y WhatsApp.
 import { calcular, mensajeWhatsApp, enlaceWhatsApp, fmtCS, fmtUSD, esComprable, maxPedido, UMBRAL_MAYOREO } from './precios.js';
-import { PREGUNTAS, recomendar, opcionesAroma } from './recomendar.js';
+import { PREGUNTAS, recomendar, opcionesAroma, perfil } from './recomendar.js';
+import { imagenPerfil } from './tarjeta-perfil.js';
 
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
@@ -17,7 +18,7 @@ const estado = {
   nivelPrevio: null,
   ajustados: new Set(),
   aroma: null,            // nota olfativa elegida en los chips
-  quiz: { paso: 0, r: {} },  // "Encuentra tu perfume"
+  quiz: { paso: 0, r: {}, dir: 'adelante' },  // "Encuentra tu perfume"
   cajaVista: 0,           // frascos que el cliente ya vio en su caja (para animar solo los nuevos)
 };
 
@@ -503,7 +504,7 @@ function lunaQuiz(p) {
   return `<span class="luna-progreso q-luna${p >= 1 ? ' llena' : ''}" aria-hidden="true"><svg viewBox="0 0 40 40"><circle class="lp-fondo" cx="20" cy="20" r="15"/><path class="lp-luz" d="${faseLuna(p)}"/><circle class="lp-aro" cx="20" cy="20" r="18.5"/></svg></span>`;
 }
 function abrirQuiz() {
-  estado.quiz = { paso: 0, r: {} };
+  estado.quiz = { paso: 0, r: {}, dir: 'adelante' };
   pintarQuiz();
   abrir($('#hoja-quiz'));
   history.replaceState(null, '', '#encuentra');
@@ -517,9 +518,9 @@ function pintarQuiz({ foco = false } = {}) {
     const q = PREGUNTAS[paso];
     cuerpo.innerHTML = `<div class="q-cabeza">${lunaQuiz((paso + 1) / (total + 1))}<p class="q-paso">Pregunta ${paso + 1} de ${total}</p></div>
       <h3 class="q-titulo" tabindex="-1">${esc(q.titulo)}</h3>
-      <div class="q-opciones" role="group" aria-label="${esc(q.titulo)}">
+      <div class="q-opciones ${estado.quiz.dir}" role="group" aria-label="${esc(q.titulo)}" data-n="${opcionesDe(paso).length}">
         ${opcionesDe(paso).map(o => `<button class="q-op" type="button" data-accion="quiz-op" data-valor="${esc(o.id)}" aria-pressed="${r[q.id] === o.id}">
-          <b>${esc(o.t)}</b><span>${esc(o.s)}</span></button>`).join('')}
+          <span class="q-ico">${ico(o.ico)}</span><b>${esc(o.t)}</b><span class="q-sub">${esc(o.s)}</span></button>`).join('')}
       </div>`;
     pie.innerHTML = paso > 0 ? `<button class="btn sec" type="button" data-accion="quiz-atras">${ico('arrow')}Anterior</button>` : '';
     pie.hidden = paso === 0;
@@ -545,9 +546,22 @@ function pintarQuiz({ foco = false } = {}) {
     }).join('');
     const pronto = res.pronto ? `<button class="rec-pronto" type="button" data-accion="ficha" data-id="${esc(res.pronto.producto.id)}">
         <span class="estado coming">Coming soon</span><span>También va contigo <b>${esc(res.pronto.producto.nombre)}</b>, llega pronto.</span>${ico('arrow')}</button>` : '';
+    const pf = perfil(r, res);
+    const hay = res.principales.length > 0;
     cuerpo.innerHTML = `<div class="q-cabeza">${lunaQuiz(1)}<p class="q-paso">${esc(resumen)}</p></div>
-      <h3 class="q-titulo" tabindex="-1">${res.principales.length ? (res.principales.length === 1 ? 'Tu perfume ideal' : 'Tus perfumes ideales') : 'Te ayudamos por WhatsApp'}</h3>
-      ${res.principales.length
+      <section class="perfil" aria-labelledby="perfil-titulo">
+        <p class="perfil-etq">Tu estilo</p>
+        <h3 class="q-titulo perfil-titulo" id="perfil-titulo" tabindex="-1">${esc(pf.titulo)}</h3>
+        <p class="perfil-frase">${esc(pf.frase)}</p>
+        ${pf.mezcla.length ? `<div class="mezcla" role="list" aria-label="Tu mezcla, según las notas de tus perfumes">${pf.mezcla.map((m, i) =>
+          `<div class="mz" role="listitem" aria-label="${esc(m.txt)}: ${Math.round(m.valor * 100)} por ciento"><span>${esc(m.txt)}</span><span class="mz-barra"><i style="--v:${m.valor.toFixed(3)};--i:${i}"></i></span></div>`).join('')}</div>` : ''}
+        ${hay ? `<div class="perfil-acciones">
+          <button class="btn pri" type="button" data-accion="quiz-compartir">${ico('share')}Compartir mi resultado</button>
+          <button class="btn sec btn-guardar" type="button" data-accion="quiz-guardar" aria-label="Guardar imagen de mi resultado">${ico('download')}</button>
+        </div>` : ''}
+      </section>
+      <h4 class="recs-titulo">${hay ? (res.principales.length === 1 ? 'Tu perfume ideal' : 'Tus perfumes ideales') : 'Te ayudamos por WhatsApp'}</h4>
+      ${hay
         ? `${res.exacto ? '' : '<p class="q-nota">No hay uno exacto disponible ahora; estos son los que más se acercan.</p>'}<ol class="recs">${recs}</ol>`
         : '<p class="q-nota">Ahora mismo no tenemos disponible un perfume con ese estilo. Escríbenos y te recomendamos uno.</p>'}
       ${pronto}
@@ -556,10 +570,36 @@ function pintarQuiz({ foco = false } = {}) {
     pie.innerHTML = `<button class="btn sec" type="button" data-accion="quiz-reiniciar">Volver a empezar</button>
       <button class="btn pri" type="button" data-accion="quiz-catalogo" data-cat="${esc(r.para)}">Ver ${cat}</button>`;
     pie.hidden = false;
+    // la imagen se prepara desde ya, para que "Compartir" responda al instante
+    resultado = { titulo: pf.titulo, frase: pf.frase, mezcla: pf.mezcla, producto: res.principales[0]?.producto || null };
+    imagenLista = hay ? imagenPerfil(resultado).catch(() => null) : null;
   }
   $('.hoja-cuerpo', d).scrollTop = 0;
   if (foco) requestAnimationFrame(() => $('.q-titulo', d)?.focus({ preventScroll: true }));
 }
+let resultado = null, imagenLista = null;
+async function compartirResultado(soloGuardar = false) {
+  if (!resultado?.producto) return;
+  const blob = await imagenLista;
+  const url = `${location.origin}${location.pathname}#encuentra`;
+  const texto = `Mi estilo de perfume es ${resultado.titulo.toLowerCase()} y mi perfume ideal es ${resultado.producto.nombre}. Descubre el tuyo en MN Scents:`;
+  if (!soloGuardar) {
+    const archivo = blob ? new File([blob], 'mi-estilo-mn-scents.png', { type: 'image/png' }) : null;
+    try {
+      if (archivo && navigator.canShare?.({ files: [archivo] })) { await navigator.share({ files: [archivo], text: `${texto} ${url}` }); return; }
+      if (navigator.share) { await navigator.share({ title: 'Mi estilo de perfume · MN Scents', text: texto, url }); return; }
+    } catch (e) { if (e?.name === 'AbortError') return; }
+  }
+  if (blob) {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob); a.download = 'mi-estilo-mn-scents.png';
+    document.body.append(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+    anunciar('Imagen guardada. Súbela a tus historias o estados.');
+  }
+  if (!soloGuardar) window.open(`https://wa.me/?text=${encodeURIComponent(`${texto} ${url}`)}`, '_blank', 'noopener');
+}
+
 let tQuiz;
 function elegirQuiz(b) {
   const q = PREGUNTAS[estado.quiz.paso]; if (!q) return;
@@ -568,7 +608,7 @@ function elegirQuiz(b) {
   if (q.id === 'para') delete estado.quiz.r.aroma;   // las opciones de aroma dependen del catálogo
   for (const o of $$('.q-op')) o.setAttribute('aria-pressed', o === b);
   // un instante para ver la opción marcada, luego la siguiente pregunta
-  tQuiz = setTimeout(() => { estado.quiz.paso++; pintarQuiz({ foco: true }); }, 220);
+  tQuiz = setTimeout(() => { estado.quiz.paso++; estado.quiz.dir = 'adelante'; pintarQuiz({ foco: true }); }, 260);
 }
 $('#hoja-quiz').addEventListener('close', () => {
   clearTimeout(tQuiz);
@@ -617,8 +657,10 @@ document.addEventListener('click', e => {
     case 'ver-pedido': cerrar($('#hoja-ficha')); abrir($('#hoja-pedido')); pintarPedido(); break;
     case 'abrir-quiz': abrirQuiz(); break;
     case 'quiz-op': elegirQuiz(b); break;
-    case 'quiz-atras': clearTimeout(tQuiz); estado.quiz.paso = Math.max(0, estado.quiz.paso - 1); pintarQuiz({ foco: true }); break;
-    case 'quiz-reiniciar': estado.quiz = { paso: 0, r: {} }; pintarQuiz({ foco: true }); break;
+    case 'quiz-atras': clearTimeout(tQuiz); estado.quiz.paso = Math.max(0, estado.quiz.paso - 1); estado.quiz.dir = 'atras'; pintarQuiz({ foco: true }); break;
+    case 'quiz-reiniciar': estado.quiz = { paso: 0, r: {}, dir: 'atras' }; pintarQuiz({ foco: true }); break;
+    case 'quiz-compartir': compartirResultado(); break;
+    case 'quiz-guardar': compartirResultado(true); break;
     case 'quiz-catalogo':
       cerrar($('#hoja-quiz'));
       ponerCat(b.dataset.cat);

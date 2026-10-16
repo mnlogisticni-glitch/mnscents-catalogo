@@ -23,6 +23,7 @@ with sync_playwright() as p:
     pg.screenshot(path=f'{S}/shots/q1-pregunta1.png')
     def elegir(t):
         pg.click(f'.q-op:has-text("{t}")'); pg.wait_for_timeout(450)
+    ok('Opciones con íconos', pg.locator('.q-op .q-ico svg').count() == 2)
     elegir('Para él'); ok('Avanza a pregunta 2', 'Pregunta 2 de 4' in pg.inner_text('.q-paso'))
     elegir('De día')
     ok('Aromas de caballeros sin "Floral"', pg.locator('.q-op:has-text("Floral")').count() == 0)
@@ -33,6 +34,16 @@ with sync_playwright() as p:
     elegir('Fresco y limpio'); elegir('Suave y elegante')
     nombres = pg.locator('.rec-nombre').all_inner_texts()
     ok('Resultado: Hawas Ice y 9AM Dive', 'Hawas Ice' in nombres and '9AM Dive' in nombres, nombres)
+    ok('Tu estilo: "Relajado y fresco"', pg.inner_text('.perfil-titulo') == 'Relajado y fresco', pg.inner_text('.perfil-titulo'))
+    ok('Barras de mezcla visibles', pg.locator('.mz').count() >= 1)
+    pg.wait_for_timeout(900)
+    pg.screenshot(path=f'{S}/shots/q4b-perfil.png')
+    with pg.expect_download() as dl:
+        pg.click('[data-accion=quiz-guardar]')
+    d = dl.value; ruta = f'{S}/shots/imagen-compartir.png'; d.save_as(ruta)
+    from PIL import Image
+    im = Image.open(ruta)
+    ok('Imagen para historias 1080x1920', im.size == (1080, 1920), im.size)
     ok('Mejor opción marcada', pg.locator('.rec.mejor .rec-mejor').count() == 1)
     ok('Explica por qué coincide', pg.locator('.rec-por').count() == len(nombres))
     ok('Botón WhatsApp de asesoría con respuestas', 'para%20%C3%A9l' in (pg.get_attribute('.q-wa', 'href') or ''))

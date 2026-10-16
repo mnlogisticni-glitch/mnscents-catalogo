@@ -124,7 +124,7 @@ prueba('Más vendido / Nuevo se reconocen; otra palabra solo avisa', () => {
   assert.ok(r8.avisos.some(a => a.includes('oferta')));
 });
 // ---------- Encuentra tu perfume ----------
-const { recomendar, opcionesAroma, PREGUNTAS, GRUPOS } = await import('../js/recomendar.js');
+const { recomendar, opcionesAroma, PREGUNTAS, GRUPOS, perfil } = await import('../js/recomendar.js');
 const sinTilde = t => t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 const todas = [];
 for (const para of ['caballeros', 'damas']) for (const momento of ['dia', 'noche', 'todo'])
@@ -167,6 +167,27 @@ prueba('Cuestionario: "Pronto" solo muestra Coming soon y como máximo 3 princip
 prueba('Cuestionario: solo ofrece aromas que existen en ese catálogo', () => {
   for (const cat of ['caballeros', 'damas']) for (const o of opcionesAroma(datos.productos, cat))
     assert.ok(datos.productos.some(p => p.catalogo === cat && p.estado !== 'agotado' && p.notas.some(n => GRUPOS[o.id].includes(sinTilde(n)))));
+});
+prueba('Tu estilo: título según respuestas, en femenino para ella', () => {
+  const r1 = { para: 'caballeros', momento: 'noche', aroma: 'calido', fuerza: 'notar' };
+  assert.equal(perfil(r1, recomendar(datos.productos, r1)).titulo, 'Misterioso y cálido');
+  const r2 = { para: 'damas', momento: 'noche', aroma: 'calido', fuerza: 'notar' };
+  assert.equal(perfil(r2, recomendar(datos.productos, r2)).titulo, 'Misteriosa y cálida');
+  const r3 = { para: 'damas', momento: 'dia', aroma: 'fresco', fuerza: 'suave' };
+  assert.equal(perfil(r3, recomendar(datos.productos, r3)).titulo, 'Relajada y fresca');
+  for (const r of todas) assert.ok(!/estel/i.test(perfil(r, recomendar(datos.productos, r)).titulo));
+});
+prueba('Tu estilo: la mezcla sale solo de las notas de los perfumes recomendados', () => {
+  for (const r of todas) {
+    const res = recomendar(datos.productos, r);
+    const pf = perfil(r, res);
+    const notas = [...res.principales, res.pronto].filter(Boolean).flatMap(x => x.producto.notas.map(sinTilde));
+    for (const m of pf.mezcla) {
+      assert.ok(m.valor > 0 && m.valor <= 1);
+      assert.ok(notas.some(n => GRUPOS[m.id].includes(n)), `${m.id} sin notas reales`);
+    }
+    if (pf.mezcla.length) assert.equal(pf.mezcla[0].valor, 1);
+  }
 });
 prueba('Cuestionario: él + de día + fresco → Hawas Ice y 9AM Dive', () => {
   const ids = recomendar(datos.productos, { para: 'caballeros', momento: 'dia', aroma: 'fresco', fuerza: 'suave' }).principales.map(x => x.producto.id);

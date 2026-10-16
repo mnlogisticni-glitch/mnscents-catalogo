@@ -18,23 +18,23 @@ export const GRUPOS = {
 
 export const PREGUNTAS = [
   { id: 'para', titulo: '¿Para quién es?', opciones: [
-    { id: 'caballeros', t: 'Para él', s: 'Catálogo de caballeros' },
-    { id: 'damas', t: 'Para ella', s: 'Catálogo de damas' },
+    { id: 'caballeros', t: 'Para él', s: 'Catálogo de caballeros', ico: 'q-el' },
+    { id: 'damas', t: 'Para ella', s: 'Catálogo de damas', ico: 'q-ella' },
   ] },
   { id: 'momento', titulo: '¿Cuándo lo vas a usar?', opciones: [
-    { id: 'dia', t: 'De día', s: 'Trabajo, clases, días de calor' },
-    { id: 'noche', t: 'De noche', s: 'Salidas, citas, eventos' },
-    { id: 'todo', t: 'Para todo', s: 'Uno que sirva siempre' },
+    { id: 'dia', t: 'De día', s: 'Trabajo, clases, calor', ico: 'q-sol' },
+    { id: 'noche', t: 'De noche', s: 'Salidas, citas, eventos', ico: 'q-luna' },
+    { id: 'todo', t: 'Para todo', s: 'Uno que sirva siempre', ico: 'q-siempre' },
   ] },
   { id: 'aroma', titulo: '¿Qué tipo de aroma te gusta?', opciones: [
-    { id: 'fresco', t: 'Fresco y limpio', s: 'Cítrico, acuático, verde' },
-    { id: 'dulce', t: 'Dulce', s: 'Frutal, cremoso, goloso' },
-    { id: 'calido', t: 'Cálido e intenso', s: 'Amaderado, especiado, ámbar' },
-    { id: 'floral', t: 'Floral', s: 'Flores, femenino' },
+    { id: 'fresco', t: 'Fresco y limpio', s: 'Cítrico, acuático, verde', ico: 'q-ola' },
+    { id: 'dulce', t: 'Dulce', s: 'Frutal, cremoso, goloso', ico: 'q-dulce' },
+    { id: 'calido', t: 'Cálido e intenso', s: 'Amaderado, especiado, ámbar', ico: 'q-llama' },
+    { id: 'floral', t: 'Floral', s: 'Flores, femenino', ico: 'q-flor' },
   ] },
   { id: 'fuerza', titulo: '¿Cómo quieres que se sienta?', opciones: [
-    { id: 'suave', t: 'Suave y elegante', s: 'Que huela rico de cerca' },
-    { id: 'notar', t: 'Que se note', s: 'Que deje estela y lo comenten' },
+    { id: 'suave', t: 'Suave y elegante', s: 'Que huela rico de cerca', ico: 'q-pluma' },
+    { id: 'notar', t: 'Que se note', s: 'Que deje estela y lo comenten', ico: 'q-estela' },
   ] },
 ];
 
@@ -84,4 +84,38 @@ export function recomendar(productos, r) {
   const pronto = claros.filter(x => x.producto.estado === 'coming_soon' && (principales.length < 3 || x.puntos >= minimo))
     .sort(orden)[0] || null;
   return { principales, pronto, exacto: conAroma.length > 0 };
+}
+
+// ---------- "Tu estilo": el perfil que ve el cliente al final ----------
+// El carácter sale de cuándo lo usa y cuánto quiere que se note; el aroma, de lo que eligió.
+const CARACTER = {
+  'noche-notar': { m: 'Misterioso', f: 'Misteriosa', frase: 'Te gustan los perfumes que dejan huella y se quedan en la memoria.' },
+  'noche-suave': { m: 'Elegante', f: 'Elegante', frase: 'Prefieres un aroma fino, de los que se descubren de cerca.' },
+  'dia-notar': { m: 'Atrevido', f: 'Atrevida', frase: 'Te gusta que tu perfume se note desde que llegas.' },
+  'dia-suave': { m: 'Relajado', f: 'Relajada', frase: 'Buscas un aroma ligero que te acompañe todo el día sin cansar.' },
+  'todo-notar': { m: 'Magnético', f: 'Magnética', frase: 'Quieres un perfume con presencia para cualquier momento.' },
+  'todo-suave': { m: 'Versátil', f: 'Versátil', frase: 'Quieres un perfume que vaya contigo a todas partes.' },
+};
+const AROMA_ADJ = {
+  fresco: { m: 'fresco', f: 'fresca' }, dulce: { m: 'dulce', f: 'dulce' },
+  calido: { m: 'cálido', f: 'cálida' }, floral: { m: 'floral', f: 'floral' },
+};
+export const MEZCLA = [
+  { id: 'fresco', txt: 'Fresco' }, { id: 'dulce', txt: 'Dulce' },
+  { id: 'calido', txt: 'Cálido' }, { id: 'floral', txt: 'Floral' },
+];
+
+// titulo ("Misterioso y cálido"), frase, y la mezcla de las notas reales de los perfumes recomendados (0 a 1)
+export function perfil(r, res) {
+  const g = r.para === 'damas' ? 'f' : 'm';
+  const c = CARACTER[`${r.momento}-${r.fuerza}`] || CARACTER['todo-suave'];
+  const a = AROMA_ADJ[r.aroma] || AROMA_ADJ.fresco;
+  const lista = [...(res?.principales || []), ...(res?.pronto ? [res.pronto] : [])].map(x => x.producto);
+  const notasN = lista.flatMap(p => p.notas.map(norm));
+  const conteo = MEZCLA.map(m => ({ ...m, n: cuenta(notasN, m.id) }));
+  const max = Math.max(...conteo.map(m => m.n), 0);
+  // solo lo que de verdad tienen sus perfumes, de mayor a menor
+  const mezcla = conteo.filter(m => m.n > 0).sort((x, y) => y.n - x.n)
+    .map(m => ({ id: m.id, txt: m.txt, valor: m.n / max }));
+  return { titulo: `${c[g]} y ${a[g]}`, frase: c.frase, mezcla };
 }
