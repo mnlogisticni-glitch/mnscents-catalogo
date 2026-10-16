@@ -78,11 +78,31 @@ export function mensajeWhatsApp(pedido) {
     : `Precios aplicados: AL DETALLE (mayorista desde ${UMBRAL_MAYOREO} unidades)`);
   L.push(`*TOTAL: ${fmtCS(pedido.totalCS)} / ${fmtUSD(pedido.totalUSD)}*`);
   L.push('');
+  // El texto se puede editar antes de enviarlo; este enlace solo lleva códigos y cantidades,
+  // y al abrirlo la web recalcula los precios desde el catálogo.
+  L.push(`Verificar pedido: ${enlaceVerificacion(pedido)}`);
+  L.push('');
   L.push('Nombre: ');
   L.push('Dirección de entrega: ');
   return L.join('\n');
 }
 
+export const WEB = 'https://mnscents.pages.dev/';
+export function enlaceVerificacion(pedido, base = WEB) {
+  return `${base}#pedido=${pedido.lineas.map(l => `${l.producto.id}-${l.qty}`).join(',')}`;
+}
+// Lee "#pedido=H01-2,D05-1" sin confiar en él: solo códigos válidos y cantidades de 1 a 99, máximo 60 líneas
+export function leerPedidoEnlace(texto) {
+  const out = [];
+  for (const parte of String(texto || '').split(',').slice(0, 60)) {
+    const m = /^([A-Za-z0-9]{1,12})-(\d{1,2})$/.exec(parte.trim());
+    if (!m) continue;
+    const qty = Number(m[2]);
+    if (qty < 1 || out.some(x => x.id === m[1])) continue;
+    out.push({ id: m[1], qty });
+  }
+  return out;
+}
 export function enlaceWhatsApp(texto) {
   return `https://wa.me/${WHATSAPP}${texto ? '?text=' + encodeURIComponent(texto) : ''}`;
 }

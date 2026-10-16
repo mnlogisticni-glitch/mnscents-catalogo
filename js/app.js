@@ -1,5 +1,5 @@
 // MN Scents — catálogo, filtros, ficha, pedido y WhatsApp.
-import { calcular, mensajeWhatsApp, enlaceWhatsApp, fmtCS, fmtUSD, esComprable, maxPedido, UMBRAL_MAYOREO } from './precios.js';
+import { calcular, mensajeWhatsApp, enlaceWhatsApp, fmtCS, fmtUSD, esComprable, maxPedido, UMBRAL_MAYOREO, leerPedidoEnlace } from './precios.js';
 import { PREGUNTAS, recomendar, opcionesAroma, perfil } from './recomendar.js';
 import { imagenPerfil } from './tarjeta-perfil.js';
 
@@ -494,6 +494,36 @@ function pintarSugeridos(ped, h) {
     </li>`).join('');
 }
 
+// ---------- Verificar un pedido recibido (enlace "#pedido=H01-2,D05-1") ----------
+// El texto de WhatsApp se puede editar; aquí los precios salen siempre del catálogo publicado.
+function abrirVerificacion(enlace) {
+  const items = leerPedidoEnlace(enlace);
+  const ped = calcular(items, estado.porId);
+  const desconocidos = items.filter(x => !estado.porId.has(x.id));
+  const caja = $('#hoja-verificar .verificar');
+  const hoy = new Date().toLocaleDateString('es-NI', { day: 'numeric', month: 'long', year: 'numeric' });
+  caja.innerHTML = !items.length
+    ? '<p class="v-aviso">Este enlace no contiene un pedido válido.</p>'
+    : `<p class="v-intro">Precios calculados con el catálogo publicado hoy, ${esc(hoy)}. Compara este total con el del mensaje: si no coinciden, vale este.</p>
+      <ul class="v-lineas">${ped.lineas.map(l => `<li>
+          <span class="v-nombre">${esc(l.producto.nombre)} <small>${esc(l.producto.id)}</small></span>
+          <span class="v-cant">${l.qty} × ${fmtCS(l.unitCS)}</span>
+          <span class="v-sub">${fmtCS(l.subCS)}</span>
+          ${l.ajustada ? `<span class="v-alerta">Pidió ${l.pedida}; solo hay ${l.max} disponible${l.max === 1 ? '' : 's'}.</span>` : ''}
+        </li>`).join('')}</ul>
+      ${ped.noDisponibles.length || desconocidos.length ? `<div class="v-alerta-caja">No se cobran porque no están disponibles o no existen:
+        <ul>${ped.noDisponibles.map(x => `<li>${esc(x.producto?.nombre || x.id)}</li>`).join('')}</ul></div>` : ''}
+      <dl class="totales v-totales">
+        <div><dt>Unidades</dt><dd>${ped.unidades}</dd></div>
+        <div><dt>Precios aplicados</dt><dd class="${ped.nivel === 'mayor' ? 't-nivel mayor' : ''}">${ped.nivel === 'mayor' ? 'Por mayor' : 'Al detalle'}</dd></div>
+        <div class="t-total"><dt>Total</dt><dd><span class="t-cs">${fmtCS(ped.totalCS)}</span><span class="t-usd">${fmtUSD(ped.totalUSD)}</span></dd></div>
+      </dl>`;
+  abrir($('#hoja-verificar'));
+}
+$('#hoja-verificar').addEventListener('close', () => {
+  if (location.hash.startsWith('#pedido=')) history.replaceState(null, '', `#${estado.cat}`);
+});
+
 // ---------- Encuentra tu perfume ----------
 const textoOpcion = (pid, oid) => PREGUNTAS.find(q => q.id === pid)?.opciones.find(o => o.id === oid)?.t || '';
 function opcionesDe(i) {
@@ -753,6 +783,11 @@ $('.limpiar-q').addEventListener('click', () => {
 function irAHash() {
   let h = '';
   try { h = decodeURIComponent(location.hash.slice(1)); } catch { h = ''; }   // un enlace mal escrito no rompe la página
+  if (h.startsWith('pedido=')) {
+    if (!$('.tarjeta')) ponerCat(estado.cat, { conHash: false });
+    abrirVerificacion(h.slice(7));
+    return true;
+  }
   if (h === 'encuentra') {
     if (!$('.tarjeta')) ponerCat(estado.cat, { conHash: false });
     if (!$('#hoja-quiz').open) abrirQuiz();

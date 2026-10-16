@@ -130,6 +130,20 @@ prueba('Más vendido / Nuevo se reconocen; otra palabra solo avisa', () => {
   assert.deepEqual(r8.productos.map(p => p.etiqueta), ['top', 'nuevo', null]);
   assert.ok(r8.avisos.some(a => a.includes('oferta')));
 });
+// ---------- Verificación del pedido ----------
+const { leerPedidoEnlace, enlaceVerificacion } = await import('../js/precios.js');
+prueba('Verificación: el mensaje incluye el enlace con códigos y cantidades', () => {
+  const ped = calcular([{ id: 'H01', qty: 2 }, { id: 'D05', qty: 1 }], cat);
+  assert.ok(mensajeWhatsApp(ped).includes('Verificar pedido: https://mnscents.pages.dev/#pedido=H01-2,D05-1'));
+  assert.equal(enlaceVerificacion(ped), 'https://mnscents.pages.dev/#pedido=H01-2,D05-1');
+});
+prueba('Verificación: el enlace se lee sin confiar en él', () => {
+  assert.deepEqual(leerPedidoEnlace('H01-2,D05-1'), [{ id: 'H01', qty: 2 }, { id: 'D05', qty: 1 }]);
+  assert.deepEqual(leerPedidoEnlace('<img src=x>-1,H01-0,H01--5,H01-1e9,H01-100,../x-1'), []);
+  assert.deepEqual(leerPedidoEnlace('H01-3,H01-9'), [{ id: 'H01', qty: 3 }]);
+  assert.equal(leerPedidoEnlace(Array.from({ length: 200 }, (_, i) => `A${i}-1`).join(',')).length, 60);
+});
+
 // ---------- Encuentra tu perfume ----------
 const { recomendar, opcionesAroma, PREGUNTAS, GRUPOS, perfil } = await import('../js/recomendar.js');
 const sinTilde = t => t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();

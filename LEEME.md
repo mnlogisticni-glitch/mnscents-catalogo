@@ -16,3 +16,10 @@ WhatsApp de pedidos: +505 8473-5485 (en `js/precios.js`).
 - `js/recomendar.js`: las 4 preguntas y la recomendación. Solo usa la columna `notas` de la hoja: un perfume sin notas no aparece en el cuestionario. Enlace directo: `https://mnscents.pages.dev/#encuentra`.
 - La caja de 6 del pedido y las sugerencias para completarla están en `js/app.js` (`pintarCaja`, `pintarSugeridos`).
 - Pruebas: `node scripts/test-logica.mjs` (usa una copia fija de los datos del PDF en `scripts/fixtures/`), `python3 scripts/test-navegador.py <carpeta>` y `python3 scripts/test-quiz-caja.py <carpeta>` con un servidor local.
+
+## Seguridad
+- No hay panel de administración ni servidor propio: la "administración" son tus cuentas de Google (hoja), GitHub (código) y Cloudflare (publicación). Protégelas con verificación en dos pasos.
+- Ningún secreto vive en este repositorio ni en la web. El repositorio es público: no subas nunca contraseñas, claves ni datos privados.
+- El mensaje de WhatsApp lleva "Verificar pedido: …/#pedido=…". Ábrelo antes de confirmar un pedido: los precios se recalculan desde el catálogo, aunque el cliente haya editado el texto.
+- `.github/workflows/verificar-web.yml` revisa cada lunes la web publicada (cabeceras, archivos internos, claves expuestas). También se puede correr a mano en Actions.
+- Pruebas locales: `python3 scripts/test-seguridad.py <carpeta>` (usa `scripts/servidor-pages.py`, que imita Cloudflare Pages).

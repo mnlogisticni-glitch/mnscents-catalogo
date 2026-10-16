@@ -540,6 +540,20 @@ label.opcion input:focus-visible + span { outline: 2px solid var(--lila); outlin
 
 .sin-js { padding: 20px; text-align: center; }
 
+/* ---------- Verificar pedido ---------- */
+.v-intro { color: var(--tinta-2); font-size: 14px; }
+.v-aviso { color: var(--rosa); font-size: 15px; }
+.v-lineas { list-style: none; margin: 14px 0 0; padding: 0; display: grid; }
+.v-lineas li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 12px; padding: 10px 0; border-bottom: 1px solid var(--linea-suave); }
+.v-nombre { font-weight: 700; }
+.v-nombre small { font-weight: 400; color: var(--tinta-3); margin-left: 4px; }
+.v-cant { grid-column: 1; font-size: 13.5px; color: var(--tinta-2); font-variant-numeric: tabular-nums; }
+.v-sub { grid-column: 2; grid-row: 1 / span 2; align-self: center; font-weight: 700; font-variant-numeric: tabular-nums; }
+.v-alerta { grid-column: 1 / -1; font-size: 13px; color: var(--oro); }
+.v-alerta-caja { margin-top: 14px; padding: 12px 14px; border-radius: var(--r-m); border: 1px solid #5a2a3c; background: #23121f; color: var(--tinta-2); font-size: 13.5px; }
+.v-alerta-caja ul { margin: 6px 0 0; padding-left: 18px; }
+.v-totales { margin-top: 16px; }
+
 /* ---------- Caja de 6 (pedido) ---------- */
 .caja {
   grid-column: 1 / -1; position: relative;

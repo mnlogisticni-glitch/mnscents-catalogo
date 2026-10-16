@@ -1,0 +1,54 @@
+name: Verificar seguridad de la web publicada
+
+# Revisa la web real (mnscents.pages.dev), no una copia local:
+# cabeceras de seguridad, archivos internos que no deben servirse, rutas que no existen
+# y que ningún archivo público contenga claves o contraseñas.
+on:
+  workflow_dispatch: {}
+  schedule:
+    - cron: '23 14 * * 1'   # lunes 8:23 a. m. hora de Nicaragua
+
+permissions:
+  contents: read
+
+jobs:
+  verificar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Revisar mnscents.pages.dev
+        env:
+          WEB: https://mnscents.pages.dev
+        run: |
+          fallos=0; informe=""
+          bien() { informe="$informe%0A✓ $1"; }
+          mal()  { informe="$informe%0A✗ $1"; fallos=$((fallos+1)); }
+
+          curl -sS -D cab.txt -o portada.html "$WEB/"
+          for c in content-security-policy x-frame-options x-content-type-options referrer-policy permissions-policy; do
+            if grep -qi "^$c:" cab.txt; then bien "Cabecera $c"; else mal "Falta la cabecera $c"; fi
+          done
+          grep -qi "frame-ancestors 'none'" cab.txt && bien "No se puede incrustar en otra página" || mal "La página se puede incrustar (clickjacking)"
+          grep -qi "static.cloudflareinsights.com/beacon" portada.html && bien "Web Analytics activo" || bien "Web Analytics no inyectado en esta respuesta"
+
+          for ruta in /scripts/sync.mjs /scripts/test-seguridad.py /.github/workflows/sincronizar.yml /LEEME.md /_headers /_redirects; do
+            cod=$(curl -s -o cuerpo.txt -w '%{http_code}' "$WEB$ruta")
+            if [ "$cod" = "200" ] && ! grep -q '<html' cuerpo.txt; then mal "$ruta se sirve públicamente ($cod)"; else bien "$ruta no se sirve ($cod)"; fi
+          done
+          for ruta in /admin /login /api/productos /.env /.git/config /wp-admin; do
+            cod=$(curl -s -o /dev/null -w '%{http_code}' "$WEB$ruta")
+            [ "$cod" = "404" ] && bien "$ruta → 404" || mal "$ruta responde $cod (se esperaba 404)"
+          done
+          cod=$(curl -s -o /dev/null -w '%{http_code}' -X POST -d 'x=1' "$WEB/data/productos.json")
+          [ "$cod" = "405" ] || [ "$cod" = "404" ] && bien "Escribir en los datos por POST no es posible ($cod)" || mal "POST a los datos respondió $cod"
+
+          # Todo lo que recibe el navegador: buscar claves, tokens o contraseñas
+          mkdir -p publico && cp portada.html publico/
+          for f in js/app.js js/precios.js js/recomendar.js js/tarjeta-perfil.js sw.js manifest.webmanifest data/productos.json css/estilos.css; do
+            curl -sS -o "publico/$(echo $f | tr / _)" "$WEB/$f"
+          done
+          patron='(ghp_|gho_|github_pat_|ghs_|AKIA[0-9A-Z]{16}|AIza[0-9A-Za-z_-]{35}|sk-[A-Za-z0-9]{20,}|xox[baprs]-|PRIVATE KEY|password[\"'"'"' ]*[:=]|contraseña[\"'"'"' ]*[:=]|api[_-]?key[\"'"'"' ]*[:=]|secret[\"'"'"' ]*[:=]|2PACX-|/spreadsheets/d/)'
+          if grep -rEil "$patron" publico; then mal "Hay texto parecido a una clave en los archivos públicos (ver arriba)"; else bien "Ningún archivo público contiene claves, tokens ni enlaces a la hoja"; fi
+
+          echo "::notice title=Resultado ($fallos fallos)::$informe"
+          [ "$fallos" -eq 0 ]
