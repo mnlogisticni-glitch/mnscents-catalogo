@@ -1,5 +1,5 @@
 {
- "actualizado": "2026-10-15T20:50:59.759Z",
+ "actualizado": "2026-10-16T21:25:00.193Z",
  "productos": [
   {
    "id": "H01",
@@ -25,7 +25,7 @@
     }
    },
    "estado": "disponible",
-   "existencias": 8,
+   "existencias": 7,
    "etiqueta": "top",
    "foto": "mandarin-sky.webp",
    "orden": 1
