@@ -1,5 +1,5 @@
 {
- "actualizado": "2026-10-16T21:25:00.193Z",
+ "actualizado": "2026-10-17T19:41:24.274Z",
  "productos": [
   {
    "id": "H01",
@@ -20,8 +20,8 @@
      "usd": 40
     },
     "mayor": {
-     "cs": 1080,
-     "usd": 29.3
+     "cs": 985,
+     "usd": 26.75
     }
    },
    "estado": "disponible",
@@ -49,8 +49,8 @@
      "usd": 40.6
     },
     "mayor": {
-     "cs": 1095,
-     "usd": 29.85
+     "cs": 1055,
+     "usd": 28.65
     }
    },
    "estado": "coming_soon",
@@ -78,7 +78,7 @@
     },
     "mayor": {
      "cs": 1065,
-     "usd": 28.95
+     "usd": 28.9
     }
    },
    "estado": "disponible",
@@ -472,8 +472,8 @@
      "usd": 38
     },
     "mayor": {
-     "cs": 885,
-     "usd": 24
+     "cs": 780,
+     "usd": 21.2
     }
    },
    "estado": "coming_soon",
@@ -658,8 +658,8 @@
      "usd": 38
     },
     "mayor": {
-     "cs": 885,
-     "usd": 24
+     "cs": 780,
+     "usd": 21.2
     }
    },
    "estado": "coming_soon",
@@ -682,8 +682,8 @@
      "usd": 38
     },
     "mayor": {
-     "cs": 885,
-     "usd": 24
+     "cs": 780,
+     "usd": 21.2
     }
    },
    "estado": "coming_soon",
