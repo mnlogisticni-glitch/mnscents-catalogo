@@ -1,5 +1,5 @@
 {
- "actualizado": "2026-10-17T20:19:32.683Z",
+ "actualizado": "2026-10-17T20:30:07.829Z",
  "productos": [
   {
    "id": "H01",
@@ -292,9 +292,8 @@
    "presentacion": "",
    "notas": [
     "Fresco",
-    "Cremoso",
     "Dulce",
-    "Amaderado"
+    "Coco"
    ],
    "descripcion": "La mejor alternativa del Jean Paul Paradise Garden",
    "precios": {
@@ -464,7 +463,12 @@
    "nombre": "Imperial",
    "marca": "Stallion 53",
    "presentacion": "Incluye spray de viaje de 20 ml",
-   "notas": [],
+   "notas": [
+    "Dulce",
+    "Vainilla",
+    "canela",
+    "picante"
+   ],
    "descripcion": "Excelente alternativa al Althair de perfums de marley",
    "precios": {
     "detalle": {
@@ -650,7 +654,12 @@
    "nombre": "Paradise",
    "marca": "Stallion 53",
    "presentacion": "Incluye spray de viaje de 20 ml",
-   "notas": [],
+   "notas": [
+    "Flores blancas",
+    "citrico",
+    "dulce",
+    "vanilla"
+   ],
    "descripcion": "Excelente alternativa al paradoxe de prada",
    "precios": {
     "detalle": {
@@ -674,7 +683,12 @@
    "nombre": "La furia",
    "marca": "Stallion 53",
    "presentacion": "Incluye spray de viaje de 20 ml",
-   "notas": [],
+   "notas": [
+    "Floral",
+    "Tropical",
+    "frutal",
+    "vainilla"
+   ],
    "descripcion": "Excelente alternativa a la bomba de Carolina herrera",
    "precios": {
     "detalle": {
