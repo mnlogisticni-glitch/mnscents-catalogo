@@ -1,5 +1,5 @@
 {
- "actualizado": "2026-10-19T15:58:24.902Z",
+ "actualizado": "2026-10-19T23:47:34.438Z",
  "productos": [
   {
    "id": "H01",
@@ -25,7 +25,7 @@
     }
    },
    "estado": "disponible",
-   "existencias": 6,
+   "existencias": 4,
    "etiqueta": "top",
    "foto": "mandarin-sky.webp",
    "orden": 1
@@ -54,7 +54,7 @@
     }
    },
    "estado": "coming_soon",
-   "existencias": 0,
+   "existencias": 1,
    "etiqueta": null,
    "foto": "khamrah-qahwa.webp",
    "orden": 2
@@ -82,7 +82,7 @@
     }
    },
    "estado": "disponible",
-   "existencias": 12,
+   "existencias": 11,
    "etiqueta": null,
    "foto": "afnan-9pm.webp",
    "orden": 3
@@ -111,7 +111,7 @@
     }
    },
    "estado": "disponible",
-   "existencias": 3,
+   "existencias": 4,
    "etiqueta": null,
    "foto": "amber-oud-gold-edition.webp",
    "orden": 4
@@ -139,7 +139,7 @@
     }
    },
    "estado": "disponible",
-   "existencias": 9,
+   "existencias": 7,
    "etiqueta": null,
    "foto": "club-de-nuit-intense-man.webp",
    "orden": 5
@@ -163,7 +163,7 @@
     }
    },
    "estado": "disponible",
-   "existencias": 3,
+   "existencias": 2,
    "etiqueta": null,
    "foto": "uomo-intense.webp",
    "orden": 6
@@ -192,7 +192,7 @@
     }
    },
    "estado": "coming_soon",
-   "existencias": null,
+   "existencias": 0,
    "etiqueta": null,
    "foto": "nautica-voyage.webp",
    "orden": 7
@@ -221,7 +221,7 @@
     }
    },
    "estado": "disponible",
-   "existencias": 1,
+   "existencias": 2,
    "etiqueta": null,
    "foto": "badee-al-oud-for-glory.webp",
    "orden": 8
@@ -279,7 +279,7 @@
     }
    },
    "estado": "disponible",
-   "existencias": 5,
+   "existencias": 4,
    "etiqueta": "top",
    "foto": "hawas-ice.webp",
    "orden": 10
@@ -307,7 +307,7 @@
     }
    },
    "estado": "agotado",
-   "existencias": null,
+   "existencias": 1,
    "etiqueta": null,
    "foto": "hawas-tropical.webp",
    "orden": 11
@@ -336,7 +336,7 @@
     }
    },
    "estado": "agotado",
-   "existencias": 0,
+   "existencias": 1,
    "etiqueta": null,
    "foto": "hawas-elixir.webp",
    "orden": 12
@@ -365,7 +365,7 @@
     }
    },
    "estado": "disponible",
-   "existencias": 6,
+   "existencias": 7,
    "etiqueta": null,
    "foto": "mandarin-sky-elixir.webp",
    "orden": 13
@@ -394,7 +394,7 @@
     }
    },
    "estado": "coming_soon",
-   "existencias": null,
+   "existencias": 0,
    "etiqueta": null,
    "foto": "jean-lowe-vibe.webp",
    "orden": 14
@@ -423,7 +423,7 @@
     }
    },
    "estado": "disponible",
-   "existencias": 5,
+   "existencias": 6,
    "etiqueta": null,
    "foto": "asad-bourbon.webp",
    "orden": 15
@@ -452,7 +452,7 @@
     }
    },
    "estado": "coming_soon",
-   "existencias": null,
+   "existencias": 0,
    "etiqueta": null,
    "foto": "club-de-nuit-iconic.webp",
    "orden": 16
@@ -510,7 +510,7 @@
     }
    },
    "estado": "disponible",
-   "existencias": 4,
+   "existencias": 3,
    "etiqueta": "top",
    "foto": "9am-pour-femme.webp",
    "orden": 1
@@ -562,7 +562,7 @@
     }
    },
    "estado": "coming_soon",
-   "existencias": null,
+   "existencias": 0,
    "etiqueta": null,
    "foto": "delilah-pour-femme.webp",
    "orden": 3
@@ -590,7 +590,7 @@
     }
    },
    "estado": "coming_soon",
-   "existencias": null,
+   "existencias": 0,
    "etiqueta": null,
    "foto": "odyssey-candee.webp",
    "orden": 4
@@ -619,7 +619,7 @@
     }
    },
    "estado": "disponible",
-   "existencias": 3,
+   "existencias": 2,
    "etiqueta": null,
    "foto": "yara-tous.webp",
    "orden": 5
@@ -643,7 +643,7 @@
     }
    },
    "estado": "disponible",
-   "existencias": 3,
+   "existencias": 4,
    "etiqueta": null,
    "foto": "set-yara-4-piezas.webp",
    "orden": 6
