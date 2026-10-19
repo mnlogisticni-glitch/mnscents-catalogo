@@ -23,3 +23,8 @@ WhatsApp de pedidos: +505 8473-5485 (en `js/precios.js`).
 - El mensaje de WhatsApp lleva "Verificar pedido: …/#pedido=…". Ábrelo antes de confirmar un pedido: los precios se recalculan desde el catálogo, aunque el cliente haya editado el texto.
 - `.github/workflows/verificar-web.yml` revisa cada lunes la web publicada (cabeceras, archivos internos, claves expuestas). También se puede correr a mano en Actions.
 - Pruebas locales: `python3 scripts/test-seguridad.py <carpeta>` (usa `scripts/servidor-pages.py`, que imita Cloudflare Pages).
+
+## Existencias conectadas al sistema (MNScents_claude)
+- La columna `existencias` (P) de la hoja de la web ya no se escribe a mano: la fórmula de P2 trae el "Stock actual" (columna R) de la hoja Inventario del sistema MNScents_claude, buscando el SKU de la columna `sku_inventario` (R).
+- Perfume nuevo en la web: llena su fila y copia en `sku_inventario` el SKU que tiene en Inventario (columna A). Sin SKU, la web no limita sus unidades (la sincronización avisa).
+- Si la conexión falla (#REF!) o todo llega en 0, la sincronización no publica nada y la web conserva las existencias anteriores.
