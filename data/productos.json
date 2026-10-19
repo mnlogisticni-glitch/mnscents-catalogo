@@ -1,5 +1,5 @@
 {
- "actualizado": "2026-10-19T15:31:48.968Z",
+ "actualizado": "2026-10-19T15:58:24.902Z",
  "productos": [
   {
    "id": "H01",
@@ -25,7 +25,7 @@
     }
    },
    "estado": "disponible",
-   "existencias": 7,
+   "existencias": 6,
    "etiqueta": "top",
    "foto": "mandarin-sky.webp",
    "orden": 1
@@ -82,7 +82,7 @@
     }
    },
    "estado": "disponible",
-   "existencias": 13,
+   "existencias": 12,
    "etiqueta": null,
    "foto": "afnan-9pm.webp",
    "orden": 3
@@ -139,7 +139,7 @@
     }
    },
    "estado": "disponible",
-   "existencias": 10,
+   "existencias": 9,
    "etiqueta": null,
    "foto": "club-de-nuit-intense-man.webp",
    "orden": 5
@@ -279,7 +279,7 @@
     }
    },
    "estado": "disponible",
-   "existencias": 6,
+   "existencias": 5,
    "etiqueta": "top",
    "foto": "hawas-ice.webp",
    "orden": 10
