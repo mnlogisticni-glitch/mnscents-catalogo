@@ -1,5 +1,5 @@
 {
- "actualizado": "2026-10-17T20:30:07.829Z",
+ "actualizado": "2026-10-19T05:30:01.067Z",
  "productos": [
   {
    "id": "H01",
@@ -335,8 +335,8 @@
      "usd": 35.65
     }
    },
-   "estado": "disponible",
-   "existencias": 1,
+   "estado": "agotado",
+   "existencias": 0,
    "etiqueta": null,
    "foto": "hawas-elixir.webp",
    "orden": 12
