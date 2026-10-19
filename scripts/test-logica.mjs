@@ -130,6 +130,26 @@ prueba('Más vendido / Nuevo se reconocen; otra palabra solo avisa', () => {
   assert.deepEqual(r8.productos.map(p => p.etiqueta), ['top', 'nuevo', null]);
   assert.ok(r8.avisos.some(a => a.includes('oferta')));
 });
+// ---------- Existencias conectadas al Inventario ----------
+const cabInv = 'id,catalogo,nombre,marca,presentacion,notas,descripcion,precio_detalle_cs,precio_detalle_usd,precio_mayor_cs,precio_mayor_usd,estado,foto,mostrar,orden,existencias,etiqueta,sku_inventario\n';
+const rRef = await convertir(cabInv + 'H01,Caballeros,A,M,,,,1460,40,1080,29.5,Disponible,,Sí,1,#REF!,,6294015149371\n', { comprobarFotos: false });
+const rInv = await convertir(cabInv + 'H01,Caballeros,A,M,,,,1460,40,1080,29.5,Disponible,,Sí,1,6,,6294015149371\nH02,Caballeros,B,M,,,,1460,40,1080,29.5,Disponible,,Sí,2,,,\n', { comprobarFotos: false });
+const rCero = await convertir(cabInv + ['H01','H02','H03'].map((id, i) => `${id},Caballeros,P${i},M,,,,1460,40,1080,29.5,Disponible,,Sí,${i + 1},0,,62940151493${i}`).join('\n') + '\n', { comprobarFotos: false });
+prueba('Inventario: si TODO viene en 0 no publica (conexión rota, no ventas)', () => {
+  assert.ok(rCero.errores.some(e => /problema de conexión/.test(e)), JSON.stringify(rCero.errores));
+});
+prueba('Inventario: el SKU no se publica en la web', () => {
+  assert.ok(rInv.productos.every(p => !('_sku' in p)));
+});
+prueba('Inventario: un #REF! en existencias detiene la publicación con un mensaje claro', () => {
+  assert.ok(rRef.errores.some(e => /Permitir acceso/.test(e)), JSON.stringify(rRef.errores));
+});
+prueba('Inventario: existencias que vienen de la fórmula se respetan y avisa si falta el SKU', () => {
+  assert.equal(rInv.errores.length, 0, JSON.stringify(rInv.errores));
+  assert.equal(rInv.productos.find(p => p.id === 'H01').existencias, 6);
+  assert.ok(rInv.avisos.some(a => /\(B\)|H02|Fila 3/.test(a) && /SKU/.test(a)), JSON.stringify(rInv.avisos));
+});
+
 // ---------- Comparar ----------
 const { comparar, candidatos, leerComparar } = await import('../js/comparar.js');
 prueba('Comparar: notas en común y precio más económico salen de la hoja', () => {

@@ -141,10 +141,15 @@ export async function convertir(texto, { comprobarFotos = true } = {}) {
     // Existencias (columna opcional): vacío = sin límite; 0 = se muestra como Agotado
     let existencias = null;
     if ('existencias' in col && g('existencias') !== '') {
-      const n = numero(g('existencias'));
-      if (!Number.isInteger(n) || n < 0) errores.push(`${pref}: en "existencias" escribe un número entero (0, 1, 2…) o déjalo vacío.`);
+      const crudo = g('existencias');
+      const n = numero(crudo);
+      if (/^#/.test(crudo)) errores.push(`${pref}: "existencias" muestra ${crudo}. La conexión con el Inventario del sistema falló: abre la hoja de la web, toca la celda P2 y pulsa "Permitir acceso". Mientras tanto la web conserva las existencias anteriores.`);
+      else if (!Number.isInteger(n) || n < 0) errores.push(`${pref}: en "existencias" escribe un número entero (0, 1, 2…) o déjalo vacío.`);
       else existencias = n;
     }
+    // Conectado al Inventario: un perfume disponible sin SKU no tendría límite de unidades
+    if ('sku_inventario' in col && !g('sku_inventario') && est === 'disponible')
+      avisos.push(`${pref}: no tiene SKU en "sku_inventario", así que la web no limita sus unidades. Copia su SKU de la hoja Inventario.`);
     const estadoFinal = existencias === 0 && est === 'disponible' ? 'agotado' : est;
 
     // Etiqueta (columna opcional): Nuevo o Más vendido
@@ -170,10 +175,18 @@ export async function convertir(texto, { comprobarFotos = true } = {}) {
     if (mostrar !== false) productos.push({
       id, catalogo, nombre, marca: g('marca'), presentacion: g('presentacion'),
       notas: g('notas').split(/\s*[·•|\-]\s*/).filter(Boolean),
-      descripcion: g('descripcion'), precios, estado: estadoFinal, existencias, etiqueta, foto, orden,
+      descripcion: g('descripcion'), precios, estado: estadoFinal, existencias, etiqueta, foto, orden, _sku: 'sku_inventario' in col ? g('sku_inventario') : '',
     });
   }
   productos.sort((a, b) => a.catalogo.localeCompare(b.catalogo) || a.orden - b.orden || a.nombre.localeCompare(b.nombre));
+  // Protección: si la hoja está conectada al Inventario y TODOS los perfumes con SKU marcan 0,
+  // casi seguro es la conexión (sin permiso o SKU que no coinciden), no que se vendió todo.
+  if ('sku_inventario' in col) {
+    const conSku = productos.filter(p => p._sku);
+    if (conSku.length >= 3 && conSku.every(p => p.existencias === 0))
+      errores.push('Todas las existencias que vienen del Inventario están en 0. Parece un problema de conexión (permiso de acceso o SKU que no coinciden), no ventas reales. No se publicó nada para no marcar toda la web como agotada.');
+  }
+  for (const p of productos) delete p._sku;
   return { errores, avisos, productos };
 }
 
