@@ -1,5 +1,5 @@
 {
- "actualizado": "2026-10-20T03:28:23.508Z",
+ "actualizado": "2026-10-20T03:29:09.206Z",
  "productos": [
   {
    "id": "H01",
@@ -598,7 +598,7 @@
   {
    "id": "D05",
    "catalogo": "damas",
-   "nombre": "Yara Tous",
+   "nombre": "Yara moi",
    "marca": "Lattafa",
    "presentacion": "",
    "notas": [
@@ -618,8 +618,8 @@
      "usd": 22.95
     }
    },
-   "estado": "disponible",
-   "existencias": 2,
+   "estado": "agotado",
+   "existencias": 0,
    "etiqueta": null,
    "foto": "yara-tous.webp",
    "orden": 5
