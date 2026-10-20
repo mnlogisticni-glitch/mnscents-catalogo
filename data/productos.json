@@ -1,5 +1,5 @@
 {
- "actualizado": "2026-10-20T03:29:09.206Z",
+ "actualizado": "2026-10-20T03:34:53.757Z",
  "productos": [
   {
    "id": "H01",
@@ -618,8 +618,8 @@
      "usd": 22.95
     }
    },
-   "estado": "agotado",
-   "existencias": 0,
+   "estado": "disponible",
+   "existencias": 2,
    "etiqueta": null,
    "foto": "yara-tous.webp",
    "orden": 5
