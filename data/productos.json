@@ -1,5 +1,5 @@
 {
- "actualizado": "2026-10-20T18:31:50.560Z",
+ "actualizado": "2026-10-20T23:24:12.143Z",
  "productos": [
   {
    "id": "H01",
@@ -509,8 +509,8 @@
      "usd": 29.85
     }
    },
-   "estado": "disponible",
-   "existencias": 2,
+   "estado": "agotado",
+   "existencias": 0,
    "etiqueta": "top",
    "foto": "9am-pour-femme.webp",
    "orden": 1
@@ -619,7 +619,7 @@
     }
    },
    "estado": "disponible",
-   "existencias": 2,
+   "existencias": 1,
    "etiqueta": null,
    "foto": "yara-tous.webp",
    "orden": 5
