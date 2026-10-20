@@ -1,5 +1,5 @@
 {
- "actualizado": "2026-10-20T03:34:53.757Z",
+ "actualizado": "2026-10-20T18:31:50.560Z",
  "productos": [
   {
    "id": "H01",
@@ -279,7 +279,7 @@
     }
    },
    "estado": "disponible",
-   "existencias": 4,
+   "existencias": 2,
    "etiqueta": "top",
    "foto": "hawas-ice.webp",
    "orden": 10
@@ -510,7 +510,7 @@
     }
    },
    "estado": "disponible",
-   "existencias": 3,
+   "existencias": 2,
    "etiqueta": "top",
    "foto": "9am-pour-femme.webp",
    "orden": 1
@@ -643,7 +643,7 @@
     }
    },
    "estado": "disponible",
-   "existencias": 4,
+   "existencias": 3,
    "etiqueta": null,
    "foto": "set-yara-4-piezas.webp",
    "orden": 6
