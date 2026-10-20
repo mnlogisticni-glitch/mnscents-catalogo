@@ -1,5 +1,5 @@
 {
- "actualizado": "2026-10-20T00:36:36.728Z",
+ "actualizado": "2026-10-20T01:33:15.609Z",
  "productos": [
   {
    "id": "H01",
@@ -111,7 +111,7 @@
     }
    },
    "estado": "disponible",
-   "existencias": 4,
+   "existencias": 3,
    "etiqueta": null,
    "foto": "amber-oud-gold-edition.webp",
    "orden": 4
