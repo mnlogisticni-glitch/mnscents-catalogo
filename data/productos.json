@@ -1,5 +1,5 @@
 {
- "actualizado": "2026-10-19T23:47:34.438Z",
+ "actualizado": "2026-10-20T00:36:36.728Z",
  "productos": [
   {
    "id": "H01",
@@ -163,7 +163,7 @@
     }
    },
    "estado": "disponible",
-   "existencias": 2,
+   "existencias": 1,
    "etiqueta": null,
    "foto": "uomo-intense.webp",
    "orden": 6
