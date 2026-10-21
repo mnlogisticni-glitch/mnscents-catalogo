@@ -1,5 +1,5 @@
 {
- "actualizado": "2026-10-20T23:24:12.143Z",
+ "actualizado": "2026-10-21T00:23:51.998Z",
  "productos": [
   {
    "id": "H01",
@@ -82,7 +82,7 @@
     }
    },
    "estado": "disponible",
-   "existencias": 11,
+   "existencias": 10,
    "etiqueta": null,
    "foto": "afnan-9pm.webp",
    "orden": 3
@@ -111,7 +111,7 @@
     }
    },
    "estado": "disponible",
-   "existencias": 3,
+   "existencias": 2,
    "etiqueta": null,
    "foto": "amber-oud-gold-edition.webp",
    "orden": 4
@@ -139,7 +139,7 @@
     }
    },
    "estado": "disponible",
-   "existencias": 7,
+   "existencias": 5,
    "etiqueta": null,
    "foto": "club-de-nuit-intense-man.webp",
    "orden": 5
@@ -162,8 +162,8 @@
      "usd": 24.55
     }
    },
-   "estado": "disponible",
-   "existencias": 1,
+   "estado": "agotado",
+   "existencias": 0,
    "etiqueta": null,
    "foto": "uomo-intense.webp",
    "orden": 6
@@ -221,7 +221,7 @@
     }
    },
    "estado": "disponible",
-   "existencias": 2,
+   "existencias": 1,
    "etiqueta": null,
    "foto": "badee-al-oud-for-glory.webp",
    "orden": 8
@@ -279,7 +279,7 @@
     }
    },
    "estado": "disponible",
-   "existencias": 2,
+   "existencias": 1,
    "etiqueta": "top",
    "foto": "hawas-ice.webp",
    "orden": 10
@@ -307,7 +307,7 @@
     }
    },
    "estado": "agotado",
-   "existencias": 1,
+   "existencias": 0,
    "etiqueta": null,
    "foto": "hawas-tropical.webp",
    "orden": 11
@@ -423,7 +423,7 @@
     }
    },
    "estado": "disponible",
-   "existencias": 6,
+   "existencias": 5,
    "etiqueta": null,
    "foto": "asad-bourbon.webp",
    "orden": 15
@@ -642,8 +642,8 @@
      "usd": 29.3
     }
    },
-   "estado": "disponible",
-   "existencias": 3,
+   "estado": "agotado",
+   "existencias": 0,
    "etiqueta": null,
    "foto": "set-yara-4-piezas.webp",
    "orden": 6
