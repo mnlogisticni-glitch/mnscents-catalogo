@@ -1,5 +1,5 @@
 {
- "actualizado": "2026-10-21T00:23:51.998Z",
+ "actualizado": "2026-10-23T17:45:55.798Z",
  "productos": [
   {
    "id": "H01",
@@ -25,7 +25,7 @@
     }
    },
    "estado": "disponible",
-   "existencias": 4,
+   "existencias": 10,
    "etiqueta": "top",
    "foto": "mandarin-sky.webp",
    "orden": 1
@@ -192,7 +192,7 @@
     }
    },
    "estado": "coming_soon",
-   "existencias": 0,
+   "existencias": 9,
    "etiqueta": null,
    "foto": "nautica-voyage.webp",
    "orden": 7
@@ -394,7 +394,7 @@
     }
    },
    "estado": "coming_soon",
-   "existencias": 0,
+   "existencias": 5,
    "etiqueta": null,
    "foto": "jean-lowe-vibe.webp",
    "orden": 14
@@ -452,7 +452,7 @@
     }
    },
    "estado": "coming_soon",
-   "existencias": 0,
+   "existencias": 4,
    "etiqueta": null,
    "foto": "club-de-nuit-iconic.webp",
    "orden": 16
@@ -562,7 +562,7 @@
     }
    },
    "estado": "coming_soon",
-   "existencias": 0,
+   "existencias": 5,
    "etiqueta": null,
    "foto": "delilah-pour-femme.webp",
    "orden": 3
@@ -590,7 +590,7 @@
     }
    },
    "estado": "coming_soon",
-   "existencias": 0,
+   "existencias": 5,
    "etiqueta": null,
    "foto": "odyssey-candee.webp",
    "orden": 4
