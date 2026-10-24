@@ -1,5 +1,5 @@
 {
- "actualizado": "2026-10-23T17:58:00.731Z",
+ "actualizado": "2026-10-24T16:48:30.802Z",
  "productos": [
   {
    "id": "H01",
@@ -278,8 +278,8 @@
      "usd": 37.35
     }
    },
-   "estado": "disponible",
-   "existencias": 1,
+   "estado": "agotado",
+   "existencias": 0,
    "etiqueta": "top",
    "foto": "hawas-ice.webp",
    "orden": 10
