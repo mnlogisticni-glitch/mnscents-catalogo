@@ -1,4 +1,5 @@
 # Prueba en navegador: "Encuentra tu perfume" y "Arma tu caja de 6"
+# Usa un catálogo fijo (scripts/fixtures/productos-web.json) para que las pruebas no dependan de las existencias del día.
 # Uso: python3 scripts/test-quiz-caja.py <carpeta-capturas> [url]
 import sys
 from playwright.sync_api import sync_playwright
@@ -8,15 +9,15 @@ def ok(n, c, extra=''):
     res.append(c); print(('  ✓ ' if c else '  ✗ ') + n + ('' if c else f'  [{extra}]'))
 with sync_playwright() as p:
     b = p.chromium.launch()
-    ctx = b.new_context(viewport={'width': 390, 'height': 844}, device_scale_factor=2, is_mobile=True, has_touch=True)
+    ctx = b.new_context(viewport={'width': 390, 'height': 844}, device_scale_factor=2, is_mobile=True, has_touch=True); ctx.route('**/data/productos.json', lambda r: r.fulfill(path='scripts/fixtures/productos-web.json', content_type='application/json'))
     pg = ctx.new_page()
     pg.on('console', lambda m: m.type == 'error' and errs.append(m.text)); pg.on('pageerror', lambda e: errs.append(str(e)))
     pg.goto(URL); pg.wait_for_selector('.tarjeta')
     pg.evaluate("localStorage.clear()"); pg.reload(); pg.wait_for_selector('.tarjeta')
-    ok('Entrada "Encuentra tu perfume" visible', pg.locator('.descubre').is_visible())
+    ok('Entrada "Encuentra tu perfume" visible', pg.locator('.descubre').first.is_visible())
     ok('La luna de la entrada tiene su creciente', len(pg.get_attribute('.descubre .lp-luz', 'd') or '') > 10)
     pg.screenshot(path=f'{S}/shots/q0-entrada.png')
-    pg.click('.descubre'); pg.wait_for_timeout(450)
+    pg.click('.descubre:not(.descubre-mapa)'); pg.wait_for_timeout(450)
     ok('Abre el cuestionario', pg.locator('#hoja-quiz[open]').count() == 1)
     ok('Pregunta 1 de 4', 'Pregunta 1 de 4' in pg.inner_text('.q-paso'))
     ok('Enlace directo #encuentra', pg.evaluate('location.hash') == '#encuentra')

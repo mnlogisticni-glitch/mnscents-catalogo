@@ -1,0 +1,710 @@
+{
+ "actualizado": "2026-10-19T23:47:34.438Z",
+ "productos": [
+  {
+   "id": "H01",
+   "catalogo": "caballeros",
+   "nombre": "Mandarin Sky",
+   "marca": "Armaf",
+   "presentacion": "",
+   "notas": [
+    "Cítrico",
+    "Dulce",
+    "Aromático",
+    "Ámbar"
+   ],
+   "descripcion": "",
+   "precios": {
+    "detalle": {
+     "cs": 1460,
+     "usd": 40
+    },
+    "mayor": {
+     "cs": 985,
+     "usd": 26.75
+    }
+   },
+   "estado": "disponible",
+   "existencias": 4,
+   "etiqueta": "top",
+   "foto": "mandarin-sky.webp",
+   "orden": 1
+  },
+  {
+   "id": "H02",
+   "catalogo": "caballeros",
+   "nombre": "Khamrah Qahwa",
+   "marca": "Lattafa",
+   "presentacion": "",
+   "notas": [
+    "Cálido",
+    "Dulce",
+    "Canela",
+    "Café"
+   ],
+   "descripcion": "",
+   "precios": {
+    "detalle": {
+     "cs": 1490,
+     "usd": 40.6
+    },
+    "mayor": {
+     "cs": 1055,
+     "usd": 28.65
+    }
+   },
+   "estado": "coming_soon",
+   "existencias": 1,
+   "etiqueta": null,
+   "foto": "khamrah-qahwa.webp",
+   "orden": 2
+  },
+  {
+   "id": "H03",
+   "catalogo": "caballeros",
+   "nombre": "9PM",
+   "marca": "Afnan",
+   "presentacion": "",
+   "notas": [
+    "Dulce",
+    "Cálido",
+    "Amaderado"
+   ],
+   "descripcion": "",
+   "precios": {
+    "detalle": {
+     "cs": 1490,
+     "usd": 40.6
+    },
+    "mayor": {
+     "cs": 965,
+     "usd": 26.2
+    }
+   },
+   "estado": "disponible",
+   "existencias": 11,
+   "etiqueta": null,
+   "foto": "afnan-9pm.webp",
+   "orden": 3
+  },
+  {
+   "id": "H04",
+   "catalogo": "caballeros",
+   "nombre": "Amber Oud Gold Edition",
+   "marca": "Al Haramain",
+   "presentacion": "120 ml",
+   "notas": [
+    "Dulce",
+    "Especiado",
+    "Ámbar",
+    "Afrutado"
+   ],
+   "descripcion": "La mejor alternativa del Erba Pura",
+   "precios": {
+    "detalle": {
+     "cs": 2380,
+     "usd": 65
+    },
+    "mayor": {
+     "cs": 1845,
+     "usd": 50.5
+    }
+   },
+   "estado": "disponible",
+   "existencias": 4,
+   "etiqueta": null,
+   "foto": "amber-oud-gold-edition.webp",
+   "orden": 4
+  },
+  {
+   "id": "H05",
+   "catalogo": "caballeros",
+   "nombre": "Club de Nuit Intense Man",
+   "marca": "Armaf",
+   "presentacion": "",
+   "notas": [
+    "Elegante",
+    "Masculino",
+    "Intenso"
+   ],
+   "descripcion": "",
+   "precios": {
+    "detalle": {
+     "cs": 1490,
+     "usd": 40.6
+    },
+    "mayor": {
+     "cs": 1150,
+     "usd": 31.25
+    }
+   },
+   "estado": "disponible",
+   "existencias": 7,
+   "etiqueta": null,
+   "foto": "club-de-nuit-intense-man.webp",
+   "orden": 5
+  },
+  {
+   "id": "H06",
+   "catalogo": "caballeros",
+   "nombre": "Uomo Intense",
+   "marca": "Stallion 53",
+   "presentacion": "Incluye spray de viaje de 20 ml",
+   "notas": [],
+   "descripcion": "Alternativa del Valentino Uomo Intense",
+   "precios": {
+    "detalle": {
+     "cs": 1390,
+     "usd": 38
+    },
+    "mayor": {
+     "cs": 905,
+     "usd": 24.55
+    }
+   },
+   "estado": "disponible",
+   "existencias": 2,
+   "etiqueta": null,
+   "foto": "uomo-intense.webp",
+   "orden": 6
+  },
+  {
+   "id": "H07",
+   "catalogo": "caballeros",
+   "nombre": "Nautica Voyage",
+   "marca": "Nautica",
+   "presentacion": "",
+   "notas": [
+    "Fresco",
+    "Verde",
+    "Acuático",
+    "Elegante"
+   ],
+   "descripcion": "",
+   "precios": {
+    "detalle": {
+     "cs": 1200,
+     "usd": 32.55
+    },
+    "mayor": {
+     "cs": 755,
+     "usd": 20.5
+    }
+   },
+   "estado": "coming_soon",
+   "existencias": 0,
+   "etiqueta": null,
+   "foto": "nautica-voyage.webp",
+   "orden": 7
+  },
+  {
+   "id": "H08",
+   "catalogo": "caballeros",
+   "nombre": "Bade'e Al Oud For Glory",
+   "marca": "Lattafa",
+   "presentacion": "",
+   "notas": [
+    "Intenso",
+    "Amaderado",
+    "Especiado",
+    "Misterioso"
+   ],
+   "descripcion": "",
+   "precios": {
+    "detalle": {
+     "cs": 1390,
+     "usd": 38
+    },
+    "mayor": {
+     "cs": 970,
+     "usd": 26.3
+    }
+   },
+   "estado": "disponible",
+   "existencias": 2,
+   "etiqueta": null,
+   "foto": "badee-al-oud-for-glory.webp",
+   "orden": 8
+  },
+  {
+   "id": "H09",
+   "catalogo": "caballeros",
+   "nombre": "9AM Dive",
+   "marca": "Afnan",
+   "presentacion": "",
+   "notas": [
+    "Fresco",
+    "Cítrico",
+    "Verde",
+    "Acuático"
+   ],
+   "descripcion": "",
+   "precios": {
+    "detalle": {
+     "cs": 1490,
+     "usd": 40.6
+    },
+    "mayor": {
+     "cs": 1095,
+     "usd": 29.85
+    }
+   },
+   "estado": "disponible",
+   "existencias": 14,
+   "etiqueta": null,
+   "foto": "9am-dive.webp",
+   "orden": 9
+  },
+  {
+   "id": "H10",
+   "catalogo": "caballeros",
+   "nombre": "Hawas Ice",
+   "marca": "Rasasi",
+   "presentacion": "",
+   "notas": [
+    "Fresco",
+    "Cítrico",
+    "Acuático",
+    "Masculino"
+   ],
+   "descripcion": "",
+   "precios": {
+    "detalle": {
+     "cs": 1930,
+     "usd": 52.4
+    },
+    "mayor": {
+     "cs": 1375,
+     "usd": 37.35
+    }
+   },
+   "estado": "disponible",
+   "existencias": 4,
+   "etiqueta": "top",
+   "foto": "hawas-ice.webp",
+   "orden": 10
+  },
+  {
+   "id": "H11",
+   "catalogo": "caballeros",
+   "nombre": "Hawas Tropical",
+   "marca": "Rasasi",
+   "presentacion": "",
+   "notas": [
+    "Fresco",
+    "Dulce",
+    "Coco"
+   ],
+   "descripcion": "La mejor alternativa del Jean Paul Paradise Garden",
+   "precios": {
+    "detalle": {
+     "cs": 2010,
+     "usd": 55
+    },
+    "mayor": {
+     "cs": 1485,
+     "usd": 40.5
+    }
+   },
+   "estado": "agotado",
+   "existencias": 1,
+   "etiqueta": null,
+   "foto": "hawas-tropical.webp",
+   "orden": 11
+  },
+  {
+   "id": "H12",
+   "catalogo": "caballeros",
+   "nombre": "Hawas Elixir",
+   "marca": "Rasasi",
+   "presentacion": "",
+   "notas": [
+    "Dulce",
+    "Nocturno",
+    "Especiado",
+    "Masculino"
+   ],
+   "descripcion": "La mejor alternativa del Jean Paul Elixir",
+   "precios": {
+    "detalle": {
+     "cs": 1690,
+     "usd": 45.9
+    },
+    "mayor": {
+     "cs": 1310,
+     "usd": 35.65
+    }
+   },
+   "estado": "agotado",
+   "existencias": 1,
+   "etiqueta": null,
+   "foto": "hawas-elixir.webp",
+   "orden": 12
+  },
+  {
+   "id": "H13",
+   "catalogo": "caballeros",
+   "nombre": "Mandarin Sky Elixir",
+   "marca": "Armaf",
+   "presentacion": "",
+   "notas": [
+    "Dulce",
+    "Atrevido",
+    "Frutal",
+    "Magnético"
+   ],
+   "descripcion": "",
+   "precios": {
+    "detalle": {
+     "cs": 1760,
+     "usd": 48
+    },
+    "mayor": {
+     "cs": 1245,
+     "usd": 33.8
+    }
+   },
+   "estado": "disponible",
+   "existencias": 7,
+   "etiqueta": null,
+   "foto": "mandarin-sky-elixir.webp",
+   "orden": 13
+  },
+  {
+   "id": "H14",
+   "catalogo": "caballeros",
+   "nombre": "Jean Lowe Vibe",
+   "marca": "Maison Alhambra",
+   "presentacion": "",
+   "notas": [
+    "Fresco",
+    "Atractivo",
+    "Acuático",
+    "Verde"
+   ],
+   "descripcion": "Similar a Pacific Chill de LV",
+   "precios": {
+    "detalle": {
+     "cs": 1490,
+     "usd": 40.6
+    },
+    "mayor": {
+     "cs": 1080,
+     "usd": 29.3
+    }
+   },
+   "estado": "coming_soon",
+   "existencias": 0,
+   "etiqueta": null,
+   "foto": "jean-lowe-vibe.webp",
+   "orden": 14
+  },
+  {
+   "id": "H15",
+   "catalogo": "caballeros",
+   "nombre": "Asad Bourbon",
+   "marca": "Lattafa",
+   "presentacion": "",
+   "notas": [
+    "Seductor",
+    "Cálido",
+    "Elegante",
+    "Dulce"
+   ],
+   "descripcion": "",
+   "precios": {
+    "detalle": {
+     "cs": 1490,
+     "usd": 40.6
+    },
+    "mayor": {
+     "cs": 1035,
+     "usd": 28.1
+    }
+   },
+   "estado": "disponible",
+   "existencias": 6,
+   "etiqueta": null,
+   "foto": "asad-bourbon.webp",
+   "orden": 15
+  },
+  {
+   "id": "H16",
+   "catalogo": "caballeros",
+   "nombre": "Club de Nuit Iconic",
+   "marca": "Armaf",
+   "presentacion": "",
+   "notas": [
+    "Fresco",
+    "Refinado",
+    "Seductor",
+    "Acuático"
+   ],
+   "descripcion": "",
+   "precios": {
+    "detalle": {
+     "cs": 1950,
+     "usd": 53
+    },
+    "mayor": {
+     "cs": 1475,
+     "usd": 39.95
+    }
+   },
+   "estado": "coming_soon",
+   "existencias": 0,
+   "etiqueta": null,
+   "foto": "club-de-nuit-iconic.webp",
+   "orden": 16
+  },
+  {
+   "id": "H17",
+   "catalogo": "caballeros",
+   "nombre": "Imperial",
+   "marca": "Stallion 53",
+   "presentacion": "Incluye spray de viaje de 20 ml",
+   "notas": [
+    "Dulce",
+    "Vainilla",
+    "canela",
+    "picante"
+   ],
+   "descripcion": "Excelente alternativa al Althair de perfums de marley",
+   "precios": {
+    "detalle": {
+     "cs": 1390,
+     "usd": 38
+    },
+    "mayor": {
+     "cs": 780,
+     "usd": 21.2
+    }
+   },
+   "estado": "coming_soon",
+   "existencias": 0,
+   "etiqueta": null,
+   "foto": "stallion53.imperial.png",
+   "orden": 17
+  },
+  {
+   "id": "D01",
+   "catalogo": "damas",
+   "nombre": "9AM Pour Femme",
+   "marca": "Afnan",
+   "presentacion": "",
+   "notas": [
+    "Frutal",
+    "Cítrico",
+    "Floral",
+    "Fresco"
+   ],
+   "descripcion": "",
+   "precios": {
+    "detalle": {
+     "cs": 1490,
+     "usd": 40.6
+    },
+    "mayor": {
+     "cs": 1095,
+     "usd": 29.85
+    }
+   },
+   "estado": "disponible",
+   "existencias": 3,
+   "etiqueta": "top",
+   "foto": "9am-pour-femme.webp",
+   "orden": 1
+  },
+  {
+   "id": "D02",
+   "catalogo": "damas",
+   "nombre": "Donna Intense",
+   "marca": "Stallion 53",
+   "presentacion": "Incluye spray de viaje de 20 ml",
+   "notas": [],
+   "descripcion": "Excelente alternativa al Valentino Donna Intense",
+   "precios": {
+    "detalle": {
+     "cs": 1390,
+     "usd": 38
+    },
+    "mayor": {
+     "cs": 905,
+     "usd": 24.55
+    }
+   },
+   "estado": "agotado",
+   "existencias": 0,
+   "etiqueta": null,
+   "foto": "donna-intense.webp",
+   "orden": 2
+  },
+  {
+   "id": "D03",
+   "catalogo": "damas",
+   "nombre": "Delilah",
+   "marca": "Maison Alhambra",
+   "presentacion": "",
+   "notas": [
+    "Floral",
+    "Femenino",
+    "Frutal"
+   ],
+   "descripcion": "",
+   "precios": {
+    "detalle": {
+     "cs": 1390,
+     "usd": 38
+    },
+    "mayor": {
+     "cs": 925,
+     "usd": 25.1
+    }
+   },
+   "estado": "coming_soon",
+   "existencias": 0,
+   "etiqueta": null,
+   "foto": "delilah-pour-femme.webp",
+   "orden": 3
+  },
+  {
+   "id": "D04",
+   "catalogo": "damas",
+   "nombre": "Odyssey Candee",
+   "marca": "Armaf",
+   "presentacion": "",
+   "notas": [
+    "Frutal",
+    "Cremoso",
+    "Femenino"
+   ],
+   "descripcion": "",
+   "precios": {
+    "detalle": {
+     "cs": 1390,
+     "usd": 38
+    },
+    "mayor": {
+     "cs": 935,
+     "usd": 25.4
+    }
+   },
+   "estado": "coming_soon",
+   "existencias": 0,
+   "etiqueta": null,
+   "foto": "odyssey-candee.webp",
+   "orden": 4
+  },
+  {
+   "id": "D05",
+   "catalogo": "damas",
+   "nombre": "Yara Tous",
+   "marca": "Lattafa",
+   "presentacion": "",
+   "notas": [
+    "Cremoso",
+    "Dulce",
+    "Sensual",
+    "Adictivo"
+   ],
+   "descripcion": "",
+   "precios": {
+    "detalle": {
+     "cs": 1390,
+     "usd": 38
+    },
+    "mayor": {
+     "cs": 845,
+     "usd": 22.95
+    }
+   },
+   "estado": "disponible",
+   "existencias": 2,
+   "etiqueta": null,
+   "foto": "yara-tous.webp",
+   "orden": 5
+  },
+  {
+   "id": "D06",
+   "catalogo": "damas",
+   "nombre": "Set Yara 4 piezas",
+   "marca": "Lattafa",
+   "presentacion": "4 aceites de 5 ml (esencia pura)",
+   "notas": [],
+   "descripcion": "4 perfumes diferentes de la línea Yara en aceite",
+   "precios": {
+    "detalle": {
+     "cs": 1390,
+     "usd": 38
+    },
+    "mayor": {
+     "cs": 1080,
+     "usd": 29.3
+    }
+   },
+   "estado": "disponible",
+   "existencias": 4,
+   "etiqueta": null,
+   "foto": "set-yara-4-piezas.webp",
+   "orden": 6
+  },
+  {
+   "id": "D07",
+   "catalogo": "damas",
+   "nombre": "Paradise",
+   "marca": "Stallion 53",
+   "presentacion": "Incluye spray de viaje de 20 ml",
+   "notas": [
+    "Flores blancas",
+    "citrico",
+    "dulce",
+    "vanilla"
+   ],
+   "descripcion": "Excelente alternativa al paradoxe de prada",
+   "precios": {
+    "detalle": {
+     "cs": 1390,
+     "usd": 38
+    },
+    "mayor": {
+     "cs": 780,
+     "usd": 21.2
+    }
+   },
+   "estado": "coming_soon",
+   "existencias": 0,
+   "etiqueta": null,
+   "foto": "stallion53-paradise.webp",
+   "orden": 7
+  },
+  {
+   "id": "D08",
+   "catalogo": "damas",
+   "nombre": "La furia",
+   "marca": "Stallion 53",
+   "presentacion": "Incluye spray de viaje de 20 ml",
+   "notas": [
+    "Floral",
+    "Tropical",
+    "frutal",
+    "vainilla"
+   ],
+   "descripcion": "Excelente alternativa a la bomba de Carolina herrera",
+   "precios": {
+    "detalle": {
+     "cs": 1390,
+     "usd": 38
+    },
+    "mayor": {
+     "cs": 780,
+     "usd": 21.2
+    }
+   },
+   "estado": "coming_soon",
+   "existencias": 0,
+   "etiqueta": null,
+   "foto": "stallion53-la-furia.webp",
+   "orden": 8
+  }
+ ]
+}

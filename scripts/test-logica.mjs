@@ -265,5 +265,166 @@ prueba('Cuestionario: él + de día + fresco → Hawas Ice y 9AM Dive', () => {
   assert.ok(ids.includes('H10') && ids.includes('H09'), ids.join(','));
 });
 
+// ---------- Racha mayorista ----------
+console.log('\nRacha mayorista (se guarda en el teléfono, siempre por confirmar)');
+const { estadoRacha, registrarEnvio, validarRacha, RACHA } = await import('../js/racha.js');
+const { leerRachaEnlace } = await import('../js/precios.js');
+const DIA = 86400000, T0 = Date.UTC(2026, 9, 1, 18);
+const items6 = [{ id: 'H01', qty: 3 }, { id: 'H03', qty: 3 }];
+prueba('Una compra de 6 activa la racha; de 5 no', () => {
+  assert.equal(registrarEnvio(null, 5, [{ id: 'H01', qty: 5 }], T0), null);
+  const r = registrarEnvio(null, 6, items6, T0);
+  assert.equal(r.inicio, T0); assert.equal(r.primeraUsada, false); assert.deepEqual(r.pedido, items6);
+});
+const rA = registrarEnvio(null, 6, items6, T0);
+prueba('Primeros 6 días: desde 1 perfume a precio mayorista', () => {
+  const e = estadoRacha(rA, T0 + 2 * DIA);
+  assert.equal(e.activa, true); assert.equal(e.etapa, 'primera'); assert.equal(e.minimo, 1); assert.equal(e.dias, 4);
+});
+prueba('Después de 6 días: desde 3 perfumes, hasta 30 días desde la última compra', () => {
+  const e = estadoRacha(rA, T0 + 7 * DIA);
+  assert.equal(e.etapa, 'mantener'); assert.equal(e.minimo, 3); assert.equal(e.dias, 23);
+  assert.equal(estadoRacha(rA, T0 + 31 * DIA).activa, false);
+  assert.equal(estadoRacha(rA, T0 + 31 * DIA).vencida, true);
+});
+prueba('La compra de 1 en los 6 días usa la primera y reinicia los 30 días', () => {
+  const r2 = registrarEnvio(rA, 1, [{ id: 'H01', qty: 1 }], T0 + 3 * DIA);
+  assert.equal(r2.primeraUsada, true); assert.equal(r2.ultima, T0 + 3 * DIA);
+  const e = estadoRacha(r2, T0 + 4 * DIA);
+  assert.equal(e.etapa, 'mantener'); assert.equal(e.minimo, 3);
+  assert.equal(estadoRacha(r2, T0 + 33 * DIA).activa, true);
+  assert.equal(estadoRacha(r2, T0 + 34 * DIA).activa, false);
+});
+prueba('Comprar 2 en etapa de mantener no cuenta; 3 sí', () => {
+  const t = T0 + 10 * DIA;
+  assert.equal(registrarEnvio(rA, 2, [{ id: 'H01', qty: 2 }], t), rA);
+  assert.equal(registrarEnvio(rA, 3, [{ id: 'H01', qty: 3 }], t).ultima, t);
+});
+prueba('Racha vencida: una compra de 3 no la revive; una de 6 sí', () => {
+  const t = T0 + 40 * DIA;
+  assert.equal(registrarEnvio(rA, 3, [{ id: 'H01', qty: 3 }], t), rA);
+  assert.equal(registrarEnvio(rA, 6, items6, t).inicio, t);
+});
+prueba('Datos guardados manipulados se descartan', () => {
+  assert.equal(validarRacha({ inicio: 'x', ultima: 5 }), null);
+  assert.equal(validarRacha({ inicio: 10, ultima: 5 }), null);
+  const v = validarRacha({ inicio: 5, ultima: 6, primeraUsada: 'sí', pedido: [{ id: '<img>', qty: 1 }, { id: 'H01', qty: 2 }, { id: 'H02', qty: 500 }] });
+  assert.deepEqual(v, { inicio: 5, ultima: 6, primeraUsada: false, pedido: [{ id: 'H01', qty: 2 }] });
+});
+prueba('Reglas iguales a la sección de mayoristas (6 días · 1, 30 días · 3)', () => {
+  assert.deepEqual(RACHA, { diasPrimera: 6, minPrimera: 1, diasMantener: 30, minMantener: 3 });
+});
+prueba('Carrito con racha: 1 o 3 unidades a precio mayorista, marcado "por racha"', () => {
+  const p1 = calcular([{ id: 'H01', qty: 1 }], cat, { minimoMayor: 1 });
+  assert.equal(p1.nivel, 'mayor'); assert.equal(p1.porRacha, true); assert.equal(p1.totalCS, cat.get('H01').precios.mayor.cs);
+  const p2 = calcular([{ id: 'H01', qty: 2 }], cat, { minimoMayor: 3 });
+  assert.equal(p2.nivel, 'detalle'); assert.equal(p2.porRacha, false);
+  const p6 = calcular([{ id: 'H01', qty: 6 }], cat, { minimoMayor: 3 });
+  assert.equal(p6.porRacha, false); assert.equal(p6.nivel, 'mayor');
+  assert.equal(calcular([{ id: 'H01', qty: 1 }], cat, { minimoMayor: 0 }).nivel, 'detalle');
+});
+prueba('Mensaje de WhatsApp dice "por confirmar" y el enlace lleva la fecha', () => {
+  const p1 = calcular([{ id: 'H01', qty: 1 }], cat, { minimoMayor: 1 });
+  const m = mensajeWhatsApp(p1, { racha: { ultima: '26/10/2026', enlace: '20261026' } });
+  assert.ok(m.includes('MAYORISTA POR RACHA, por confirmar (mi última compra mayorista: 26/10/2026)'));
+  assert.ok(m.includes('#pedido=H01-1&racha=20261026'));
+  const sin = mensajeWhatsApp(calcular([{ id: 'H01', qty: 1 }], cat));
+  assert.ok(!sin.includes('racha'));
+});
+prueba('Enlace de verificación con racha: se leen pedido y fecha; fechas falsas se ignoran', () => {
+  assert.deepEqual(leerPedidoEnlace('H01-1,H03-2&racha=20261026'), [{ id: 'H01', qty: 1 }, { id: 'H03', qty: 2 }]);
+  assert.equal(leerRachaEnlace('H01-1&racha=20261026').texto, '26/10/2026');
+  assert.equal(leerRachaEnlace('H01-1&racha=20261399'), null);
+  assert.equal(leerRachaEnlace('H01-1&racha=<script>'), null);
+  assert.equal(enlaceVerificacion(calcular([{ id: 'H01', qty: 1 }], cat), 'x/', 'malo'), 'x/#pedido=H01-1');
+});
+
+// ---------- Calculadora de ganancia ----------
+console.log('\nCalculadora de ganancia para revendedores');
+const { calcularGanancia, precioConMargen, leerMonto } = await import('../js/ganancia.js');
+prueba('Ganancia = ventas − costo mayorista − gastos (incluye el envío)', () => {
+  const g = calcularGanancia([{ qty: 2, costo: 995, venta: 1500 }, { qty: 4, costo: 1150, venta: 1600 }], [{ monto: 300 }, { monto: '100' }]);
+  assert.equal(g.inversionProductos, 2 * 995 + 4 * 1150);
+  assert.equal(g.totalGastos, 400);
+  assert.equal(g.venta, 3000 + 6400);
+  assert.equal(g.ganancia, 9400 - 6590 - 400);
+  assert.equal(g.porFrasco, (9400 - 6590 - 400) / 6);
+  assert.ok(Math.abs(g.margen - 2410 / 9400) < 1e-9);
+});
+prueba('Sin precio de venta en alguna línea no se inventa la ganancia total', () => {
+  const g = calcularGanancia([{ qty: 1, costo: 995, venta: 1500 }, { qty: 1, costo: 900, venta: '' }]);
+  assert.equal(g.completas, false); assert.equal(g.ganancia, null);
+  assert.equal(g.lineas[0].gananciaUnit, 505); assert.equal(g.lineas[1].gananciaUnit, null);
+});
+prueba('Vender por debajo del costo muestra pérdida', () => {
+  assert.equal(calcularGanancia([{ qty: 1, costo: 1000, venta: 900 }], [{ monto: 50 }]).ganancia, -150);
+});
+prueba('% de ganancia sobre el costo, redondeado hacia arriba a C$5; montos raros se ignoran', () => {
+  assert.equal(precioConMargen(995, 30), 1295);
+  assert.equal(precioConMargen(1000, 0), 1000);
+  assert.equal(precioConMargen(1000, -5), 0);
+  assert.equal(leerMonto('C$1,450'), 1450); assert.equal(leerMonto('-20'), 20);
+  assert.equal(leerMonto('abc'), 0); assert.equal(leerMonto('99999999999'), 0);
+});
+
+// ---------- Mapa de aromas ----------
+console.log('\nMapa de aromas');
+const { ubicar, cercanos, notasComunes, centros, puntoDeQuiz } = await import('../js/mapa.js');
+const pts = ubicar(datos.productos);
+prueba('Solo aparecen perfumes con notas, todos dentro del mapa y sin encimarse', () => {
+  assert.equal(pts.length, datos.productos.filter(p => p.notas.length).length);
+  for (const p of pts) assert.ok(p.x >= 0.08 && p.x <= 0.92 && p.y >= 0.08 && p.y <= 0.92, p.producto.id);
+  for (const a of pts) for (const b of pts) if (a !== b) assert.ok(Math.hypot(a.x - b.x, a.y - b.y) > 0.08, `${a.producto.id}-${b.producto.id}`);
+});
+prueba('Siempre el mismo mapa (no cambia de lugar entre visitas)', () => {
+  const otra = ubicar(datos.productos);
+  assert.deepEqual(otra.map(p => [p.producto.id, p.x, p.y]), pts.map(p => [p.producto.id, p.x, p.y]));
+});
+prueba('Frescos a la izquierda y cálidos a la derecha (según sus notas)', () => {
+  const prom = f => { const l = pts.filter(p => p.familia === f); return l.reduce((s, p) => s + p.x, 0) / l.length; };
+  assert.ok(prom('fresco') < 0.5 && prom('calido') > 0.5);
+});
+prueba('Cercanos, notas en común, centros y punto del quiz', () => {
+  const c = cercanos(pts, 0.1, 0.9, 3);
+  assert.equal(c.length, 3); assert.ok(c[0].d <= c[1].d && c[1].d <= c[2].d);
+  assert.deepEqual(notasComunes({ notas: ['Cítrico', 'Dulce'] }, { notas: ['citrico', 'Ámbar'] }), ['Cítrico']);
+  assert.ok(centros(pts).every(x => x.n > 0));
+  assert.equal(puntoDeQuiz({}), null);
+  const q = puntoDeQuiz({ aroma: 'calido', momento: 'noche', fuerza: 'notar' });
+  assert.ok(q.x > 0.5 && q.y < 0.5);
+});
+
+// ---------- Lo más pedido ----------
+console.log('\nLo más pedido del mes');
+const cabP = cab.trim() + ',pedidos_30d\n';
+const rp = await convertir(cabP
+  + 'A1,Caballeros,A,M,,,,1390,38,905,24.55,Disponible,,Sí,1,5\n'
+  + 'A2,Caballeros,B,M,,,,1390,38,905,24.55,Disponible,,Sí,2,9\n'
+  + 'A3,Caballeros,C,M,,,,1390,38,905,24.55,Disponible,,Sí,3,1\n'
+  + 'A4,Caballeros,D,M,,,,1390,38,905,24.55,Disponible,,Sí,4,5\n'
+  + 'A5,Caballeros,E,M,,,,1390,38,905,24.55,Disponible,,Sí,5,4\n'
+  + 'B1,Damas,F,M,,,,1390,38,905,24.55,Disponible,,Sí,1,#REF!\n', { comprobarFotos: false });
+prueba('Top 3 por catálogo; mínimo 2 pedidos; empate por orden; no se publica la cantidad', () => {
+  const t = Object.fromEntries(rp.productos.map(p => [p.id, p.top]));
+  assert.deepEqual(t, { A1: 2, A2: 1, A3: undefined, A4: 3, A5: undefined, B1: undefined });
+  assert.ok(rp.productos.every(p => !('_pedidos' in p) && !('pedidos_30d' in p)));
+  assert.equal(rp.errores.length, 0);
+  assert.ok(rp.avisos.some(a => a.includes('pedidos_30d')));
+});
+const rsin = await convertir(cab + 'A1,Caballeros,A,M,,,,1390,38,905,24.55,Disponible,,Sí,1\n', { comprobarFotos: false });
+prueba('Sin la columna, nadie tiene puesto', () => { assert.ok(rsin.productos.every(p => p.top === undefined)); });
+
+// ---------- Catálogo de reventa ----------
+console.log('\nCatálogo de reventa');
+const { rejilla, limpiar, limpiarTelefono } = await import('../js/catalogo-reventa.js');
+prueba('Rejilla para 1 a 6 perfumes', () => {
+  assert.deepEqual([1, 2, 3, 4, 5, 6].map(n => rejilla(n)), [{ cols: 1, filas: 1 }, { cols: 2, filas: 1 }, { cols: 2, filas: 2 }, { cols: 2, filas: 2 }, { cols: 2, filas: 3 }, { cols: 2, filas: 3 }]);
+});
+prueba('Textos del revendedor se limpian (sin controles, con límite)', () => {
+  assert.equal(limpiar('  Perfumes\n\tAna  ', 40), 'Perfumes Ana');
+  assert.equal(limpiar('x'.repeat(80), 40).length, 40);
+  assert.equal(limpiarTelefono('+505 8888-1234 <b>'), '+505 8888-1234');
+});
+
 console.log(`\n${ok} pruebas correctas, ${fallos} fallidas.`);
 process.exit(fallos ? 1 : 0);

@@ -28,3 +28,14 @@ WhatsApp de pedidos: +505 8473-5485 (en `js/precios.js`).
 - La columna `existencias` (P) de la hoja de la web ya no se escribe a mano: la fórmula de P2 trae el "Stock actual" (columna R) de la hoja Inventario del sistema MNScents_claude, buscando el SKU de la columna `sku_inventario` (R).
 - Perfume nuevo en la web: llena su fila y copia en `sku_inventario` el SKU que tiene en Inventario (columna A). Sin SKU, la web no limita sus unidades (la sincronización avisa).
 - Si la conexión falla (#REF!) o todo llega en 0, la sincronización no publica nada y la web conserva las existencias anteriores.
+
+## Herramientas para clientes y mayoristas
+Todo funciona en el navegador del cliente: sin cuentas, sin servidores ni servicios de pago.
+
+- **Mapa de aromas** (`js/mapa.js`, `js/mapa-ui.js`, enlace `#mapa`): cada perfume con notas es una estrella. Horizontal: fresco ← → cálido; vertical: suave/de día ↔ intenso/de noche. La posición sale solo de las notas de la hoja (la página dice que es aproximada). La luna se arrastra (o se mueve con las flechas) y muestra los 3 perfumes más cercanos; tocar una estrella dibuja su constelación (perfumes con notas en común). Un perfume sin notas no aparece: agrégale notas en la hoja.
+- **Mi racha mayorista** (`js/racha.js`): al enviar por WhatsApp un pedido de 6+ se guarda la fecha en el teléfono del cliente. Durante 6 días, desde 1 perfume va a precio mayorista; después, desde 3 perfumes cada 30 días (contados desde la última compra). Siempre dice "por confirmar": el mensaje y el enlace de verificación (`#pedido=…&racha=AAAAMMDD`) muestran la fecha, y la verificación enseña también el total sin racha. **Confírmala con la hoja de Ventas antes de aceptar el precio.** Las reglas están en `RACHA` dentro de `js/racha.js`.
+- **Calcula tu ganancia** (`js/ganancia.js`, `#ganancia`): usa el pedido; costo = precio mayorista publicado; el revendedor escribe sus precios y gastos (envío, empaque…). No sugerimos precios.
+- **Catálogo de reventa** (`js/catalogo-reventa.js`, `#reventa`): imagen 1080×1920 con hasta 6 perfumes disponibles, los precios y el teléfono del revendedor y su logo opcional. Sin marca de MN Scents.
+- **Lo más pedido del mes**: la hoja de la web tiene la columna `pedidos_30d` (viene de la columna "Pedidos 30 días" del Inventario del sistema, por SKU). La sincronización publica **solo el puesto** (top 3 por catálogo, mínimo 2 pedidos); el número no se publica. Si hay ranking, reemplaza la etiqueta manual "Más vendido".
+
+Pruebas: `node scripts/test-logica.mjs`, y con `python3 scripts/servidor-pages.py 8770 &` → `python3 scripts/test-herramientas.py <carpeta>`. Las pruebas de navegador usan el catálogo fijo `scripts/fixtures/productos-web.json`.

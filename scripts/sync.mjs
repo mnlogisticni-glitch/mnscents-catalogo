@@ -86,6 +86,7 @@ function siNo(v) {
 }
 const slug = s => sinAcentos(String(s).toLowerCase()).replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 
+const MIN_PEDIDOS_TOP = 2;
 const COLUMNAS = ['id', 'catalogo', 'nombre', 'marca', 'presentacion', 'notas', 'descripcion',
   'precio_detalle_cs', 'precio_detalle_usd', 'precio_mayor_cs', 'precio_mayor_usd', 'estado', 'foto', 'mostrar', 'orden'];
 
@@ -171,11 +172,20 @@ export async function convertir(texto, { comprobarFotos = true } = {}) {
       catch { avisos.push(`${pref}: no encontré la foto "${foto}" en img/productos. Se mostrará sin foto.`); foto = null; }
     }
 
+    // Pedidos de los últimos 30 días (columna opcional, viene de las Ventas del sistema).
+    // Solo se usa para calcular el puesto en "Lo más pedido"; el número no se publica.
+    let pedidos = 0;
+    if ('pedidos_30d' in col && g('pedidos_30d') !== '') {
+      const crudo = g('pedidos_30d'), n = numero(crudo);
+      if (/^#/.test(crudo)) avisos.push(`${pref}: "pedidos_30d" muestra ${crudo}. Revisa la conexión con el sistema; "Lo más pedido" no lo cuenta.`);
+      else if (Number.isInteger(n) && n >= 0) pedidos = n;
+    }
+
     const orden = Number(g('orden')) || 999;
     if (mostrar !== false) productos.push({
       id, catalogo, nombre, marca: g('marca'), presentacion: g('presentacion'),
       notas: g('notas').split(/\s*[·•|\-]\s*/).filter(Boolean),
-      descripcion: g('descripcion'), precios, estado: estadoFinal, existencias, etiqueta, foto, orden, _sku: 'sku_inventario' in col ? g('sku_inventario') : '',
+      descripcion: g('descripcion'), precios, estado: estadoFinal, existencias, etiqueta, foto, orden, _sku: 'sku_inventario' in col ? g('sku_inventario') : '', _pedidos: pedidos,
     });
   }
   productos.sort((a, b) => a.catalogo.localeCompare(b.catalogo) || a.orden - b.orden || a.nombre.localeCompare(b.nombre));
@@ -186,7 +196,13 @@ export async function convertir(texto, { comprobarFotos = true } = {}) {
     if (conSku.length >= 3 && conSku.every(p => p.existencias === 0))
       errores.push('Todas las existencias que vienen del Inventario están en 0. Parece un problema de conexión (permiso de acceso o SKU que no coinciden), no ventas reales. No se publicó nada para no marcar toda la web como agotada.');
   }
-  for (const p of productos) delete p._sku;
+  // "Lo más pedido del mes": los 3 con más pedidos en cada catálogo (mínimo 2 pedidos para contar)
+  for (const cat of ['caballeros', 'damas']) {
+    productos.filter(p => p.catalogo === cat && p._pedidos >= MIN_PEDIDOS_TOP)
+      .sort((a, b) => b._pedidos - a._pedidos || a.orden - b.orden)
+      .slice(0, 3).forEach((p, i) => { p.top = i + 1; });
+  }
+  for (const p of productos) { delete p._sku; delete p._pedidos; }
   return { errores, avisos, productos };
 }
 

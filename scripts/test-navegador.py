@@ -1,16 +1,17 @@
 import sys, json, urllib.parse
+# Usa un catálogo fijo (scripts/fixtures/productos-web.json) para que las pruebas no dependan de las existencias del día.
 from playwright.sync_api import sync_playwright
 S=sys.argv[1]; URL='http://localhost:8765/'
 res=[]; errs=[]
 def ok(n,c,extra=''):
     res.append((n,bool(c))); print(('  ✓ ' if c else '  ✗ ')+n+(' '+str(extra) if not c and extra else ''))
-D=json.load(open('data/productos.json'))['productos']
+D=json.load(open('scripts/fixtures/productos-web.json'))['productos']
 NC=sum(1 for x in D if x['catalogo']=='caballeros'); ND=sum(1 for x in D if x['catalogo']=='damas')
 CS=sum(1 for x in D if x['catalogo']=='caballeros' and x['estado']=='coming_soon'); AG=sum(1 for x in D if x['catalogo']=='caballeros' and x['estado']=='agotado')
 NODISP=sum(1 for x in D if x['catalogo']=='caballeros' and not (x['estado']=='disponible' and x.get('existencias')!=0))
 with sync_playwright() as p:
     b=p.chromium.launch()
-    ctx=b.new_context(viewport={'width':390,'height':844}, device_scale_factor=2, is_mobile=True, has_touch=True)
+    ctx=b.new_context(viewport={'width':390,'height':844}, device_scale_factor=2, is_mobile=True, has_touch=True); ctx.route('**/data/productos.json', lambda r: r.fulfill(path='scripts/fixtures/productos-web.json', content_type='application/json'))
     pg=ctx.new_page(); pg.on('console', lambda m: m.type=='error' and errs.append(m.text)); pg.on('pageerror', lambda e: errs.append(str(e)))
     pg.goto(URL); pg.wait_for_selector('.tarjeta')
     pg.screenshot(path=f'{S}/shots/m1-inicio.png')
@@ -34,7 +35,8 @@ with sync_playwright() as p:
     pg.click('label.opcion:has(input[name=estado][value=disponible])')
     pg.click('label.opcion:has(input[name=marca][value=Rasasi])')
     pg.click('[data-accion=aplicar-filtros]'); pg.wait_for_timeout(450)
-    ok('Filtro Disponibles + Rasasi → 2', pg.locator('.tarjeta').count()==2, pg.locator('.tarjeta').count())
+    NR=sum(1 for x in D if x['catalogo']=='caballeros' and x['marca']=='Rasasi' and x['estado']=='disponible')
+    ok(f'Filtro Disponibles + Rasasi → {NR}', pg.locator('.tarjeta').count()==NR, pg.locator('.tarjeta').count())
     pg.click('[data-accion=quitar-filtro][data-tipo=marca]'); pg.click('[data-accion=quitar-filtro][data-tipo=estado]'); pg.wait_for_timeout(200)
     ok(f'Quitar filtros → {NC}', pg.locator('.tarjeta').count()==NC)
     # carrito
@@ -49,12 +51,14 @@ with sync_playwright() as p:
     mas('H10')
     pg.wait_for_timeout(300)
     ok('6 unidades: mayoreo activado', 'mayorista' in pg.inner_text('.bp-linea1') and pg.locator('.barra-pedido.mayor').count()==1)
-    exp=3*1065+1145+2*1495
+    PM={x['id']:x['precios']['mayor'] for x in D}
+    exp=3*PM['H03']['cs']+PM['H15']['cs']+2*PM['H10']['cs']
+    expu=(3*round(PM['H03']['usd']*100)+round(PM['H15']['usd']*100)+2*round(PM['H10']['usd']*100))/100
     ok(f'Total mayorista C${exp:,}', pg.inner_text('.bp-total')==f'C${exp:,}', pg.inner_text('.bp-total'))
     pg.click('.bp-boton'); pg.wait_for_timeout(500)
     pg.screenshot(path=f'{S}/shots/m5-pedido-mayor.png')
     ok('Hoja: 3 líneas', pg.locator('.linea').count()==3)
-    ok('Hoja: total C$ y US$', pg.inner_text('.t-cs')==f'C${exp:,}' and pg.inner_text('.t-usd')=='$199.20', (pg.inner_text('.t-cs'),pg.inner_text('.t-usd')))
+    ok('Hoja: total C$ y US$', pg.inner_text('.t-cs')==f'C${exp:,}' and pg.inner_text('.t-usd')==f'${expu:,.2f}', (pg.inner_text('.t-cs'),pg.inner_text('.t-usd')))
     href=pg.get_attribute('.btn-enviar','href'); msg=urllib.parse.unquote(href.split('text=')[1])
     ok('Enlace WhatsApp correcto', href.startswith('https://wa.me/50584735485?text=') and 'MAYORISTA' in msg and 'Total de unidades: 6' in msg)
     print('----- mensaje -----\n'+msg+'\n-------------------')

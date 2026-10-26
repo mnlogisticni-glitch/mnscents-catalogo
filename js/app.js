@@ -1,5 +1,8 @@
 // MN Scents — catálogo, filtros, ficha, pedido y WhatsApp.
-import { calcular, mensajeWhatsApp, enlaceWhatsApp, fmtCS, fmtUSD, esComprable, maxPedido, UMBRAL_MAYOREO, leerPedidoEnlace } from './precios.js';
+import { calcular, mensajeWhatsApp, enlaceWhatsApp, fmtCS, fmtUSD, esComprable, maxPedido, UMBRAL_MAYOREO, leerPedidoEnlace, leerRachaEnlace } from './precios.js';
+import { validarRacha, estadoRacha, registrarEnvio, fechaCorta, fechaEnlace } from './racha.js';
+import { iniciarMayoristas } from './mayoristas-ui.js';
+import { iniciarMapa } from './mapa-ui.js';
 import { PREGUNTAS, recomendar, opcionesAroma, perfil } from './recomendar.js';
 import { imagenPerfil } from './tarjeta-perfil.js';
 import { comparar, candidatos, leerComparar } from './comparar.js';
@@ -7,6 +10,7 @@ import { comparar, candidatos, leerComparar } from './comparar.js';
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
 const CLAVE_CARRITO = 'mnscents-pedido-v1';
+const CLAVE_RACHA = 'mnscents-racha-v1';
 const FOTOS = 'img/productos/';
 
 const estado = {
@@ -16,6 +20,7 @@ const estado = {
   q: '',
   filtros: { estado: 'todos', marcas: new Set(), precio: 'todos', orden: 'recomendado' },
   carrito: cargarCarrito(),
+  racha: cargarRacha(),   // racha mayorista guardada en este teléfono (por confirmar)
   nivelPrevio: null,
   ajustados: new Set(),
   aroma: null,            // nota olfativa elegida en los chips
@@ -34,6 +39,18 @@ function cargarCarrito() {
   try { const v = JSON.parse(localStorage.getItem(CLAVE_CARRITO) || '[]'); return Array.isArray(v) ? v.filter(x => x && x.id && x.qty > 0) : []; }
   catch { return []; }
 }
+function cargarRacha() {
+  try { return validarRacha(JSON.parse(localStorage.getItem(CLAVE_RACHA) || 'null')); } catch { return null; }
+}
+function guardarRacha() {
+  try { estado.racha ? localStorage.setItem(CLAVE_RACHA, JSON.stringify(estado.racha)) : localStorage.removeItem(CLAVE_RACHA); } catch {}
+}
+// El pedido con la racha mayorista aplicada (si está activa en este teléfono)
+function calcPedido(items = estado.carrito) {
+  const e = estadoRacha(estado.racha);
+  return calcular(items, estado.porId, e.activa ? { minimoMayor: e.minimo } : {});
+}
+let mayoristas = null, mapaUI = null;
 function guardarCarrito() { try { localStorage.setItem(CLAVE_CARRITO, JSON.stringify(estado.carrito)); } catch {} }
 const qtyEnCarrito = id => estado.carrito.find(x => x.id === id)?.qty || 0;
 // Devuelve la cantidad que realmente quedó (nunca más que las existencias)
@@ -85,13 +102,17 @@ const ESTADOS = [
   { id: 'todos', txt: 'Todos' }, { id: 'disponible', txt: 'Disponibles' },
   { id: 'coming_soon', txt: 'Coming soon' }, { id: 'agotado', txt: 'Agotados' },
 ];
-const ORDENES = [
-  { id: 'recomendado', txt: 'Recomendado' }, { id: 'precio-asc', txt: 'Precio: menor a mayor' },
+const ORDENES_BASE = [
+  { id: 'recomendado', txt: 'Recomendado' }, { id: 'pedidos', txt: 'Más pedidos del mes' }, { id: 'precio-asc', txt: 'Precio: menor a mayor' },
   { id: 'precio-desc', txt: 'Precio: mayor a menor' }, { id: 'nombre', txt: 'Nombre A–Z' },
 ];
+// "Lo más pedido" sale de las ventas reales de los últimos 30 días (la hoja publica solo el puesto)
+const hayRanking = () => estado.productos.some(p => Number.isInteger(p.top));
+const ORDENES_ACTUALES = () => ORDENES_BASE.filter(o => o.id !== 'pedidos' || hayRanking());
 const pesoEstado = { disponible: 0, coming_soon: 1, agotado: 2 };
-const pesoEtiqueta = p => (p.etiqueta === 'top' ? 0 : p.etiqueta === 'nuevo' ? 1 : 2);
-const etiquetaMarca = p => (p.etiqueta === 'top' ? '<span class="etq top">Más vendido</span>'
+const pesoEtiqueta = p => (Number.isInteger(p.top) ? p.top - 1 : p.etiqueta === 'top' && !hayRanking() ? 3 : p.etiqueta === 'nuevo' ? 4 : 5);
+const etiquetaMarca = p => (Number.isInteger(p.top) ? `<span class="etq top">N.º ${p.top} del mes</span>`
+  : p.etiqueta === 'top' && !hayRanking() ? '<span class="etq top">Más vendido</span>'
   : p.etiqueta === 'nuevo' ? '<span class="etq nuevo">Nuevo</span>' : '');
 
 function filtrar(cat, conBusqueda = true) {
@@ -108,6 +129,7 @@ function filtrar(cat, conBusqueda = true) {
     o === 'precio-asc' ? a.precios.detalle.cs - b.precios.detalle.cs
     : o === 'precio-desc' ? b.precios.detalle.cs - a.precios.detalle.cs
     : o === 'nombre' ? a.nombre.localeCompare(b.nombre, 'es')
+    : o === 'pedidos' ? ((a.top || 99) - (b.top || 99)) || (pesoEstado[a.estado] - pesoEstado[b.estado]) || a.orden - b.orden
     : (pesoEstado[a.estado] - pesoEstado[b.estado]) || (pesoEtiqueta(a) - pesoEtiqueta(b)) || a.orden - b.orden);
   return lista;
 }
@@ -166,6 +188,7 @@ function pintarCatalogo() {
   } else {
     rej.innerHTML = lista.map(p => tarjeta(p)).join('');
   }
+  pintarLoMas();
   const disp = lista.filter(esComprable).length;
   $('.resumen').textContent = lista.length
     ? `${lista.length} ${lista.length === 1 ? 'perfume' : 'perfumes'} · ${disp} ${disp === 1 ? 'disponible' : 'disponibles'}`
@@ -178,8 +201,27 @@ function pintarCatalogo() {
   if (enOtra) caja.innerHTML = `<button type="button" data-accion="ir-cat" data-cat="${otra}">También hay <b>${enOtra} ${enOtra === 1 ? 'resultado' : 'resultados'}</b> en ${otra === 'damas' ? 'Damas' : 'Caballeros'}</button>`;
 }
 
+function pintarLoMas() {
+  const caja = $('.lo-mas');
+  const sinFiltros = !estado.q && !estado.aroma && !filtrosActivos().length;
+  const top = estado.productos.filter(p => p.catalogo === estado.cat && Number.isInteger(p.top) && esComprable(p))
+    .sort((a, b) => a.top - b.top);
+  caja.hidden = !sinFiltros || !top.length;
+  if (caja.hidden) { caja.innerHTML = ''; return; }
+  caja.innerHTML = `<div class="lm-cabeza"><h2 id="t-lomas">Lo más pedido del mes</h2><p>Según los pedidos de los últimos 30 días</p></div>
+    <ol class="lm-lista">${top.map(p => `<li class="lo-item" data-id="${esc(p.id)}">
+      <button class="lm-abrir" type="button" data-accion="ficha" data-id="${esc(p.id)}" aria-label="N.º ${p.top}: ${esc(p.nombre)}. Ver detalles">
+        <span class="lm-num" aria-hidden="true">${p.top}</span>
+        <span class="lm-foto">${p.foto ? `<img src="${FOTOS}${esc(p.foto)}" alt="" width="96" height="96" loading="lazy">` : ''}</span>
+        <span class="lm-nombre">${esc(p.nombre)}</span>
+        <span class="lm-precio">${fmtCS(p.precios.detalle.cs)} <small>· mayor ${fmtCS(p.precios.mayor.cs)}</small></span>
+      </button>
+      <div class="t-accion">${controlAgregar(p)}</div>
+    </li>`).join('')}</ol>`;
+}
+
 function actualizarControlesTarjetas() {
-  for (const art of $$('.tarjeta, .rec, .cmp-col')) {
+  for (const art of $$('.tarjeta, .rec, .cmp-col, .lo-item')) {
     const p = estado.porId.get(art.dataset.id);
     const accion = art.querySelector('.t-accion');   // la cabecera de la comparación no tiene botón
     if (p && accion) accion.innerHTML = controlAgregar(p);
@@ -223,7 +265,7 @@ function filtrosActivos() {
   if (f.estado !== 'todos') a.push({ tipo: 'estado', txt: ESTADOS.find(e => e.id === f.estado).txt });
   for (const m of f.marcas) a.push({ tipo: 'marca', valor: m, txt: m });
   if (f.precio !== 'todos') a.push({ tipo: 'precio', txt: RANGOS.find(r => r.id === f.precio).txt });
-  if (f.orden !== 'recomendado') a.push({ tipo: 'orden', txt: ORDENES.find(o => o.id === f.orden).txt });
+  if (f.orden !== 'recomendado') a.push({ tipo: 'orden', txt: (ORDENES_BASE.find(o => o.id === f.orden) || ORDENES_BASE[0]).txt });
   return a;
 }
 function pintarChips() {
@@ -247,7 +289,7 @@ function pintarFiltrosFijos() {
   const f = estado.filtros;
   $('[data-filtro="estado"]').innerHTML = opciones('estado', 'radio', ESTADOS, id => f.estado === id);
   $('[data-filtro="precio"]').innerHTML = opciones('precio', 'radio', RANGOS, id => f.precio === id);
-  $('[data-filtro="orden"]').innerHTML = opciones('orden', 'radio', ORDENES, id => f.orden === id);
+  $('[data-filtro="orden"]').innerHTML = opciones('orden', 'radio', ORDENES_ACTUALES(), id => f.orden === id);
 }
 function leerFiltros() {
   const h = $('#hoja-filtros');
@@ -284,7 +326,7 @@ let fichaQty = 1, fichaMax = 99;
 function abrirFicha(id) {
   const p = estado.porId.get(id); if (!p) return;
   fichaQty = 1;
-  const ped = calcular(estado.carrito, estado.porId);
+  const ped = calcPedido();
   const enCarrito = qtyEnCarrito(id);
   const maxP = maxPedido(p);
   fichaMax = Math.max(0, maxP - enCarrito);
@@ -298,6 +340,7 @@ function abrirFicha(id) {
       <div class="ficha-botones">
         <button class="btn-compartir" type="button" data-accion="compartir" data-id="${esc(p.id)}">${ico('share')}Compartir</button>
         <button class="btn-compartir" type="button" data-accion="cmp-abrir" data-id="${esc(p.id)}">${ico('comparar')}Comparar</button>
+        ${p.notas.length ? `<button class="btn-compartir" type="button" data-accion="mapa-ver" data-id="${esc(p.id)}">${ico('mapa')}En el mapa</button>` : ''}
       </div>
       ${p.presentacion ? `<p class="ficha-pres">${esc(p.presentacion)}</p>` : ''}
       ${p.descripcion ? `<p class="ficha-desc">${esc(p.descripcion)}</p>` : ''}
@@ -355,7 +398,8 @@ function faseLuna(p, r = 15, c = 20) {
 }
 
 function pintarPedido() {
-  const ped = calcular(estado.carrito, estado.porId);
+  const ped = calcPedido();
+  const racha = estadoRacha(estado.racha);
   // Si las existencias bajaron desde la última visita, el pedido guardado se ajusta (y se avisa en la línea)
   if (ped.lineas.some(l => l.ajustada)) {
     for (const l of ped.lineas) if (l.ajustada) { const it = estado.carrito.find(x => x.id === l.producto.id); if (it) it.qty = l.max; estado.ajustados.add(l.producto.id); }
@@ -369,8 +413,9 @@ function pintarPedido() {
   const barra = $('.barra-pedido');
   barra.classList.toggle('mayor', mayor);
   barra.classList.toggle('vacio', ped.unidades === 0);
-  $('.bp-linea1').textContent = ped.unidades === 0 ? 'Tu pedido está vacío' : `${ped.unidades} ${ped.unidades === 1 ? 'unidad' : 'unidades'} · ${mayor ? 'precio mayorista' : 'precio al detalle'}`;
-  $('.bp-linea2').textContent = ped.unidades === 0 ? `Mayoreo desde ${UMBRAL_MAYOREO} unidades`
+  $('.bp-linea1').textContent = ped.unidades === 0 ? 'Tu pedido está vacío' : `${ped.unidades} ${ped.unidades === 1 ? 'unidad' : 'unidades'} · ${ped.porRacha ? 'mayorista por tu racha' : mayor ? 'precio mayorista' : 'precio al detalle'}`;
+  $('.bp-linea2').textContent = ped.unidades === 0 ? (racha.activa ? 'Tu racha mayorista está activa' : `Mayoreo desde ${UMBRAL_MAYOREO} unidades`)
+    : ped.porRacha ? 'Precio por confirmar por WhatsApp'
     : mayor ? `Ahorras ${fmtCS(ped.ahorroCS)} con mayoreo`
     : `Faltan ${ped.faltan} para precio mayorista`;
   $('.bp-total').textContent = ped.unidades ? fmtCS(ped.totalCS) : '';
@@ -381,13 +426,21 @@ function pintarPedido() {
   // hoja del pedido
   const h = $('#hoja-pedido');
   $('.progreso-mayoreo', h).classList.toggle('mayor', mayor);
-  $('.pm-titulo', h).textContent = mayor ? 'Precio mayorista activado'
+  const diasRacha = racha.activa ? (racha.dias === 0 ? 'vence hoy' : `te ${racha.dias === 1 ? 'queda 1 día' : `quedan ${racha.dias} días`}`) : '';
+  $('.pm-titulo', h).textContent = ped.porRacha ? 'Precio mayorista por tu racha'
+    : mayor ? 'Precio mayorista activado'
+    : racha.activa && ped.unidades > 0 ? `${ped.unidades} de ${racha.minimo} para tu precio de racha`
     : ped.unidades === 0 ? `Mayoreo desde ${UMBRAL_MAYOREO} unidades` : `${ped.unidades} de ${UMBRAL_MAYOREO} unidades para mayoreo`;
-  $('.pm-nota', h).textContent = mayor
+  $('.pm-nota', h).textContent = ped.porRacha
+    ? `Tu racha está activa (${diasRacha}): estos perfumes van a precio mayorista. Lo confirmamos por WhatsApp antes de cobrar.`
+    : mayor
     ? `Tienes ${ped.unidades} unidades: todos los perfumes de tu pedido van a precio por mayor. Si bajas de ${UMBRAL_MAYOREO}, vuelven al precio al detalle.`
+    : racha.activa && ped.unidades > 0
+    ? `Con tu racha activa (${diasRacha}), desde ${racha.minimo} ${racha.minimo === 1 ? 'perfume' : 'perfumes'} pagas precio mayorista. Agrega ${racha.minimo - ped.unidades} más.`
     : ped.unidades === 0 ? 'Cuentan todas las unidades de perfumes disponibles, puedes combinarlos.'
     : `Agrega ${ped.faltan} ${ped.faltan === 1 ? 'unidad más' : 'unidades más'} (cualquier perfume disponible) y todo tu pedido pasa a precio por mayor.`;
-  $('.aviso-racha', h).hidden = mayor || ped.unidades === 0;
+  $('.aviso-racha', h).hidden = mayor || ped.unidades === 0 || racha.activa;
+  $('.reventa-atajo', h).hidden = !mayor;
   pintarCaja(ped, h);
   pintarSugeridos(ped, h);
 
@@ -428,7 +481,7 @@ function pintarPedido() {
 
   $('.t-unidades', h).textContent = ped.unidades;
   const tn = $('.t-nivel', h);
-  tn.textContent = mayor ? 'Por mayor' : 'Al detalle';
+  tn.textContent = ped.porRacha ? 'Por mayor (racha, por confirmar)' : mayor ? 'Por mayor' : 'Al detalle';
   tn.classList.toggle('mayor', mayor);
   $('.t-ahorro-fila', h).hidden = !mayor;
   $('.t-ahorro', h).textContent = fmtCS(ped.ahorroCS);
@@ -436,7 +489,11 @@ function pintarPedido() {
   $('.t-usd', h).textContent = fmtUSD(ped.totalUSD);
   const env = $('.btn-enviar', h);
   if (vacio) { env.setAttribute('aria-disabled', 'true'); env.href = '#'; }
-  else { env.removeAttribute('aria-disabled'); env.href = enlaceWhatsApp(mensajeWhatsApp(ped)); }
+  else {
+    env.removeAttribute('aria-disabled');
+    const datosRacha = racha.activa ? { ultima: fechaCorta(estado.racha.ultima), enlace: fechaEnlace(estado.racha.ultima) } : null;
+    env.href = enlaceWhatsApp(mensajeWhatsApp(ped, { racha: datosRacha }));
+  }
 
   // momento de luna llena
   if (estado.nivelPrevio && estado.nivelPrevio !== ped.nivel) {
@@ -609,7 +666,10 @@ $('#hoja-comparar').addEventListener('close', () => {
 // El texto de WhatsApp se puede editar; aquí los precios salen siempre del catálogo publicado.
 function abrirVerificacion(enlace) {
   const items = leerPedidoEnlace(enlace);
-  const ped = calcular(items, estado.porId);
+  const rachaDicha = leerRachaEnlace(enlace);
+  const sinRacha = calcular(items, estado.porId);
+  // si el cliente dice tener racha, mostramos ambos totales: la racha se confirma con la hoja de Ventas
+  const ped = rachaDicha ? calcular(items, estado.porId, { minimoMayor: 1 }) : sinRacha;
   const desconocidos = items.filter(x => !estado.porId.has(x.id));
   const caja = $('#hoja-verificar .verificar');
   const hoy = new Date().toLocaleDateString('es-NI', { day: 'numeric', month: 'long', year: 'numeric' });
@@ -624,9 +684,11 @@ function abrirVerificacion(enlace) {
         </li>`).join('')}</ul>
       ${ped.noDisponibles.length || desconocidos.length ? `<div class="v-alerta-caja">No se cobran porque no están disponibles o no existen:
         <ul>${ped.noDisponibles.map(x => `<li>${esc(x.producto?.nombre || x.id)}</li>`).join('')}</ul></div>` : ''}
+      ${rachaDicha && ped.porRacha ? `<div class="v-racha"><b>El cliente indica racha mayorista activa</b> (su última compra mayorista: ${esc(rachaDicha.texto)}).
+        Confírmala en tu hoja de Ventas antes de aceptar este precio. Sin racha, al detalle, el total es <b>${fmtCS(sinRacha.totalCS)}</b>.</div>` : ''}
       <dl class="totales v-totales">
         <div><dt>Unidades</dt><dd>${ped.unidades}</dd></div>
-        <div><dt>Precios aplicados</dt><dd class="${ped.nivel === 'mayor' ? 't-nivel mayor' : ''}">${ped.nivel === 'mayor' ? 'Por mayor' : 'Al detalle'}</dd></div>
+        <div><dt>Precios aplicados</dt><dd class="${ped.nivel === 'mayor' ? 't-nivel mayor' : ''}">${ped.porRacha ? 'Por mayor (racha por confirmar)' : ped.nivel === 'mayor' ? 'Por mayor' : 'Al detalle'}</dd></div>
         <div class="t-total"><dt>Total</dt><dd><span class="t-cs">${fmtCS(ped.totalCS)}</span><span class="t-usd">${fmtUSD(ped.totalUSD)}</span></dd></div>
       </dl>`;
   abrir($('#hoja-verificar'));
@@ -760,6 +822,8 @@ $('#hoja-quiz').addEventListener('close', () => {
 function actualizarTodo() {
   pintarPedido();
   actualizarControlesTarjetas();
+  mayoristas?.refrescar();
+  mapaUI?.refrescar();
 }
 
 // ---------- eventos ----------
@@ -773,7 +837,7 @@ document.addEventListener('click', e => {
       fijarQty(id, qtyEnCarrito(id) + 1);
       saltoBarra();
       const p = estado.porId.get(id);
-      const ped = calcular(estado.carrito, estado.porId);
+      const ped = calcPedido();
       anunciar(`${p.nombre} agregado. ${ped.unidades} ${ped.unidades === 1 ? 'unidad' : 'unidades'} en tu pedido.`);
       const art = b.closest('.tarjeta, .rec');
       requestAnimationFrame(() => art?.querySelector('.paso [data-accion="mas"]')?.focus());
@@ -858,12 +922,21 @@ document.addEventListener('click', e => {
       }
       break;
     case 'limpiar-no-disp': {
-      const ids = new Set(calcular(estado.carrito, estado.porId).noDisponibles.map(x => x.id));
+      const ids = new Set(calcPedido().noDisponibles.map(x => x.id));
       estado.carrito = estado.carrito.filter(x => !ids.has(x.id)); guardarCarrito(); actualizarTodo();
       break;
     }
     case 'cerrar-pedido': cerrar($('#hoja-pedido')); break;
     case 'reintentar': iniciar(); break;
+    case 'abrir-mapa': mapaUI.abrirMapa(); break;
+    case 'mapa-ver': cerrar($('#hoja-ficha')); mapaUI.abrirMapa({ id }); break;
+    case 'abrir-ganancia': if (b.getAttribute('aria-disabled') !== 'true') { cerrar($('#hoja-pedido')); mayoristas.abrirGanancia(); } break;
+    case 'abrir-reventa': if (b.getAttribute('aria-disabled') !== 'true') mayoristas.abrirReventa(); break;
+    case 'repetir-racha': mayoristas.repetirPedido(); break;
+    case 'borrar-racha':
+      estado.racha = null; guardarRacha(); actualizarTodo();
+      anunciar('Tu racha se borró de este teléfono.');
+      break;
   }
 });
 
@@ -874,7 +947,18 @@ function saltoBarra() {
 
 $('.bp-boton').addEventListener('click', () => { abrir($('#hoja-pedido')); pintarPedido(); });
 $('.btn-filtros').addEventListener('click', () => { pintarFiltrosFijos(); pintarMarcas(); abrir($('#hoja-filtros')); });
-$('.btn-enviar').addEventListener('click', e => { if (e.currentTarget.getAttribute('aria-disabled') === 'true') e.preventDefault(); });
+$('.btn-enviar').addEventListener('click', e => {
+  if (e.currentTarget.getAttribute('aria-disabled') === 'true') { e.preventDefault(); return; }
+  // Si el pedido cuenta para la racha mayorista, se guarda en este teléfono (MN Scents la confirma por WhatsApp)
+  const ped = calcPedido();
+  const antes = estado.racha;
+  const nueva = registrarEnvio(antes, ped.unidades, ped.lineas.map(l => ({ id: l.producto.id, qty: l.qty })));
+  if (nueva !== antes) {
+    estado.racha = nueva; guardarRacha();
+    setTimeout(() => { pintarPedido(); mayoristas?.pintarRacha(); }, 400);
+    anunciar(ped.unidades >= UMBRAL_MAYOREO ? 'Guardamos tu racha mayorista en este teléfono.' : 'Tu racha mayorista sigue activa.');
+  }
+});
 
 // pestañas con teclado
 const tablist = $('.segmento');
@@ -913,6 +997,16 @@ function irAHash() {
     abrirVerificacion(h.slice(7));
     return true;
   }
+  if (h === 'mapa') {
+    if (!$('.tarjeta')) ponerCat(estado.cat, { conHash: false });
+    if (!$('#hoja-mapa').open) mapaUI.abrirMapa();
+    return true;
+  }
+  if (h === 'ganancia' || h === 'reventa') {
+    if (!$('.tarjeta')) ponerCat(estado.cat, { conHash: false });
+    h === 'ganancia' ? mayoristas.abrirGanancia() : mayoristas.abrirReventa();
+    return true;
+  }
   if (h === 'encuentra') {
     if (!$('.tarjeta')) ponerCat(estado.cat, { conHash: false });
     if (!$('#hoja-quiz').open) abrirQuiz();
@@ -929,7 +1023,10 @@ window.addEventListener('hashchange', irAHash);
 const centinela = $('.cielo');
 new IntersectionObserver(([en]) => $('.barra-sup').classList.toggle('con-borde', !en.isIntersecting), { rootMargin: '-64px 0px 0px 0px' }).observe(centinela);
 // otra pestaña cambió el pedido
-window.addEventListener('storage', e => { if (e.key === CLAVE_CARRITO) { estado.carrito = cargarCarrito(); actualizarTodo(); } });
+window.addEventListener('storage', e => {
+  if (e.key === CLAVE_CARRITO) { estado.carrito = cargarCarrito(); actualizarTodo(); }
+  if (e.key === CLAVE_RACHA) { estado.racha = cargarRacha(); actualizarTodo(); }
+});
 
 // ---------- carga ----------
 async function iniciar() {
@@ -950,6 +1047,7 @@ async function iniciar() {
     }
     pintarFiltrosFijos();
     pintarPedido();   // primero: ajusta un pedido guardado a las existencias actuales
+    mayoristas.pintarRacha();
     if (!irAHash()) ponerCat(estado.cat || 'caballeros');
   } catch {
     rej.setAttribute('aria-busy', 'false');
@@ -958,6 +1056,9 @@ async function iniciar() {
       <a class="btn sec" href="https://wa.me/50584735485" target="_blank" rel="noopener">${ico('chat')}Escribir por WhatsApp</a></div></div>`;
   }
 }
+const ctxUI = { estado, $, $$, esc, ico, FOTOS, abrir, cerrar, anunciar, fijarQty, calcPedido, controlAgregar };
+mayoristas = iniciarMayoristas(ctxUI);
+mapaUI = iniciarMapa(ctxUI);
 iniciar();
 
 // ---------- tienda: abierto o cerrado ahora (hora de Nicaragua) ----------

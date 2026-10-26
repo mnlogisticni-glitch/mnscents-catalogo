@@ -7,7 +7,7 @@ const C = {
   lila: '#c4a1ff', lilaFuerte: '#a97cff', luna: '#f6f0ff', fondoBarra: '#2b1d48',
 };
 
-function cargarImagen(src) {
+export function cargarImagen(src) {
   return new Promise((ok, mal) => {
     const im = new Image();
     im.decoding = 'async';
@@ -27,7 +27,7 @@ async function cargarCrestas() {
 }
 
 // Parte el texto en líneas que quepan en el ancho
-function lineas(ctx, texto, ancho) {
+export function lineas(ctx, texto, ancho) {
   const palabras = String(texto).split(/\s+/);
   const out = [];
   let linea = '';
@@ -40,9 +40,9 @@ function lineas(ctx, texto, ancho) {
   return out;
 }
 
-function espaciado(ctx, px) { if ('letterSpacing' in ctx) ctx.letterSpacing = `${px}px`; }
+export function espaciado(ctx, px) { if ('letterSpacing' in ctx) ctx.letterSpacing = `${px}px`; }
 
-function redondeado(ctx, x, y, w, h, r) {
+export function redondeado(ctx, x, y, w, h, r) {
   ctx.beginPath();
   ctx.moveTo(x + r, y);
   ctx.arcTo(x + w, y, x + w, y + h, r);

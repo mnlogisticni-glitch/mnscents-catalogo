@@ -1,16 +1,17 @@
 # Prueba en navegador: "Comparar dos perfumes"
+# Usa un catálogo fijo (scripts/fixtures/productos-web.json) para que las pruebas no dependan de las existencias del día.
 # Uso: python3 scripts/test-comparar.py <carpeta-capturas> [url]
 import sys, json
 from playwright.sync_api import sync_playwright
 S = sys.argv[1]; URL = sys.argv[2] if len(sys.argv) > 2 else 'http://localhost:8766/'
-D = {p['id']: p for p in json.load(open('data/productos.json', encoding='utf-8'))['productos']}
+D = {p['id']: p for p in json.load(open('scripts/fixtures/productos-web.json', encoding='utf-8'))['productos']}
 res = []; errs = []
 def ok(n, c, extra=''):
     res.append(c); print(('  ✓ ' if c else '  ✗ ') + n + ('' if c else f'  [{extra}]'))
 def cs(v): return f"C${v:,}"
 with sync_playwright() as p:
     b = p.chromium.launch()
-    ctx = b.new_context(viewport={'width': 390, 'height': 844}, device_scale_factor=2, is_mobile=True, has_touch=True)
+    ctx = b.new_context(viewport={'width': 390, 'height': 844}, device_scale_factor=2, is_mobile=True, has_touch=True); ctx.route('**/data/productos.json', lambda r: r.fulfill(path='scripts/fixtures/productos-web.json', content_type='application/json'))
     pg = ctx.new_page()
     pg.on('console', lambda m: m.type == 'error' and errs.append(m.text)); pg.on('pageerror', lambda e: errs.append(str(e) + ' @ ' + (e.stack or '')[:400]))
     pg.goto(URL); pg.wait_for_selector('.tarjeta'); pg.evaluate('localStorage.clear()'); pg.reload(); pg.wait_for_selector('.tarjeta')
