@@ -387,6 +387,7 @@ function pintarPedido() {
     ? `Tienes ${ped.unidades} unidades: todos los perfumes de tu pedido van a precio por mayor. Si bajas de ${UMBRAL_MAYOREO}, vuelven al precio al detalle.`
     : ped.unidades === 0 ? 'Cuentan todas las unidades de perfumes disponibles, puedes combinarlos.'
     : `Agrega ${ped.faltan} ${ped.faltan === 1 ? 'unidad más' : 'unidades más'} (cualquier perfume disponible) y todo tu pedido pasa a precio por mayor.`;
+  $('.aviso-racha', h).hidden = mayor || ped.unidades === 0;
   pintarCaja(ped, h);
   pintarSugeridos(ped, h);
 

@@ -1,6 +1,6 @@
 // MN Scents — permite instalar la web como app y abrirla sin señal.
 // Siempre intenta traer lo más nuevo de internet; solo usa la copia guardada si no hay conexión.
-const CACHE = 'mnscents-v3';
+const CACHE = 'mnscents-v4';
 const BASE = ['./', 'index.html', 'css/estilos.css', 'js/app.js', 'js/precios.js', 'js/recomendar.js', 'js/tarjeta-perfil.js', 'js/comparar.js', 'data/productos.json',
   'img/marca/logo.webp', 'img/marca/crestas.svg', 'manifest.webmanifest'];
 

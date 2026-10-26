@@ -323,6 +323,30 @@ main { outline: none; }
 .btn-compartir:active { transform: scale(0.97); }
 
 /* ---------- Fidelidad ---------- */
+/* Beneficios para mayoristas */
+.seccion-etiqueta { display: inline-block; margin-bottom: 10px; padding: 4px 10px; border-radius: 999px; font: 600 12px/1.3 var(--texto); letter-spacing: 0.04em; text-transform: uppercase; color: var(--lila); background: var(--lila-fondo); }
+.seccion-etiqueta.oro { color: var(--oro); background: var(--oro-fondo); }
+.mayoristas { margin: 20px var(--pad) 0; padding: 26px 20px; border-radius: var(--r-l); border: 1px solid var(--linea-suave); background: linear-gradient(160deg, var(--noche-2), var(--noche-0)); }
+.mayoristas h2 { font: 700 21px/1.25 var(--display); margin-bottom: 8px; text-wrap: balance; }
+.may-sub { color: var(--tinta-2); font-size: 15px; margin-bottom: 22px; }
+.racha { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; position: relative; }
+.racha li { display: grid; grid-template-columns: 44px 1fr; gap: 14px; align-items: start; position: relative; padding-bottom: 22px; }
+.racha li:last-child { padding-bottom: 0; }
+.racha li:not(:last-child)::before { content: ""; position: absolute; left: 21px; top: 46px; bottom: 2px; width: 2px; border-radius: 2px; background: linear-gradient(var(--lila), rgb(196 161 255 / 0.15)); }
+.r-ico { width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; background: var(--lila-fondo); color: var(--lila); border: 1px solid rgb(196 161 255 / 0.35); }
+.r-ico .ico { width: 22px; height: 22px; }
+.racha .r-desbloquea .r-ico { background: var(--oro-fondo); color: var(--oro); border-color: rgb(242 211 138 / 0.45); }
+.racha .r-cae .r-ico { background: rgb(255 157 177 / 0.12); color: var(--rosa); border-color: rgb(255 157 177 / 0.4); }
+.racha h3, .may-extra h3 { font: 700 15px/1.3 var(--texto); margin: 2px 0 4px; }
+.racha p, .may-extra p { color: var(--tinta-2); font-size: 14px; max-width: 46ch; }
+.racha strong, .may-extra strong { color: var(--tinta); }
+.r-plazo { color: var(--lila); }
+.racha .r-cae h3 { color: var(--rosa); }
+.may-extra { margin-top: 24px; padding: 18px; border-radius: var(--r-m); background: rgb(196 161 255 / 0.06); border: 1px dashed rgb(196 161 255 / 0.35); display: grid; grid-template-columns: 44px 1fr; gap: 14px; align-items: start; }
+.may-extra .btn { margin-top: 12px; }
+.fid-aplica { margin-top: 10px; font-size: 13.5px !important; color: var(--tinta-3) !important; }
+.aviso-racha { font-size: 12.5px; color: var(--oro); text-align: center; line-height: 1.45; margin-bottom: 6px; }
+
 .fidelidad { margin: 20px var(--pad) 0; padding: 26px 20px; border-radius: var(--r-l); border: 1px solid rgb(242 211 138 / 0.35); background: linear-gradient(150deg, #2c1f2a, var(--noche-2) 60%); display: grid; gap: 20px; }
 .fidelidad h2 { font: 700 21px/1.2 var(--display); margin-bottom: 10px; }
 .fid-texto p { color: var(--tinta-2); font-size: 15px; max-width: 46ch; }
@@ -762,6 +786,12 @@ label.opcion input:focus-visible + span { outline: 2px solid var(--lila); outlin
   .condiciones { margin-left: var(--pad); margin-right: var(--pad); padding: 36px 40px; }
   .cond-lista { grid-template-columns: repeat(4, 1fr); gap: 28px; }
   .cond-lista li { grid-template-columns: 1fr; }
+  .mayoristas { padding: 36px 40px; }
+  .mayoristas h2 { font-size: 24px; }
+  .racha { grid-template-columns: repeat(4, 1fr); gap: 24px; }
+  .racha li { grid-template-columns: 1fr; padding-bottom: 0; }
+  .racha li:not(:last-child)::before { left: 54px; right: -20px; top: 21px; bottom: auto; width: auto; height: 2px; background: linear-gradient(90deg, var(--lila), rgb(196 161 255 / 0.15)); }
+  .may-extra { grid-template-columns: 44px 1fr; max-width: 760px; }
   .fidelidad { margin-left: var(--pad); margin-right: var(--pad); padding: 36px 40px; grid-template-columns: 1fr auto; align-items: center; gap: 40px; }
   .sellos { width: 340px; }
   .tienda { margin-left: var(--pad); margin-right: var(--pad); padding: 36px 40px; }
