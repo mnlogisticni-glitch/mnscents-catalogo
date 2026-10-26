@@ -1,5 +1,5 @@
 {
- "actualizado": "2026-10-24T16:48:30.802Z",
+ "actualizado": "2026-10-26T18:16:01.858Z",
  "productos": [
   {
    "id": "H01",
@@ -28,7 +28,8 @@
    "existencias": 10,
    "etiqueta": "top",
    "foto": "mandarin-sky.webp",
-   "orden": 1
+   "orden": 1,
+   "top": 1
   },
   {
    "id": "H02",
@@ -85,7 +86,8 @@
    "existencias": 10,
    "etiqueta": null,
    "foto": "afnan-9pm.webp",
-   "orden": 3
+   "orden": 3,
+   "top": 2
   },
   {
    "id": "H04",
@@ -142,7 +144,8 @@
    "existencias": 5,
    "etiqueta": null,
    "foto": "club-de-nuit-intense-man.webp",
-   "orden": 5
+   "orden": 5,
+   "top": 3
   },
   {
    "id": "H06",
@@ -513,7 +516,8 @@
    "existencias": 0,
    "etiqueta": "top",
    "foto": "9am-pour-femme.webp",
-   "orden": 1
+   "orden": 1,
+   "top": 1
   },
   {
    "id": "D02",
@@ -646,7 +650,8 @@
    "existencias": 0,
    "etiqueta": null,
    "foto": "set-yara-4-piezas.webp",
-   "orden": 6
+   "orden": 6,
+   "top": 2
   },
   {
    "id": "D07",
