@@ -29,6 +29,9 @@ WhatsApp de pedidos: +505 8473-5485 (en `js/precios.js`).
 - Perfume nuevo en la web: llena su fila y copia en `sku_inventario` el SKU que tiene en Inventario (columna A). Sin SKU, la web no limita sus unidades (la sincronización avisa).
 - Si la conexión falla (#REF!) o todo llega en 0, la sincronización no publica nada y la web conserva las existencias anteriores.
 
+## Pestañas (como una app)
+La página tiene 5 pantallas con una barra de pestañas (abajo en el celular, arriba en computadora): **Perfumes** (`#perfumes`, catálogo; `#caballeros` y `#damas` también abren aquí), **Descubre** (`#descubre`: cuestionario, mapa de aromas y lo más pedido de ambos catálogos), **Mayoristas** (`#mayoristas`: tu racha, reglas, calculadora, catálogo de reventa y plantillas de Canva; un punto dorado en la pestaña avisa cuando hay racha activa), **Fidelidad** (`#fidelidad`) y **Tienda** (`#tienda`: dirección, horario, cómo comprar y redes). La barra del pedido aparece encima de las pestañas solo cuando hay algo en el pedido. Los enlaces de siempre (`#p-H01`, `#mapa`, `#encuentra`, `#comparar=…`, `#pedido=…`, `#acceso=…`) siguen funcionando y abren su hoja sobre la pantalla que corresponde.
+
 ## Herramientas para clientes y mayoristas
 Todo funciona en el navegador del cliente: sin cuentas, sin servidores ni servicios de pago.
 

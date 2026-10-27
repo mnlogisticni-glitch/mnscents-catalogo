@@ -14,6 +14,7 @@ with sync_playwright() as p:
     pg.on('console', lambda m: m.type == 'error' and errs.append(m.text)); pg.on('pageerror', lambda e: errs.append(str(e)))
     pg.goto(URL); pg.wait_for_selector('.tarjeta')
     pg.evaluate("localStorage.clear()"); pg.reload(); pg.wait_for_selector('.tarjeta')
+    pg.click('.nav-vistas a[data-vista="descubre"]'); pg.wait_for_timeout(350)
     ok('Entrada "Encuentra tu perfume" visible', pg.locator('.descubre').first.is_visible())
     ok('La luna de la entrada tiene su creciente', len(pg.get_attribute('.descubre .lp-luz', 'd') or '') > 10)
     pg.screenshot(path=f'{S}/shots/q0-entrada.png')
@@ -64,7 +65,7 @@ with sync_playwright() as p:
     ok('Ella + noche + dulce → Yara Tous', 'Yara Tous' in pg.locator('.rec-nombre').all_inner_texts())
     pg.screenshot(path=f'{S}/shots/q5-resultado-ella.png')
     pg.click('[data-accion=quiz-catalogo]'); pg.wait_for_timeout(500)
-    ok('"Ver Damas" cierra y abre el catálogo de damas', pg.locator('#hoja-quiz[open]').count() == 0 and pg.get_attribute('#tab-damas', 'aria-selected') == 'true')
+    ok('"Ver Damas" cierra y abre el catálogo de damas', pg.locator('#hoja-quiz[open]').count() == 0 and pg.get_attribute('#tab-damas', 'aria-selected') == 'true' and pg.is_visible('#rejilla'))
 
     # ---- caja de 6
     pg.click('#tab-caballeros'); pg.wait_for_timeout(200)

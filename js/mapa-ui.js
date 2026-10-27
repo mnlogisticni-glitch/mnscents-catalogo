@@ -245,7 +245,7 @@ export function iniciarMapa(ctx) {
       case 'mapa-soltar': seleccionar(null); break;
     }
   });
-  d.addEventListener('close', () => { if (location.hash === '#mapa') history.replaceState(null, '', `#${estado.cat}`); });
+  d.addEventListener('close', () => { if (location.hash === '#mapa') history.replaceState(null, '', ctx.hashBase ? ctx.hashBase() : `#${estado.cat}`); });
 
   // ---------- abrir ----------
   function abrirMapa({ id = null } = {}) {

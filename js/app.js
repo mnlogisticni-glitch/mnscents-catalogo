@@ -202,15 +202,7 @@ function pintarCatalogo() {
   if (enOtra) caja.innerHTML = `<button type="button" data-accion="ir-cat" data-cat="${otra}">También hay <b>${enOtra} ${enOtra === 1 ? 'resultado' : 'resultados'}</b> en ${otra === 'damas' ? 'Damas' : 'Caballeros'}</button>`;
 }
 
-function pintarLoMas() {
-  const caja = $('.lo-mas');
-  const sinFiltros = !estado.q && !estado.aroma && !filtrosActivos().length;
-  const top = estado.productos.filter(p => p.catalogo === estado.cat && Number.isInteger(p.top) && esComprable(p))
-    .sort((a, b) => a.top - b.top);
-  caja.hidden = !sinFiltros || !top.length;
-  if (caja.hidden) { caja.innerHTML = ''; return; }
-  caja.innerHTML = `<div class="lm-cabeza"><h2 id="t-lomas">Lo más pedido del mes</h2><p>Según los pedidos de los últimos 30 días</p></div>
-    <ol class="lm-lista">${top.map(p => `<li class="lo-item" data-id="${esc(p.id)}">
+const itemLoMas = p => `<li class="lo-item" data-id="${esc(p.id)}">
       <button class="lm-abrir" type="button" data-accion="ficha" data-id="${esc(p.id)}" aria-label="N.º ${p.top}: ${esc(p.nombre)}. Ver detalles">
         <span class="lm-num" aria-hidden="true">${p.top}</span>
         <span class="lm-foto">${p.foto ? `<img src="${FOTOS}${esc(p.foto)}" alt="" width="96" height="96" loading="lazy">` : ''}</span>
@@ -218,7 +210,22 @@ function pintarLoMas() {
         <span class="lm-precio">${fmtCS(p.precios.detalle.cs)} <small>· mayor ${fmtCS(p.precios.mayor.cs)}</small></span>
       </button>
       <div class="t-accion">${controlAgregar(p)}</div>
-    </li>`).join('')}</ol>`;
+    </li>`;
+const topDe = cat => estado.productos.filter(p => p.catalogo === cat && Number.isInteger(p.top) && esComprable(p)).sort((a, b) => a.top - b.top);
+function pintarLoMas() {
+  const caja = $('.lo-mas');
+  const sinFiltros = !estado.q && !estado.aroma && !filtrosActivos().length;
+  const top = topDe(estado.cat);
+  caja.hidden = !sinFiltros || !top.length;
+  if (caja.hidden) caja.innerHTML = '';
+  else caja.innerHTML = `<div class="lm-cabeza"><h2 id="t-lomas">Lo más pedido del mes</h2><p>Según los pedidos de los últimos 30 días</p></div>
+    <ol class="lm-lista">${top.map(itemLoMas).join('')}</ol>`;
+  // Descubre: los dos catálogos
+  const todo = $('.lo-mas-todo');
+  const grupos = [['caballeros', 'Caballeros'], ['damas', 'Damas']].map(([c, t]) => [t, topDe(c)]).filter(([, l]) => l.length);
+  todo.hidden = !grupos.length;
+  todo.innerHTML = grupos.length ? `<div class="lm-cabeza"><h2 id="t-lomas-todo">Lo más pedido del mes</h2><p>Según los pedidos de los últimos 30 días</p></div>
+    ${grupos.map(([t, l]) => `<h3 class="lm-cat">${t}</h3><ol class="lm-lista">${l.map(itemLoMas).join('')}</ol>`).join('')}` : '';
 }
 
 function actualizarControlesTarjetas() {
@@ -234,7 +241,7 @@ function ponerCat(cat, { foco = false, conHash = true } = {}) {
   if (cat !== 'caballeros' && cat !== 'damas') cat = 'caballeros';
   estado.cat = cat;
   $('.segmento').dataset.activo = cat;
-  for (const t of $$('[role="tab"]')) {
+  for (const t of $$('.segmento [role="tab"]')) {
     const sel = t.dataset.cat === cat;
     t.setAttribute('aria-selected', sel); t.tabIndex = sel ? 0 : -1;
     if (sel && foco) t.focus();
@@ -385,7 +392,7 @@ async function compartir(id) {
   window.open(`https://wa.me/?text=${encodeURIComponent(texto + '\n' + url)}`, '_blank', 'noopener');
 }
 $('#hoja-ficha').addEventListener('close', () => {
-  if (location.hash.startsWith('#p-')) history.replaceState(null, '', `#${estado.cat}`);
+  if (location.hash.startsWith('#p-')) history.replaceState(null, '', hashBase());
 });
 
 // ---------- pedido ----------
@@ -660,7 +667,7 @@ async function compartirComparacion() {
   window.open(`https://wa.me/?text=${encodeURIComponent(texto + '\n' + url)}`, '_blank', 'noopener');
 }
 $('#hoja-comparar').addEventListener('close', () => {
-  if (location.hash.startsWith('#comparar=')) history.replaceState(null, '', `#${estado.cat}`);
+  if (location.hash.startsWith('#comparar=')) history.replaceState(null, '', hashBase());
 });
 
 // ---------- Verificar un pedido recibido (enlace "#pedido=H01-2,D05-1") ----------
@@ -695,7 +702,7 @@ function abrirVerificacion(enlace) {
   abrir($('#hoja-verificar'));
 }
 $('#hoja-verificar').addEventListener('close', () => {
-  if (location.hash.startsWith('#pedido=')) history.replaceState(null, '', `#${estado.cat}`);
+  if (location.hash.startsWith('#pedido=')) history.replaceState(null, '', hashBase());
 });
 
 // ---------- Encuentra tu perfume ----------
@@ -817,11 +824,12 @@ function elegirQuiz(b) {
 }
 $('#hoja-quiz').addEventListener('close', () => {
   clearTimeout(tQuiz);
-  if (location.hash === '#encuentra') history.replaceState(null, '', `#${estado.cat}`);
+  if (location.hash === '#encuentra') history.replaceState(null, '', hashBase());
 });
 
 function actualizarTodo() {
   pintarPedido();
+  pintarPuntoRacha();
   actualizarControlesTarjetas();
   mayoristas?.refrescar();
   mapaUI?.refrescar();
@@ -870,6 +878,7 @@ document.addEventListener('click', e => {
     case 'quiz-guardar': compartirResultado(true); break;
     case 'quiz-catalogo':
       cerrar($('#hoja-quiz'));
+      ponerVista('perfumes');
       ponerCat(b.dataset.cat);
       window.scrollTo({ top: $('#catalogo').offsetTop - 70, behavior: 'smooth' });
       break;
@@ -982,6 +991,42 @@ $('.limpiar-q').addEventListener('click', () => {
   const q = $('#q'); q.value = ''; estado.q = ''; $('.limpiar-q').hidden = true; pintarCatalogo(); q.focus();
 });
 
+// ---------- pantallas (pestañas de abajo, como una app) ----------
+const VISTAS = ['perfumes', 'descubre', 'mayoristas', 'fidelidad', 'tienda'];
+const TITULOS = {
+  perfumes: 'MN Scents · Catálogo de perfumes', descubre: 'Descubre tu aroma · MN Scents', mayoristas: 'Mayoristas · MN Scents',
+  fidelidad: 'Tarjeta de fidelidad · MN Scents', tienda: 'Visítanos en Estelí · MN Scents',
+};
+let vistaActual = 'perfumes';
+const posiciones = {};
+// El "#" que corresponde a la pantalla abierta (para volver a él al cerrar una hoja)
+const hashBase = () => (vistaActual === 'perfumes' ? `#${estado.cat}` : `#${vistaActual}`);
+function ponerVista(v) {
+  if (!VISTAS.includes(v)) v = 'perfumes';
+  if (v === vistaActual) return;
+  posiciones[vistaActual] = scrollY;
+  vistaActual = v;
+  for (const el of $$('.vista')) el.hidden = el.dataset.vista !== v;
+  for (const a of $$('.nav-vistas a')) {
+    if (a.dataset.vista === v) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
+  }
+  document.body.dataset.vista = v;
+  document.title = TITULOS[v];
+  // el catálogo vuelve a donde estaba; las demás pantallas empiezan arriba
+  scrollTo({ top: v === 'perfumes' ? posiciones.perfumes || 0 : 0, behavior: 'instant' });
+}
+$('.nav-vistas').addEventListener('click', e => {
+  const a = e.target.closest('a[data-vista]');
+  if (a && a.dataset.vista === vistaActual) {        // tocar la pestaña abierta: sube al inicio
+    e.preventDefault();
+    scrollTo({ top: 0, behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth' });
+  }
+});
+function pintarPuntoRacha() {
+  const r = estado.racha ? estadoRacha(estado.racha, Date.now()) : null;
+  $('.nav-punto').hidden = !r?.activa;
+}
+
 function irAHash() {
   let h = '';
   try { h = decodeURIComponent(location.hash.slice(1)); } catch { h = ''; }   // un enlace mal escrito no rompe la página
@@ -999,34 +1044,46 @@ function irAHash() {
     return true;
   }
   if (h === 'mapa') {
+    ponerVista('descubre');
     if (!$('.tarjeta')) ponerCat(estado.cat, { conHash: false });
     if (!$('#hoja-mapa').open) mapaUI.abrirMapa();
     return true;
   }
   if (h.startsWith('acceso=')) {
     // enlace de acceso al catálogo de reventa: se comprueba, se guarda y se quita de la barra de direcciones
+    ponerVista('mayoristas');
     if (!$('.tarjeta')) ponerCat(estado.cat, { conHash: false });
     history.replaceState(null, '', '#reventa');
     mayoristas.abrirConEnlace(h.slice(7));
     return true;
   }
   if (h === 'ganancia' || h === 'reventa') {
+    ponerVista('mayoristas');
     if (!$('.tarjeta')) ponerCat(estado.cat, { conHash: false });
     h === 'ganancia' ? mayoristas.abrirGanancia() : mayoristas.abrirReventa();
     return true;
   }
   if (h === 'encuentra') {
+    ponerVista('descubre');
     if (!$('.tarjeta')) ponerCat(estado.cat, { conHash: false });
     if (!$('#hoja-quiz').open) abrirQuiz();
+    return true;
+  }
+  if (VISTAS.includes(h)) {
+    ponerVista(h);
+    if (!$('.tarjeta')) ponerCat(estado.cat, { conHash: false });   // el catálogo queda listo detrás
     return true;
   }
   if (h.startsWith('p-')) {
     const p = estado.porId.get(h.slice(2));
     if (p) { if (p.catalogo !== estado.cat || !$('.tarjeta')) ponerCat(p.catalogo, { conHash: false }); abrirFicha(p.id); return true; }
-  } else if (h && h !== estado.cat) { ponerCat(h); return true; }
+  } else if (h === 'caballeros' || h === 'damas') { ponerVista('perfumes'); if (h !== estado.cat || !$('.tarjeta')) ponerCat(h); return true; }
+  else if (h && h !== estado.cat) { ponerCat(h); return true; }
   return false;
 }
 window.addEventListener('hashchange', irAHash);
+for (const [id, h] of [['#hoja-ganancia', '#ganancia'], ['#hoja-reventa', '#reventa']])
+  $(id).addEventListener('close', () => { if (location.hash === h) history.replaceState(null, '', hashBase()); });
 // borde de la barra superior al desplazar
 const centinela = $('.cielo');
 new IntersectionObserver(([en]) => $('.barra-sup').classList.toggle('con-borde', !en.isIntersecting), { rootMargin: '-64px 0px 0px 0px' }).observe(centinela);
@@ -1057,6 +1114,7 @@ async function iniciar() {
     pintarFiltrosFijos();
     pintarPedido();   // primero: ajusta un pedido guardado a las existencias actuales
     mayoristas.pintarRacha();
+    pintarPuntoRacha();
     if (!irAHash()) ponerCat(estado.cat || 'caballeros');
   } catch {
     rej.setAttribute('aria-busy', 'false');
@@ -1065,7 +1123,7 @@ async function iniciar() {
       <a class="btn sec" href="https://wa.me/50584735485" target="_blank" rel="noopener">${ico('chat')}Escribir por WhatsApp</a></div></div>`;
   }
 }
-const ctxUI = { estado, $, $$, esc, ico, FOTOS, abrir, cerrar, anunciar, fijarQty, calcPedido, controlAgregar };
+const ctxUI = { estado, $, $$, esc, ico, FOTOS, abrir, cerrar, anunciar, fijarQty, calcPedido, controlAgregar, hashBase };
 mayoristas = iniciarMayoristas(ctxUI);
 mapaUI = iniciarMapa(ctxUI);
 iniciar();

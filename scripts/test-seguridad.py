@@ -68,6 +68,7 @@ try:
         pg.click('.bp-boton'); pg.wait_for_timeout(700)
         ok('Pedido y caja de 6 se dibujan', pg.locator('.caja-slot.lleno').count() >= 1)
         pg.keyboard.press('Escape'); pg.wait_for_timeout(400)
+        pg.click('.nav-vistas a[data-vista="descubre"]'); pg.wait_for_timeout(350)
         pg.click('.descubre'); pg.wait_for_timeout(450)
         for t in ['Para él', 'De noche', 'Cálido e intenso', 'Que se note']:
             pg.click(f'.q-op:has-text("{t}")'); pg.wait_for_timeout(420)
@@ -122,6 +123,7 @@ try:
         ok('El nombre malicioso se muestra como texto', '<img src=x' in pg3.inner_text('#ficha-nombre'))
         pg3.click('[data-accion=ficha-agregar]'); pg3.wait_for_timeout(400)
         pg3.click('.bp-boton'); pg3.wait_for_timeout(700); pg3.keyboard.press('Escape'); pg3.wait_for_timeout(400)
+        pg3.click('.nav-vistas a[data-vista="descubre"]'); pg3.wait_for_timeout(350)
         pg3.click('.descubre'); pg3.wait_for_timeout(450)
         for t in ['Para él', 'De día', 'Fresco y limpio', 'Suave y elegante']:
             pg3.click(f'.q-op:has-text("{t}")'); pg3.wait_for_timeout(420)
