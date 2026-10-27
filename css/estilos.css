@@ -1330,3 +1330,19 @@ body:has(.barra-pedido:not(.vacio)) { padding-bottom: calc(var(--alto-nav) + var
   .nav-vistas a::before, .nav-vistas a .ico { transition: none; }
 }
 @media (max-width: 359px) { .nav-vistas a { font-size: 10.5px; letter-spacing: 0; } .nav-vistas a .ico { width: 21px; height: 21px; } }
+
+/* Beneficios: regalías por comprarnos (solo al detalle) */
+.regalias { margin: 4px var(--pad) 0; padding: 26px 20px; border-radius: var(--r-l); border: 1px solid rgb(242 211 138 / 0.35); background: radial-gradient(120% 90% at 100% 0%, rgb(242 211 138 / 0.12), transparent 60%), var(--noche-2); }
+.regalias h2 { font: 700 21px/1.2 var(--display); margin-bottom: 16px; }
+.reg-lista { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+.reg-lista li { display: grid; grid-template-columns: 48px 1fr; gap: 14px; align-items: center; padding: 12px; border-radius: var(--r-m); background: rgb(14 7 24 / 0.45); border: 1px solid var(--linea-suave); }
+.reg-ico { width: 48px; height: 48px; border-radius: 14px; display: grid; place-items: center; background: var(--oro-fondo); color: var(--oro); }
+.reg-ico .ico { width: 24px; height: 24px; }
+.reg-lista h3 { font: 700 15.5px/1.25 var(--display); }
+.reg-lista p { font-size: 14px; color: var(--tinta-2); margin-top: 2px; }
+.reg-aplica { margin-top: 14px; font-size: 13.5px; color: var(--tinta-3); }
+@media (min-width: 1000px) {
+  .regalias { margin-left: var(--pad); margin-right: var(--pad); padding: 36px 40px; }
+  .reg-lista { grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  .reg-lista li { grid-template-columns: 1fr; align-items: start; padding: 18px; }
+}

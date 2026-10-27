@@ -61,6 +61,8 @@
     <symbol id="i-frasco" viewBox="0 0 24 24"><path d="M10 3h4v3h-4z"/><path d="M9.5 6h5l.5 2.2a6 6 0 0 1 3 5.3V19a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2v-5.5a6 6 0 0 1 3-5.3Z"/><path d="M9 14.5h6"/></symbol>
     <symbol id="i-estrella" viewBox="0 0 24 24"><path d="M12 3.5l1.9 5.1 5.1 1.9-5.1 1.9L12 17.5l-1.9-5.1L5 10.5l5.1-1.9Z"/><path d="M18.5 15.5l.7 1.8 1.8.7-1.8.7-.7 1.8-.7-1.8-1.8-.7 1.8-.7Z"/></symbol>
     <symbol id="i-tienda" viewBox="0 0 24 24"><path d="M4 9.5 5.5 4h13L20 9.5"/><path d="M4 9.5a2.7 2.7 0 0 0 5.3 0 2.7 2.7 0 0 0 5.4 0 2.7 2.7 0 0 0 5.3 0"/><path d="M5.5 12v8h13v-8"/><path d="M10 20v-4.5h4V20"/></symbol>
+    <symbol id="i-bolsa" viewBox="0 0 24 24"><path d="M5.5 8h13l-1 12.5h-11Z"/><path d="M9 10.5V7a3 3 0 0 1 6 0v3.5"/></symbol>
+    <symbol id="i-sticker" viewBox="0 0 24 24"><path d="M20 12.5V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h6.5Z"/><path d="M12.5 20a7.5 7.5 0 0 0 7.5-7.5h-5.5a2 2 0 0 0-2 2Z"/><circle cx="9" cy="10" r="1"/><circle cx="15" cy="10" r="1"/></symbol>
     <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></symbol>
     <symbol id="i-cerrado" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/><circle cx="12" cy="15.5" r="1.3"/></symbol>
     <symbol id="i-aviso" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7.5v5.5"/><circle cx="12" cy="16.3" r=".6"/></symbol>
@@ -96,7 +98,7 @@
   <a href="#perfumes" data-vista="perfumes" aria-current="page"><svg class="ico" aria-hidden="true"><use href="#i-frasco"/></svg><span>Perfumes</span></a>
   <a href="#descubre" data-vista="descubre"><svg class="ico" aria-hidden="true"><use href="#i-estrella"/></svg><span>Descubre</span></a>
   <a href="#mayoristas" data-vista="mayoristas"><svg class="ico" aria-hidden="true"><use href="#i-stack"/></svg><span>Mayoristas</span><i class="nav-punto" hidden></i></a>
-  <a href="#fidelidad" data-vista="fidelidad"><svg class="ico" aria-hidden="true"><use href="#i-gift"/></svg><span>Fidelidad</span></a>
+  <a href="#beneficios" data-vista="beneficios"><svg class="ico" aria-hidden="true"><use href="#i-gift"/></svg><span>Beneficios</span></a>
   <a href="#tienda" data-vista="tienda"><svg class="ico" aria-hidden="true"><use href="#i-tienda"/></svg><span>Tienda</span></a>
 </nav>
 
@@ -201,14 +203,24 @@
 </section>
 </div>
 
-<div class="vista" id="vista-fidelidad" data-vista="fidelidad" aria-labelledby="t-fidelidad" hidden>
+<div class="vista" id="vista-beneficios" data-vista="beneficios" aria-labelledby="t-beneficios" hidden>
 <div class="vista-cabeza">
   <p class="seccion-etiqueta">Solo compras al detalle</p>
-  <h1 id="t-fidelidad">Tarjeta de fidelidad</h1>
-  <p>Compra al detalle, junta sellos y llévate un perfume de regalo.</p>
+  <h1 id="t-beneficios">Beneficios</h1>
+  <p>Por comprarnos al detalle te llevas regalías en cada compra y tu tarjeta de fidelidad.</p>
 </div>
-<section id="fidelidad" class="fidelidad" aria-label="Tarjeta de fidelidad">
+<section id="regalias" class="regalias" aria-labelledby="t-regalias">
+  <h2 id="t-regalias">Regalías por comprarnos</h2>
+  <ul class="reg-lista">
+    <li><span class="reg-ico"><svg class="ico" aria-hidden="true"><use href="#i-truck"/></svg></span><div><h3>Delivery gratis</h3><p>Dentro de la ciudad de Estelí.</p></div></li>
+    <li><span class="reg-ico"><svg class="ico" aria-hidden="true"><use href="#i-bolsa"/></svg></span><div><h3>Bolsa personalizada</h3><p>De nuestra marca.</p></div></li>
+    <li><span class="reg-ico"><svg class="ico" aria-hidden="true"><use href="#i-sticker"/></svg></span><div><h3>Stickers</h3><p>De nuestro logo.</p></div></li>
+  </ul>
+  <p class="reg-aplica">Solo para compras al detalle; no aplica a compras mayoristas.</p>
+</section>
+<section id="fidelidad" class="fidelidad" aria-labelledby="t-fid">
   <div class="fid-texto">
+    <h2 id="t-fid">Tarjeta de fidelidad</h2>
     <p>Por cada compra recibes <strong>1 sello</strong>. Al completar <strong>10 sellos</strong>, te regalamos <strong>un perfume de la línea Stallion 53</strong>, valorado en $38.</p>
     <p class="fid-regalo">Tu tarjeta empieza con <strong>2 sellos de regalo</strong>.</p>
     <p class="fid-aplica">Es un beneficio exclusivo para compras al detalle; no aplica a compras mayoristas.</p>

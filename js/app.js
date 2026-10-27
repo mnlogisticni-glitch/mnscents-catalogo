@@ -992,10 +992,10 @@ $('.limpiar-q').addEventListener('click', () => {
 });
 
 // ---------- pantallas (pestañas de abajo, como una app) ----------
-const VISTAS = ['perfumes', 'descubre', 'mayoristas', 'fidelidad', 'tienda'];
+const VISTAS = ['perfumes', 'descubre', 'mayoristas', 'beneficios', 'tienda'];
 const TITULOS = {
   perfumes: 'MN Scents · Catálogo de perfumes', descubre: 'Descubre tu aroma · MN Scents', mayoristas: 'Mayoristas · MN Scents',
-  fidelidad: 'Tarjeta de fidelidad · MN Scents', tienda: 'Visítanos en Estelí · MN Scents',
+  beneficios: 'Beneficios · MN Scents', tienda: 'Visítanos en Estelí · MN Scents',
 };
 let vistaActual = 'perfumes';
 const posiciones = {};
@@ -1069,6 +1069,7 @@ function irAHash() {
     if (!$('#hoja-quiz').open) abrirQuiz();
     return true;
   }
+  if (h === 'fidelidad') { history.replaceState(null, '', '#beneficios'); h = 'beneficios'; }   // enlace anterior
   if (VISTAS.includes(h)) {
     ponerVista(h);
     if (!$('.tarjeta')) ponerCat(estado.cat, { conHash: false });   // el catálogo queda listo detrás
