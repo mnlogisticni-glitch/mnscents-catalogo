@@ -1,5 +1,5 @@
 {
- "actualizado": "2026-10-27T20:24:08.100Z",
+ "actualizado": "2026-10-27T20:33:26.705Z",
  "productos": [
   {
    "id": "H01",
@@ -525,7 +525,12 @@
    "nombre": "Donna Intense",
    "marca": "Stallion 53",
    "presentacion": "Incluye spray de viaje de 20 ml",
-   "notas": [],
+   "notas": [
+    "floral blanco",
+    "frutal",
+    "suave",
+    "citrico"
+   ],
    "descripcion": "Excelente alternativa al Valentino Donna Intense",
    "precios": {
     "detalle": {
