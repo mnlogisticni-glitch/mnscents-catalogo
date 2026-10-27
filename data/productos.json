@@ -1,5 +1,5 @@
 {
- "actualizado": "2026-10-27T19:38:19.238Z",
+ "actualizado": "2026-10-27T20:22:38.349Z",
  "productos": [
   {
    "id": "H01",
@@ -538,7 +538,7 @@
     }
    },
    "estado": "agotado",
-   "existencias": 0,
+   "existencias": 4,
    "etiqueta": null,
    "foto": "donna-intense.webp",
    "orden": 2
