@@ -2,6 +2,7 @@
 import { calcular, mensajeWhatsApp, enlaceWhatsApp, fmtCS, fmtUSD, esComprable, maxPedido, UMBRAL_MAYOREO, leerPedidoEnlace, leerRachaEnlace } from './precios.js';
 import { validarRacha, estadoRacha, registrarEnvio, fechaCorta, fechaEnlace } from './racha.js';
 import { iniciarMayoristas } from './mayoristas-ui.js';
+import { CLAVE_ACCESO } from './acceso.js';
 import { iniciarMapa } from './mapa-ui.js';
 import { PREGUNTAS, recomendar, opcionesAroma, perfil } from './recomendar.js';
 import { imagenPerfil } from './tarjeta-perfil.js';
@@ -1002,6 +1003,13 @@ function irAHash() {
     if (!$('#hoja-mapa').open) mapaUI.abrirMapa();
     return true;
   }
+  if (h.startsWith('acceso=')) {
+    // enlace de acceso al catálogo de reventa: se comprueba, se guarda y se quita de la barra de direcciones
+    if (!$('.tarjeta')) ponerCat(estado.cat, { conHash: false });
+    history.replaceState(null, '', '#reventa');
+    mayoristas.abrirConEnlace(h.slice(7));
+    return true;
+  }
   if (h === 'ganancia' || h === 'reventa') {
     if (!$('.tarjeta')) ponerCat(estado.cat, { conHash: false });
     h === 'ganancia' ? mayoristas.abrirGanancia() : mayoristas.abrirReventa();
@@ -1026,6 +1034,7 @@ new IntersectionObserver(([en]) => $('.barra-sup').classList.toggle('con-borde',
 window.addEventListener('storage', e => {
   if (e.key === CLAVE_CARRITO) { estado.carrito = cargarCarrito(); actualizarTodo(); }
   if (e.key === CLAVE_RACHA) { estado.racha = cargarRacha(); actualizarTodo(); }
+  if (e.key === CLAVE_ACCESO) mayoristas?.recargarAcceso();
 });
 
 // ---------- carga ----------

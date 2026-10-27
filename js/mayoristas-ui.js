@@ -1,9 +1,11 @@
-// Herramientas para mayoristas: tarjeta de racha, calculadora de ganancia y catálogo de reventa.
+// Herramientas para mayoristas: tarjeta de racha, calculadora de ganancia y catálogo de reventa
+// (este último solo con el enlace de acceso que MN Scents envía a sus clientes mayoristas).
 // Todo se guarda solo en el navegador del cliente (sin cuentas, sin servidores).
 import { fmtCS, esComprable, UMBRAL_MAYOREO } from './precios.js';
 import { estadoRacha, fechaCorta, RACHA } from './racha.js';
 import { calcularGanancia, precioConMargen, leerMonto } from './ganancia.js';
 import { imagenCatalogo, limpiar, limpiarTelefono } from './catalogo-reventa.js';
+import { CLAVE_ACCESO, comprobarAcceso, extraerToken } from './acceso.js';
 
 const CLAVE = 'mnscents-reventa-v1';
 const MAX_CATALOGO = 6;
@@ -219,64 +221,184 @@ export function iniciarMayoristas(ctx) {
   });
 
   // ======================================================================
-  // Catálogo de reventa
+  // Catálogo de reventa: solo para clientes con enlace de acceso de MN Scents.
+  // Tres pestañas: 1 Perfumes · 2 Tu negocio · 3 Tu imagen
   // ======================================================================
   const dR = $('#hoja-reventa');
+  const tabsR = $('.rev-tabs', dR);
+  const PASOS = ['perfumes', 'negocio', 'imagen'];
+  const WA = 'https://wa.me/50584735485?text=';
   let logo = null, logoUrl = null, tImagen = null, blobActual = null, vistaUrl = null, version = 0;
+  let paso = 'perfumes';
+  let acceso = null;          // resultado de comprobarAcceso (ok o vencido), o null
+  let avisoAcceso = '';       // 'invalido' si abrieron o pegaron un enlace que no sirve
+  let bienvenida = false;     // recién activado: saludo más visible
 
+  const tokenGuardado = () => { try { return localStorage.getItem(CLAVE_ACCESO) || ''; } catch { return ''; } };
+  const tieneAcceso = () => acceso?.ok === true && Date.now() <= acceso.vence;
+  async function cargarAcceso() {
+    const t = tokenGuardado();
+    const r = t ? await comprobarAcceso(t) : null;
+    acceso = r && (r.ok || r.motivo === 'vencido') ? r : null;
+    pintarBotonReventa();
+    return acceso;
+  }
+  let listo = cargarAcceso();
+
+  async function activarAcceso(texto) {
+    const t = extraerToken(texto);
+    const r = t ? await comprobarAcceso(t) : { ok: false, motivo: 'invalido' };
+    if (r.ok) {
+      try { localStorage.setItem(CLAVE_ACCESO, t); } catch {}
+      acceso = r; avisoAcceso = ''; bienvenida = true;
+    } else if (!tieneAcceso()) {
+      // un enlace vencido o malo nunca quita un acceso que sí sirve
+      if (r.motivo === 'vencido') { acceso = r; avisoAcceso = ''; } else avisoAcceso = 'invalido';
+    }
+    pintarBotonReventa();
+    return r;
+  }
+
+  function pintarBotonReventa() {
+    for (const s of $$('.rev-estado-acceso')) {
+      s.innerHTML = tieneAcceso()
+        ? `${ico('check')}Tu acceso está activo hasta el ${fechaCorta(acceso.vence)}`
+        : `${ico('cerrado')}Exclusivo para clientes que ya nos compraron al por mayor`;
+      s.closest('.may-tool')?.classList.toggle('con-candado', !tieneAcceso());
+    }
+  }
+
+  // ---------- pantalla de candado ----------
+  function pintarBloqueo() {
+    tabsR.hidden = true;
+    const venc = acceso?.motivo === 'vencido';
+    const textoWa = venc
+      ? `Hola, soy ${acceso.nombre}. Mi acceso al catálogo de reventa venció el ${fechaCorta(acceso.vence)}. ¿Me envían uno nuevo?`
+      : 'Hola, ya les compré al por mayor y quiero mi enlace de acceso al catálogo de reventa.';
+    $('.reventa', dR).innerHTML = `
+      <div class="rev-candado">
+        <span class="rc-ico">${ico('cerrado')}</span>
+        <h3>${venc ? 'Tu acceso venció' : 'Exclusivo para clientes mayoristas'}</h3>
+        ${avisoAcceso === 'invalido' ? `<p class="rc-aviso" role="alert">${ico('aviso')}Ese enlace de acceso no es válido. Revisa que esté completo o pídenos uno nuevo.</p>` : ''}
+        <p>${venc
+          ? `${esc(acceso.nombre)}, tu acceso al catálogo de reventa venció el ${fechaCorta(acceso.vence)}. Pídenos uno nuevo por WhatsApp.`
+          : 'Crear tu catálogo de reventa es un beneficio para quienes ya nos compraron al por mayor. Si ya nos compraste, pídenos tu enlace de acceso por WhatsApp y ábrelo en este teléfono.'}</p>
+        <a class="btn pri" href="${WA}${encodeURIComponent(textoWa)}" target="_blank" rel="noopener">${ico('chat')}${venc ? 'Pedir un acceso nuevo' : 'Pedir mi enlace de acceso'}</a>
+        <form class="rc-pegar" data-rev-pegar novalidate>
+          <label for="rev-codigo">¿Ya tienes tu enlace? Pégalo aquí</label>
+          <div class="rc-fila">
+            <input id="rev-codigo" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="1500" placeholder="https://mnscents.pages.dev/#acceso=…">
+            <button class="btn sec" type="submit">Activar</button>
+          </div>
+        </form>
+      </div>`;
+    const pie = $('.rev-pie', dR);
+    pie.hidden = true; pie.innerHTML = '';
+  }
+
+  // ---------- pestañas ----------
   function seleccionValida() {
     return datos.sel.filter(id => esComprable(estado.porId.get(id)));
   }
+  const telValido = () => limpiarTelefono(datos.tel).replace(/\D/g, '').length >= 8;
+  function estadoPasos() {
+    const sel = seleccionValida();
+    return { perfumes: sel.length > 0 && sel.every(id => datos.precios[id]), negocio: !!datos.negocio && telValido() };
+  }
+  // Lo que falta para la imagen y en qué pestaña se arregla
+  function faltante() {
+    const sel = seleccionValida();
+    if (!sel.length) return { texto: 'Elige al menos un perfume.', paso: 'perfumes' };
+    if (sel.some(id => !datos.precios[id])) return { texto: 'Escribe el precio de cada perfume elegido.', paso: 'perfumes' };
+    if (!datos.negocio) return { texto: 'Escribe el nombre de tu negocio.', paso: 'negocio' };
+    if (!telValido()) return { texto: 'Escribe tu número de WhatsApp.', paso: 'negocio' };
+    return null;
+  }
+  function pintarTabs() {
+    const e = estadoPasos();
+    tabsR.hidden = false;
+    for (const b of $$('[role="tab"]', tabsR)) {
+      const k = b.dataset.revTab, on = k === paso;
+      b.setAttribute('aria-selected', String(on));
+      b.tabIndex = on ? 0 : -1;
+      b.classList.toggle('hecho', !!e[k]);
+      $('.rt-num', b).innerHTML = e[k] ? ico('check') : String(PASOS.indexOf(k) + 1);
+    }
+  }
+  function irAPaso(k, foco = false) {
+    if (!PASOS.includes(k)) return;
+    paso = k;
+    for (const s of $$('.rev-panel', dR)) s.hidden = s.id !== `rev-panel-${k}`;
+    pintarTabs(); pintarPieReventa();
+    if (k === 'imagen' && !blobActual) programarImagen(0);
+    $('.hoja-cuerpo', dR).scrollTop = 0;
+    if (foco) $(`#rev-tab-${k}`, dR)?.focus();
+  }
+
   function pintarReventa() {
     const cuerpo = $('.reventa', dR);
     const disp = estado.productos.filter(esComprable)
       .sort((a, b) => a.catalogo.localeCompare(b.catalogo) || a.orden - b.orden);
     const sel = seleccionValida();
-    cuerpo.innerHTML = `
-      <p class="gan-intro">Elige hasta ${MAX_CATALOGO} perfumes disponibles, escribe tus precios y tu número. La imagen se crea en tu teléfono, lista para tus historias y estados.</p>
-      <div class="rev-campos">
-        <label class="campo"><span>Nombre de tu negocio</span><input type="text" maxlength="40" value="${esc(datos.negocio)}" data-rev="negocio" autocomplete="organization" placeholder="Ej.: Perfumes Ana"></label>
-        <label class="campo"><span>Tu WhatsApp</span><input type="tel" maxlength="22" value="${esc(datos.tel)}" data-rev="tel" autocomplete="tel" placeholder="Ej.: 8888-8888"></label>
-        <label class="campo ancho"><span>Título <small>(opcional)</small></span><input type="text" maxlength="48" value="${esc(datos.titulo)}" data-rev="titulo" placeholder="Perfumes disponibles"></label>
-      </div>
-      <div class="rev-fila">
+    const panel = (k, html) => `<section class="rev-panel" role="tabpanel" id="rev-panel-${k}" aria-labelledby="rev-tab-${k}" tabindex="-1"${k === paso ? '' : ' hidden'}>${html}</section>`;
+    const saludo = bienvenida
+      ? `<div class="rev-acceso nuevo">${ico('check')}<div><b>¡Listo, ${esc(acceso.nombre)}!</b><span>Ya tienes acceso al catálogo de reventa hasta el ${fechaCorta(acceso.vence)}.</span></div></div>`
+      : `<p class="rev-acceso">${ico('check')}<span>Acceso de <b>${esc(acceso.nombre)}</b> · activo hasta el ${fechaCorta(acceso.vence)}</span></p>`;
+    cuerpo.innerHTML =
+      panel('perfumes', `
+        ${saludo}
+        <p class="gan-intro">Elige hasta ${MAX_CATALOGO} perfumes disponibles y escribe a cuánto los vendes tú.</p>
+        <p class="gan-sub">Tus perfumes <span class="rev-cuenta">${sel.length} de ${MAX_CATALOGO}</span></p>
+        <ul class="rev-perfumes">${disp.map(p => {
+          const on = sel.includes(p.id);
+          return `<li class="rev-p${on ? ' on' : ''}" data-id="${esc(p.id)}">
+            <button type="button" class="rev-elegir" data-accion="rev-elegir" data-id="${esc(p.id)}" aria-pressed="${on}" aria-label="${esc(p.nombre)}${on ? ', elegido' : ''}">
+              <span class="rev-foto">${p.foto ? `<img src="${FOTOS}${esc(p.foto)}" alt="" width="80" height="80" loading="lazy">` : ''}</span>
+              <span class="rev-nombre">${esc(p.nombre)}</span>
+              <span class="rev-check" aria-hidden="true">${on ? sel.indexOf(p.id) + 1 : ''}</span>
+            </button>
+            ${on ? `<span class="gan-campo rev-precio${datos.precios[p.id] ? '' : ' vacio'}"><i>C$</i><input type="text" inputmode="decimal" maxlength="9" value="${esc(datos.precios[p.id] || '')}" data-rev-precio="${esc(p.id)}" aria-label="Tu precio de ${esc(p.nombre)}" placeholder="Precio"></span>` : ''}
+          </li>`;
+        }).join('')}</ul>`) +
+      panel('negocio', `
+        <p class="gan-intro">Así te van a encontrar tus clientes. Estos datos se guardan solo en este teléfono.</p>
+        <div class="rev-campos">
+          <label class="campo ancho"><span>Nombre de tu negocio</span><input type="text" maxlength="40" value="${esc(datos.negocio)}" data-rev="negocio" autocomplete="organization" placeholder="Ej.: Perfumes Ana"></label>
+          <label class="campo ancho"><span>Tu WhatsApp</span><input type="tel" maxlength="22" value="${esc(datos.tel)}" data-rev="tel" autocomplete="tel" placeholder="Ej.: 8888-8888"></label>
+          <label class="campo ancho"><span>Título de la imagen <small>(opcional)</small></span><input type="text" maxlength="48" value="${esc(datos.titulo)}" data-rev="titulo" placeholder="Perfumes disponibles"></label>
+        </div>
+        <p class="gan-sub">Tu logo</p>
         <div class="rev-logo">
-          ${logo ? `<img src="${logoUrl}" alt="Tu logo" width="48" height="48"><button class="btn-texto" type="button" data-accion="rev-quitar-logo">Quitar logo</button>`
+          ${logo ? `<img src="${logoUrl}" alt="Tu logo" width="56" height="56"><button class="btn-texto" type="button" data-accion="rev-quitar-logo">Quitar logo</button>`
             : `<label class="btn-chip"><input class="sr" type="file" accept="image/png,image/jpeg,image/webp" data-rev-logo>${ico('imagen')}Subir tu logo <small>(opcional)</small></label>`}
+        </div>`) +
+      panel('imagen', `
+        <div class="rev-tema-fila"><span>Estilo</span>
+          <div class="rev-tema" role="radiogroup" aria-label="Estilo de la imagen">
+            ${['noche', 'claro'].map(t => `<button type="button" role="radio" aria-checked="${datos.tema === t}" data-accion="rev-tema" data-tema="${t}" class="tema-${t}">${t === 'noche' ? 'Noche' : 'Claro'}</button>`).join('')}
+          </div>
         </div>
-        <div class="rev-tema" role="radiogroup" aria-label="Estilo de la imagen">
-          ${['noche', 'claro'].map(t => `<button type="button" role="radio" aria-checked="${datos.tema === t}" data-accion="rev-tema" data-tema="${t}" class="tema-${t}">${t === 'noche' ? 'Noche' : 'Claro'}</button>`).join('')}
-        </div>
-      </div>
-      <p class="gan-sub">Tus perfumes <span class="rev-cuenta">${sel.length} de ${MAX_CATALOGO}</span></p>
-      <ul class="rev-perfumes">${disp.map(p => {
-        const on = sel.includes(p.id);
-        return `<li class="rev-p${on ? ' on' : ''}" data-id="${esc(p.id)}">
-          <button type="button" class="rev-elegir" data-accion="rev-elegir" data-id="${esc(p.id)}" aria-pressed="${on}" aria-label="${esc(p.nombre)}${on ? ', elegido' : ''}">
-            <span class="rev-foto">${p.foto ? `<img src="${FOTOS}${esc(p.foto)}" alt="" width="80" height="80" loading="lazy">` : ''}</span>
-            <span class="rev-nombre">${esc(p.nombre)}</span>
-            <span class="rev-check" aria-hidden="true">${on ? sel.indexOf(p.id) + 1 : ''}</span>
-          </button>
-          ${on ? `<span class="gan-campo rev-precio"><i>C$</i><input type="text" inputmode="decimal" maxlength="9" value="${esc(datos.precios[p.id] || '')}" data-rev-precio="${esc(p.id)}" aria-label="Tu precio de ${esc(p.nombre)}" placeholder="Precio"></span>` : ''}
-        </li>`;
-      }).join('')}</ul>
-      <p class="gan-sub">Vista previa</p>
-      <div class="rev-vista" aria-live="polite"><p class="rev-falta"></p><img alt="Vista previa de tu catálogo" hidden></div>`;
+        <div class="rev-vista" aria-live="polite"><p class="rev-falta"></p><button class="btn sec rev-ir" type="button" data-accion="rev-ir" hidden></button><img alt="Vista previa de tu catálogo" hidden></div>`);
+    pintarTabs();
     programarImagen(0);
   }
 
-  function faltante() {
-    const sel = seleccionValida();
-    if (!sel.length) return 'Elige al menos un perfume.';
-    if (sel.some(id => !datos.precios[id])) return 'Escribe el precio de cada perfume elegido.';
-    if (!datos.negocio) return 'Escribe el nombre de tu negocio.';
-    if (limpiarTelefono(datos.tel).replace(/\D/g, '').length < 8) return 'Escribe tu número de WhatsApp.';
-    return '';
-  }
   function pintarPieReventa() {
-    const falta = faltante();
     const pie = $('.rev-pie', dR);
-    const dis = falta || !blobActual ? 'aria-disabled="true"' : '';
+    if (!tieneAcceso() || tabsR.hidden) return;
+    pie.hidden = false;
+    if (paso !== 'imagen') {
+      const n = seleccionValida().length;
+      const sinPrecio = seleccionValida().filter(id => !datos.precios[id]).length;
+      const nota = paso === 'perfumes'
+        ? `${n} de ${MAX_CATALOGO}${sinPrecio ? ` · ${sinPrecio === 1 ? 'falta 1 precio' : `faltan ${sinPrecio} precios`}` : ''}`
+        : (estadoPasos().negocio ? '' : 'Nombre y WhatsApp');
+      const sig = paso === 'perfumes' ? 'negocio' : 'imagen';
+      pie.innerHTML = `${nota ? `<span class="rev-nota">${nota}</span>` : ''}
+        <button class="btn pri" type="button" data-accion="rev-paso" data-paso="${sig}">${sig === 'negocio' ? 'Siguiente: tu negocio' : 'Ver mi imagen'}${ico('arrow')}</button>`;
+      return;
+    }
+    const dis = faltante() || !blobActual ? 'aria-disabled="true"' : '';
     pie.innerHTML = `<button class="btn sec btn-guardar" type="button" data-accion="rev-guardar" aria-label="Guardar imagen" ${dis}>${ico('download')}</button>
       <button class="btn pri" type="button" data-accion="rev-compartir" ${dis}>${ico('share')}Compartir mi catálogo</button>`;
   }
@@ -287,9 +409,17 @@ export function iniciarMayoristas(ctx) {
     const falta = faltante();
     const vista = $('.rev-vista', dR);
     if (!vista) return;
-    $('.rev-falta', vista).textContent = falta;
+    const ir = $('.rev-ir', vista);
+    $('.rev-falta', vista).textContent = falta ? falta.texto : '';
     $('.rev-falta', vista).hidden = !falta;
-    if (falta) { $('img', vista).hidden = true; return; }
+    ir.hidden = !falta;
+    if (falta) {
+      ir.dataset.paso = falta.paso;
+      ir.textContent = falta.paso === 'perfumes' ? 'Ir a Perfumes' : 'Ir a Tu negocio';
+      $('img', vista).hidden = true;
+      return;
+    }
+    if (paso !== 'imagen') return;          // se dibuja al llegar a la pestaña 3
     tImagen = setTimeout(async () => {
       const v = ++version;
       vista.classList.add('cargando');
@@ -307,7 +437,7 @@ export function iniciarMayoristas(ctx) {
   }
 
   async function compartirCatalogo(soloGuardar) {
-    if (!blobActual) return;
+    if (!blobActual || !tieneAcceso()) return;
     const nombre = `catalogo-${(datos.negocio || 'mi-tienda').toLowerCase().normalize('NFD').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'mi-tienda'}.png`;
     if (!soloGuardar) {
       const archivo = new File([blobActual], nombre, { type: 'image/png' });
@@ -322,18 +452,55 @@ export function iniciarMayoristas(ctx) {
     anunciar('Imagen guardada. Súbela a tus historias o estados.');
   }
 
-  function abrirReventa() {
+  async function abrirReventa() {
+    if (dG.open) ctx.cerrar(dG);
+    await listo;
+    if (!tieneAcceso()) {
+      pintarBloqueo();
+      abrir(dR);
+      $('.hoja-cuerpo', dR).scrollTop = 0;
+      return;
+    }
     // si todavía no eligió perfumes, empezamos con los de su pedido
     if (!seleccionValida().length) {
       datos.sel = calcPedido().lineas.map(l => l.producto.id).slice(0, MAX_CATALOGO);
       guardar();
     }
+    // abre en el primer paso pendiente; si ya está todo, directo a la imagen
+    paso = bienvenida ? 'perfumes' : (faltante()?.paso || 'imagen');
     pintarReventa();
-    if (dG.open) ctx.cerrar(dG);
+    bienvenida = false;
     abrir(dR);
     $('.hoja-cuerpo', dR).scrollTop = 0;
   }
 
+  // Abrieron un enlace de acceso (…/#acceso=…)
+  async function abrirConEnlace(texto) {
+    await listo;
+    const r = await activarAcceso(texto);
+    if (r.ok) anunciar(`Listo, ${r.nombre}. Ya tienes acceso al catálogo de reventa.`);
+    await abrirReventa();
+    return r;
+  }
+  function recargarAcceso() { listo = cargarAcceso(); return listo; }
+
+  tabsR.addEventListener('click', e => {
+    const b = e.target.closest('[data-rev-tab]');
+    if (b) irAPaso(b.dataset.revTab);
+  });
+  tabsR.addEventListener('keydown', e => {
+    const i = PASOS.indexOf(paso);
+    const k = { ArrowRight: PASOS[(i + 1) % 3], ArrowLeft: PASOS[(i + 2) % 3], Home: PASOS[0], End: PASOS[2] }[e.key];
+    if (k) { e.preventDefault(); irAPaso(k, true); }
+  });
+  dR.addEventListener('submit', async e => {
+    const f = e.target.closest('[data-rev-pegar]');
+    if (!f) return;
+    e.preventDefault();
+    const r = await activarAcceso($('input', f).value);
+    if (r.ok) { anunciar(`Listo, ${r.nombre}. Ya tienes acceso al catálogo de reventa.`); abrirReventa(); }
+    else { pintarBloqueo(); $('#rev-codigo', dR)?.focus(); }
+  });
   dR.addEventListener('input', e => {
     const t = e.target;
     if (t.dataset.rev === 'negocio') datos.negocio = limpiar(t.value, 40);
@@ -342,8 +509,9 @@ export function iniciarMayoristas(ctx) {
     else if (t.dataset.revPrecio) {
       const n = leerMonto(t.value);
       if (n) datos.precios[t.dataset.revPrecio] = n; else delete datos.precios[t.dataset.revPrecio];
+      t.closest('.rev-precio')?.classList.toggle('vacio', !n);
     } else return;
-    guardar(); programarImagen();
+    guardar(); pintarTabs(); programarImagen();
   });
   dR.addEventListener('change', async e => {
     const t = e.target;
@@ -373,8 +541,9 @@ export function iniciarMayoristas(ctx) {
         else requestAnimationFrame(() => $(`.rev-elegir[data-id="${CSS.escape(id)}"]`, dR)?.focus({ preventScroll: true }));
         break;
       }
+      case 'rev-paso': case 'rev-ir': irAPaso(b.dataset.paso); break;
       case 'rev-tema': datos.tema = b.dataset.tema === 'claro' ? 'claro' : 'noche'; guardar();
-        for (const x of $$('[data-accion="rev-tema"]', dR)) x.setAttribute('aria-checked', x === b);
+        for (const x of $$('[data-accion="rev-tema"]', dR)) x.setAttribute('aria-checked', String(x === b));
         programarImagen(0); break;
       case 'rev-quitar-logo': if (logoUrl) URL.revokeObjectURL(logoUrl); logo = null; logoUrl = null; pintarReventa(); break;
       case 'rev-guardar': compartirCatalogo(true); break;
@@ -394,5 +563,5 @@ export function iniciarMayoristas(ctx) {
     }
   }
 
-  return { pintarRacha, repetirPedido, abrirGanancia, abrirReventa, refrescar };
+  return { pintarRacha, repetirPedido, abrirGanancia, abrirReventa, abrirConEnlace, recargarAcceso, refrescar };
 }

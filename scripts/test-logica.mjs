@@ -426,5 +426,63 @@ prueba('Textos del revendedor se limpian (sin controles, con límite)', () => {
   assert.equal(limpiarTelefono('+505 8888-1234 <b>'), '+505 8888-1234');
 });
 
+// ---------- Enlaces de acceso al catálogo de reventa ----------
+console.log('\nEnlaces de acceso (catálogo de reventa)');
+const pruebaA = async (nombre, fn) => { try { await fn(); ok++; console.log('  ✓ ' + nombre); } catch (e) { fallos++; console.log('  ✗ ' + nombre + '\n    ' + e.message); } };
+const AC = await import('../js/acceso.js');
+const LL = JSON.parse(await readFile(new URL('./fixtures/llave-prueba.json', import.meta.url), 'utf8'));
+const OTRA = (() => { const k = { ...LL.pub, x: LL.pub.y, y: LL.pub.x }; return k; })();
+const hoy = Date.UTC(2026, 9, 27, 17, 0);            // 27/10/2026 11:00 a. m. en Nicaragua
+await pruebaA('Un enlace firmado con la llave correcta da acceso con el nombre del cliente', async () => {
+  const t = await AC.crearToken(LL.priv, { nombre: 'Perfumes Ana', dias: 30 }, hoy);
+  const r = await AC.comprobarAcceso(t, { ahora: hoy, llave: LL.pub });
+  assert.equal(r.ok, true); assert.equal(r.nombre, 'Perfumes Ana');
+});
+await pruebaA('Vence al terminar el día 30 (hora de Nicaragua)', async () => {
+  const t = await AC.crearToken(LL.priv, { nombre: 'Ana', dias: 30 }, hoy);
+  const fin = Date.UTC(2026, 10, 27, 5, 59, 59, 999);   // 26/11 23:59:59 en Nicaragua
+  assert.equal((await AC.comprobarAcceso(t, { ahora: fin, llave: LL.pub })).ok, true);
+  const r = await AC.comprobarAcceso(t, { ahora: fin + 1, llave: LL.pub });
+  assert.equal(r.ok, false); assert.equal(r.motivo, 'vencido'); assert.equal(r.nombre, 'Ana');
+});
+await pruebaA('Cambiar el nombre o la fecha dentro del enlace lo invalida', async () => {
+  const t = await AC.crearToken(LL.priv, { nombre: 'Ana', dias: 30 }, hoy);
+  const [d, f] = t.split('.');
+  const dat = JSON.parse(new TextDecoder().decode(AC.deB64u(d)));
+  for (const cambio of [{ ...dat, n: 'Otro' }, { ...dat, e: dat.e + 300 }]) {
+    const falso = AC.b64u(new TextEncoder().encode(JSON.stringify(cambio))) + '.' + f;
+    assert.equal((await AC.comprobarAcceso(falso, { ahora: hoy, llave: LL.pub })).ok, false);
+  }
+});
+await pruebaA('Un enlace firmado con otra llave no sirve', async () => {
+  const otra = (await crypto.subtle.exportKey('jwk', (await crypto.subtle.generateKey({ name: 'ECDSA', namedCurve: 'P-256' }, true, ['sign'])).privateKey));
+  const t = await AC.crearToken(otra, { nombre: 'Ana', dias: 30 }, hoy);
+  assert.equal((await AC.comprobarAcceso(t, { ahora: hoy, llave: LL.pub })).ok, false);
+});
+await pruebaA('Textos raros o códigos inventados no rompen nada', async () => {
+  for (const x of [null, '', 'hola', 'a.b', 'x'.repeat(5000), 'eyJ2IjoxfQ.' + 'A'.repeat(86), {}]) {
+    assert.equal((await AC.comprobarAcceso(x, { ahora: hoy, llave: LL.pub })).ok, false);
+  }
+  assert.equal((await AC.comprobarAcceso('x.y', { ahora: hoy, llave: OTRA })).ok, false);
+});
+await pruebaA('Se reconoce el código dentro de un enlace completo o pegado solo', async () => {
+  const t = await AC.crearToken(LL.priv, { nombre: 'Ana', dias: 90 }, hoy);
+  assert.equal(AC.extraerToken(AC.enlaceAcceso(t)), t);
+  assert.equal(AC.extraerToken('Hola! Tu acceso: ' + AC.enlaceAcceso(t) + ' gracias'), t);
+  assert.equal(AC.extraerToken('  ' + t + ' '), t);
+  assert.equal(AC.extraerToken('https://mnscents.pages.dev/#reventa'), '');
+});
+await pruebaA('La página privada reconoce su llave y rechaza otras', async () => {
+  assert.equal(await AC.llaveCorrecta(LL.priv.d, LL.pub), true);
+  assert.equal(await AC.llaveCorrecta('A'.repeat(43), LL.pub), false);
+  assert.equal(await AC.llaveCorrecta('corta', LL.pub), false);
+});
+await pruebaA('El nombre se limpia y la vigencia tiene límites', async () => {
+  const t = await AC.crearToken(LL.priv, { nombre: '  <b>Ana</b>\n ', dias: 30 }, hoy);
+  assert.equal((await AC.comprobarAcceso(t, { ahora: hoy, llave: LL.pub })).nombre, 'b Ana /b');
+  await assert.rejects(AC.crearToken(LL.priv, { nombre: 'Ana', dias: 0 }, hoy));
+  await assert.rejects(AC.crearToken(LL.priv, { nombre: '   ', dias: 30 }, hoy));
+});
+
 console.log(`\n${ok} pruebas correctas, ${fallos} fallidas.`);
 process.exit(fallos ? 1 : 0);

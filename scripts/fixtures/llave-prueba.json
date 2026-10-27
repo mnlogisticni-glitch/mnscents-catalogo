@@ -1,0 +1,16 @@
+{
+ "aviso": "Solo para pruebas automáticas. No sirve en la web publicada.",
+ "pub": {
+  "kty": "EC",
+  "x": "PilAo5IuN5aaf1jCkEFAWC6T7r6o3tSJEaOOyLCC5eg",
+  "y": "mr6KcIkvWSjjqtkoYRk7yJytI0AoW7oskvhrKjAVQrk",
+  "crv": "P-256"
+ },
+ "priv": {
+  "kty": "EC",
+  "x": "PilAo5IuN5aaf1jCkEFAWC6T7r6o3tSJEaOOyLCC5eg",
+  "y": "mr6KcIkvWSjjqtkoYRk7yJytI0AoW7oskvhrKjAVQrk",
+  "crv": "P-256",
+  "d": "Z-RmFz-oAK-o9N8OaU5yZj6WiaaPjqz5GgVqIG5LgdA"
+ }
+}
