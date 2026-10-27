@@ -33,11 +33,26 @@
   </header>
 
   <p class="adm-cargando" aria-live="polite">Revisando la llave de este teléfono…</p>
+  <p class="adm-activada" hidden role="status"><svg class="ico" aria-hidden="true"><use href="#i-check"/></svg><span>¡Tu llave quedó activada! Ya puedes crear enlaces. Te recomendamos guardar la copia de seguridad (más abajo).</span></p>
 
   <section class="adm-sin-llave adm-tarjeta" hidden>
-    <h2>Esta página es solo para MN Scents</h2>
-    <p>Para crear enlaces de acceso, abre aquí tu <b>enlace privado de vendedor</b> (el que tiene <code>#llave=</code> al final). Solo hace falta una vez por teléfono.</p>
+    <h2>Primero, tu llave</h2>
+    <p>Esta página es solo para MN Scents. Tu llave firma los enlaces de acceso: se crea y se guarda <b>solo en este teléfono</b>, nunca se envía a ningún lado. Créala en el teléfono y el navegador donde vas a crear los enlaces.</p>
     <p class="adm-error" hidden role="alert"></p>
+    <button class="btn pri" type="button" data-generar>Generar mi llave</button>
+    <p class="adm-chica">¿Ya tienes una copia de seguridad de tu llave? Ábrela en este navegador (es el enlace que termina en <code>#llave=…</code>).</p>
+  </section>
+
+  <section class="adm-pendiente adm-tarjeta" hidden aria-labelledby="t-pend">
+    <h2 id="t-pend">Tu llave está creada. Falta activarla en la web</h2>
+    <ol class="adm-pasos">
+      <li>Copia este <b>código público</b> y envíaselo a Claude. No es secreto: solo sirve para comprobar tus firmas.</li>
+      <li>Cuando te confirme que ya está publicado, vuelve a abrir esta página en este mismo teléfono.</li>
+    </ol>
+    <label class="campo"><span>Código público</span><textarea class="adm-codigo" readonly rows="3"></textarea></label>
+    <button class="btn pri" type="button" data-copiar-codigo><svg class="ico" aria-hidden="true"><use href="#i-copiar"/></svg>Copiar código</button>
+    <p class="adm-chica">Mientras tanto, no borres los datos de este navegador: tu llave vive aquí.</p>
+    <button class="btn-texto" type="button" data-regenerar>Crear otra llave</button>
   </section>
 
   <section class="adm-crear adm-tarjeta" hidden aria-labelledby="t-crear">
@@ -68,8 +83,19 @@
     <ul></ul>
   </section>
 
+  <section class="adm-respaldo adm-tarjeta" hidden aria-labelledby="t-resp">
+    <h2 id="t-resp">Copia de seguridad de tu llave</h2>
+    <p class="adm-ayuda">Tu llave vive solo en este navegador. Si borras sus datos o cambias de teléfono, la pierdes. Guarda esta copia en un lugar privado (por ejemplo, una nota bloqueada) y ábrela en el teléfono nuevo cuando la necesites.</p>
+    <button class="btn sec" type="button" data-ver-respaldo>Mostrar mi copia de seguridad</button>
+    <div class="adm-respaldo-caja" hidden>
+      <p class="adm-error">Este enlace es como una contraseña: con él, cualquiera podría crear accesos. No lo compartas con nadie.</p>
+      <label class="campo"><span>Enlace de tu llave</span><input class="adm-respaldo-enlace" type="text" readonly></label>
+      <button class="btn sec" type="button" data-copiar-respaldo><svg class="ico" aria-hidden="true"><use href="#i-copiar"/></svg>Copiar</button>
+    </div>
+  </section>
+
   <section class="adm-nota" hidden>
-    <p>Cada enlace lleva el nombre del cliente y su fecha de vencimiento, firmados con tu llave. Nadie puede crear uno ni cambiarle la fecha sin esa llave. No compartas tu enlace privado de vendedor.</p>
+    <p>Cada enlace lleva el nombre del cliente y su fecha de vencimiento, firmados con tu llave. Nadie puede crear uno ni cambiarle la fecha sin esa llave.</p>
     <button class="btn-texto" type="button" data-olvidar>Quitar la llave de este teléfono</button>
   </section>
 </main>

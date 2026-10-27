@@ -1,10 +1,12 @@
 // Página privada de MN Scents (acceso.html): crea enlaces de acceso al catálogo de reventa.
-// La llave privada llega una sola vez en el enlace privado (…/acceso#llave=…), se guarda solo
-// en este teléfono y nunca viaja a ningún servidor (lo que va después de # no se envía).
+// La llave privada se crea aquí mismo ("Generar mi llave") y se guarda solo en este teléfono;
+// a la web solo se sube su parte pública. La copia de seguridad (…/acceso#llave=…) tampoco viaja
+// a ningún servidor: lo que va después de # no se envía.
 import { crearToken, llaveCorrecta, llavePrivadaDe, comprobarAcceso, enlaceAcceso, limpiarNombre, VIGENCIAS, VIGENCIA_INICIAL } from './acceso.js';
 import { fechaCorta } from './racha.js';
 
 const CLAVE_LLAVE = 'mnscents-llave-v1';
+const CLAVE_NUEVA = 'mnscents-llave-nueva-v1';      // creada aquí, esperando a que la web tenga su parte pública
 const CLAVE_HIST = 'mnscents-accesos-creados-v1';
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -12,7 +14,9 @@ const leer = k => { try { return localStorage.getItem(k); } catch { return null;
 const escribir = (k, v) => { try { v === null ? localStorage.removeItem(k) : localStorage.setItem(k, v); return true; } catch { return false; } };
 const NOMBRES_VIGENCIA = { 30: '30 días', 90: '3 meses', 180: '6 meses', 365: '1 año' };
 
-let llave = null;
+let llave = null, dActual = '';
+const SECCIONES = ['.adm-sin-llave', '.adm-pendiente', '.adm-crear', '.adm-historial', '.adm-respaldo', '.adm-nota', '.adm-activada'];
+const ocultarTodo = () => SECCIONES.forEach(x => mostrar(x, false));
 
 function mostrar(sel, si) { const e = $(sel); if (e) e.hidden = !si; }
 function error(caja, texto) { const e = $(`${caja} .adm-error`); e.textContent = texto; e.hidden = !texto; }
@@ -59,7 +63,7 @@ async function copiar(texto, boton) {
   }
   if (boton) {
     const antes = boton.innerHTML;
-    boton.innerHTML = ok ? '<svg class="ico"><use href="#i-check"/></svg>' + (boton.dataset.copiar !== undefined ? 'Copiado' : '') : antes;
+    boton.innerHTML = ok ? '<svg class="ico"><use href="#i-check"/></svg>' + (boton.textContent.trim() ? 'Copiado' : '') : antes;
     setTimeout(() => { boton.innerHTML = antes; }, 1600);
   }
 }
@@ -94,38 +98,84 @@ $('#f-crear').addEventListener('submit', async e => {
 });
 $('#f-crear').addEventListener('input', () => { mostrar('.adm-resultado', false); error('.adm-crear', ''); });
 
-document.addEventListener('click', e => {
-  const b = e.target.closest('[data-copiar], [data-copiar-hist], [data-olvidar]');
+// Botones que piden un segundo toque para confirmar (sin ventanas emergentes)
+function confirmar(b, texto) {
+  if (b.dataset.armado) return true;
+  b.dataset.armado = '1'; b.dataset.antes = b.textContent; b.textContent = texto;
+  setTimeout(() => { if (b.isConnected) { delete b.dataset.armado; b.textContent = b.dataset.antes; } }, 4000);
+  return false;
+}
+
+document.addEventListener('click', async e => {
+  const b = e.target.closest('[data-copiar], [data-copiar-hist], [data-olvidar], [data-generar], [data-regenerar], [data-copiar-codigo], [data-ver-respaldo], [data-copiar-respaldo]');
   if (!b) return;
   if (b.dataset.copiar !== undefined) copiar($('.adm-enlace').value, b);
   else if (b.dataset.copiarHist !== undefined) { const x = historial()[+b.dataset.copiarHist]; if (x) copiar(enlaceAcceso(x.t), b); }
+  else if (b.dataset.copiarCodigo !== undefined) copiar($('.adm-codigo').value, b);
+  else if (b.dataset.copiarRespaldo !== undefined) copiar($('.adm-respaldo-enlace').value, b);
+  else if (b.dataset.verRespaldo !== undefined) {
+    $('.adm-respaldo-enlace').value = `${location.origin}/acceso#llave=${dActual}`;
+    mostrar('.adm-respaldo-caja', true); b.hidden = true;
+  } else if (b.dataset.generar !== undefined) await generar();
+  else if (b.dataset.regenerar !== undefined) { if (confirmar(b, 'Toca otra vez: la llave anterior se borra')) await generar(); }
   else if (b.dataset.olvidar !== undefined) {
-    escribir(CLAVE_LLAVE, null); llave = null;
-    for (const s of ['.adm-crear', '.adm-historial', '.adm-nota']) mostrar(s, false);
-    mostrar('.adm-sin-llave', true);
+    if (!confirmar(b, 'Toca otra vez para quitarla (sin copia de seguridad, se pierde)')) return;
+    escribir(CLAVE_LLAVE, null); llave = null; dActual = '';
+    ocultarTodo(); mostrar('.adm-sin-llave', true); error('.adm-sin-llave', '');
   }
 });
 
+// ---------- llave nueva ----------
+const codigoPublico = k => `MNS-${k.x}.${k.y}`;
+function pendiente() {
+  try {
+    const p = JSON.parse(leer(CLAVE_NUEVA) || 'null');
+    return p && /^[A-Za-z0-9_-]{43}$/.test(p.d) && /^[A-Za-z0-9_-]{43}$/.test(p.x) && /^[A-Za-z0-9_-]{43}$/.test(p.y) ? p : null;
+  } catch { return null; }
+}
+function mostrarPendiente(p) {
+  ocultarTodo();
+  $('.adm-codigo').value = codigoPublico(p);
+  mostrar('.adm-pendiente', true);
+}
+async function generar() {
+  const par = await crypto.subtle.generateKey({ name: 'ECDSA', namedCurve: 'P-256' }, true, ['sign', 'verify']);
+  const k = await crypto.subtle.exportKey('jwk', par.privateKey);
+  const p = { d: k.d, x: k.x, y: k.y, creada: Date.now() };
+  if (!escribir(CLAVE_NUEVA, JSON.stringify(p))) { error('.adm-sin-llave', 'Este navegador no deja guardar datos (¿modo incógnito?). Usa el navegador normal.'); return; }
+  mostrarPendiente(p);
+}
+function listo(d, recien = false) {
+  llave = llavePrivadaDe(d); dActual = d;
+  ocultarTodo();
+  pintarVigencias();
+  for (const x of ['.adm-crear', '.adm-respaldo', '.adm-nota']) mostrar(x, true);
+  mostrar('.adm-activada', recien);
+  mostrar('.adm-respaldo-caja', false); $('[data-ver-respaldo]').hidden = false;
+  pintarHistorial();
+}
+
 // ---------- arranque: ¿hay llave? ----------
 async function iniciar() {
-  let d = '';
   const m = /llave=([A-Za-z0-9_-]{43})(?![A-Za-z0-9_-])/.exec(location.hash);
-  if (m) {
-    d = m[1];
-    history.replaceState(null, '', location.pathname);       // la llave sale de la barra de direcciones
-  } else d = leer(CLAVE_LLAVE) || '';
-  const valida = d ? await llaveCorrecta(d) : false;
+  if (m) history.replaceState(null, '', location.pathname);       // la llave sale de la barra de direcciones
   mostrar('.adm-cargando', false);
-  if (!valida) {
-    mostrar('.adm-sin-llave', true);
-    if (d) error('.adm-sin-llave', m ? 'Ese enlace privado no corresponde a la llave de la web. Revisa que esté completo.' : 'La llave guardada ya no sirve. Abre de nuevo tu enlace privado de vendedor.');
-    if (!m && d) escribir(CLAVE_LLAVE, null);
-    return;
+  // 1) copia de seguridad abierta ahora
+  if (m) {
+    if (await llaveCorrecta(m[1])) { escribir(CLAVE_LLAVE, m[1]); escribir(CLAVE_NUEVA, null); return listo(m[1]); }
+    ocultarTodo(); mostrar('.adm-sin-llave', true);
+    return error('.adm-sin-llave', 'Ese enlace de llave no corresponde a la web. Revisa que esté completo.');
   }
-  if (m) escribir(CLAVE_LLAVE, d);
-  llave = llavePrivadaDe(d);
-  pintarVigencias();
-  for (const s of ['.adm-crear', '.adm-nota']) mostrar(s, true);
-  pintarHistorial();
+  // 2) llave ya guardada en este teléfono
+  const d = leer(CLAVE_LLAVE) || '';
+  if (d && await llaveCorrecta(d)) return listo(d);
+  // 3) llave creada aquí que espera ser publicada (si la web ya la tiene, queda activada)
+  const p = pendiente();
+  if (p) {
+    if (await llaveCorrecta(p.d)) { escribir(CLAVE_LLAVE, p.d); escribir(CLAVE_NUEVA, null); return listo(p.d, true); }
+    return mostrarPendiente(p);
+  }
+  ocultarTodo(); mostrar('.adm-sin-llave', true);
+  if (d) error('.adm-sin-llave', 'La llave guardada en este teléfono ya no corresponde a la web. Abre tu copia de seguridad o crea una llave nueva.');
 }
 iniciar();
