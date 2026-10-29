@@ -117,7 +117,7 @@ async function sincronizar({ silencioso = false } = {}) {
     });
     if (r.sinRed) throw new ErrorRed('sin red');
     if (r.fallidas) aviso(`${r.fallidas === 1 ? 'Una operación no se pudo guardar' : `${r.fallidas} operaciones no se pudieron guardar`}. Revísalas en Caja.`, 'error');
-    const e = await llamar({ accion: 'estado' });
+    const e = await llamar({ accion: 'estado' }, { espera: 90000 });   // la hoja puede estar recalculando
     guardarEstado(e); S.red = 'en-linea'; aplicarEstado(e);
     if (!silencioso && r.enviadas) aviso(r.enviadas === 1 ? 'Se envió lo pendiente a tu hoja.' : `Se enviaron ${r.enviadas} operaciones a tu hoja.`, 'ok');
   } catch (e) {

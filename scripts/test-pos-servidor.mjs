@@ -6,7 +6,15 @@ let ok = 0, fallos = 0;
 const prueba = (n, fn) => { try { fn(); ok++; console.log('  ✓ ' + n); } catch (e) { fallos++; console.log('  ✗ ' + n + '\n    ' + (e.stack || e.message).split('\n').slice(0, 3).join('\n    ')); } };
 
 import { libroBase, ctx, gas, props } from './pos-hoja-simulada.mjs';
-const atender = (L, req, ahora) => ctx.posAtender_(L, req, ahora);
+const crudo = (L, req, ahora) => ctx.posAtender_(L, req, ahora);
+// como la app: escribe y después pide el estado
+const atender = (L, req, ahora) => {
+  const r = crudo(L, req, ahora);
+  if (req.accion === 'estado') return r;
+  const e = crudo(L, { accion: 'estado' }, ahora);
+  e.resultado = r.resultado;
+  return e;
+};
 // 29/10/2026 11:30 en Nicaragua (17:30 UTC)
 const AHORA = new Date(Date.UTC(2026, 9, 29, 17, 30));
 const DIA = Math.floor((Date.UTC(2026, 9, 29) - Date.UTC(1899, 11, 30)) / 864e5);
@@ -81,6 +89,11 @@ prueba('La venta queda en la caja y en el resumen del día', () => {
   assert.equal(e.caja.movimientos.length, 1); assert.equal(e.caja.movimientos[0].tipo, 'Venta'); assert.equal(e.caja.movimientos[0].monto, 2920);
   assert.equal(e.caja.resumen.ventasEfectivo, 2920); assert.equal(e.hoy.total, 2920); assert.equal(e.hoy.unidades, 2);
   assert.equal(e.caja.movimientos[0].hora, '11:30');
+});
+
+prueba('Escribir responde enseguida, sin releer toda la hoja', () => {
+  const r = crudo(libroBase(), { accion: 'venta', venta: ventaBase() }, AHORA);
+  assert.equal(r.ok, true); assert.equal(r.resultado.numero, 8); assert.equal(r.productos, undefined);
 });
 
 console.log('\nAnular');

@@ -10,6 +10,8 @@ function posPruebaEnCopia() {
   var log = [], fallas = 0;
   var ok = function (n, c, extra) { log.push((c ? '✓ ' : '✗ ') + n + (c ? '' : '  → ' + JSON.stringify(extra))); if (!c) fallas++; };
   var ahora = new Date();
+  // como la app: escribe y luego pide el estado aparte
+  var posAtenderYEstado_ = function (ss_, req, t) { var r = posAtender_(ss_, req, t); if (req.accion === 'estado') return r; var e = posAtender_(ss_, { accion: 'estado' }, t); e.resultado = r.resultado; return e; };
   POS_TZ = ss.getSpreadsheetTimeZone();
 
   var e = posAtender_(ss, { accion: 'estado' }, ahora);
@@ -24,7 +26,7 @@ function posPruebaEnCopia() {
   var stockAntes = p1.stock;
 
   // Venta 1: 1 unidad en efectivo
-  var r1 = posAtender_(ss, { accion: 'venta', id: 'prueba-1', venta: { id: 'prueba-1', cliente: null, lineas: [{ ref: p1.ref, cantidad: 1, precio: p1.precio }], pago: { metodo: 'Efectivo' } } }, ahora);
+  var r1 = posAtenderYEstado_(ss, { accion: 'venta', id: 'prueba-1', venta: { id: 'prueba-1', cliente: null, lineas: [{ ref: p1.ref, cantidad: 1, precio: p1.precio }], pago: { metodo: 'Efectivo' } } }, ahora);
   var n1 = r1.resultado.numero;
   ok('Venta #' + n1 + ' registrada', n1 === e.siguienteVenta, r1.resultado);
   var hv = ss.getSheetByName('Ventas');
@@ -39,7 +41,7 @@ function posPruebaEnCopia() {
   ok('El stock del Inventario bajó solo (' + stockAntes + ' → ' + p1b.stock + ')', p1b.stock === stockAntes - 1, p1b.stock);
 
   // Venta 2: cliente nuevo, transferencia, varias líneas
-  var r2 = posAtender_(ss, { accion: 'venta', id: 'prueba-2', venta: { id: 'prueba-2', cliente: { nombre: 'PRUEBA POS CLIENTE', telefono: '8888-0000', ciudad: 'Estelí', nuevo: true },
+  var r2 = posAtenderYEstado_(ss, { accion: 'venta', id: 'prueba-2', venta: { id: 'prueba-2', cliente: { nombre: 'PRUEBA POS CLIENTE', telefono: '8888-0000', ciudad: 'Estelí', nuevo: true },
     lineas: [{ ref: p1.ref, cantidad: 1, precio: p1.mayor || p1.precio }, { ref: p2.ref, cantidad: 1, precio: p2.precio, descuento: 10 }], pago: { metodo: 'Transferencia bancaria', banco: 'BAC' } } }, ahora);
   var n2 = r2.resultado.numero;
   var ult = posUltima_(hv, 6, 1003);
@@ -50,12 +52,12 @@ function posPruebaEnCopia() {
   ok('Encabezado "Banco" en Ventas', hv.getRange(3, 22).getValue() === 'Banco');
 
   // Reintento: no duplica
-  var r2b = posAtender_(ss, { accion: 'venta', id: 'prueba-2', venta: { id: 'prueba-2', lineas: [{ ref: p1.ref, cantidad: 1, precio: 1 }], pago: { metodo: 'Efectivo' } } }, ahora);
+  var r2b = posAtenderYEstado_(ss, { accion: 'venta', id: 'prueba-2', venta: { id: 'prueba-2', lineas: [{ ref: p1.ref, cantidad: 1, precio: 1 }], pago: { metodo: 'Efectivo' } } }, ahora);
   ok('Un reintento no duplica la venta', r2b.resultado.repetida === true && posUltima_(hv, 6, 1003) === ult, r2b.resultado);
 
   // Caja
-  posAtender_(ss, { accion: 'caja', id: 'c1', caja: { tipo: 'apertura', monto: 1000 } }, ahora);
-  var rs = posAtender_(ss, { accion: 'caja', id: 'c2', caja: { tipo: 'salida', monto: 100, concepto: 'PRUEBA bolsas', gasto: e.config.gastos[0] || 'Otros' } }, ahora);
+  posAtenderYEstado_(ss, { accion: 'caja', id: 'c1', caja: { tipo: 'apertura', monto: 1000 } }, ahora);
+  var rs = posAtenderYEstado_(ss, { accion: 'caja', id: 'c2', caja: { tipo: 'salida', monto: 100, concepto: 'PRUEBA bolsas', gasto: e.config.gastos[0] || 'Otros' } }, ahora);
   ok('Efectivo esperado = 1000 + venta en efectivo − 100', rs.caja.resumen.esperado === 1000 + p1.precio - 100, rs.caja.resumen);
   ok('Transferencia BAC sumada', rs.caja.resumen.bancos.BAC > 0, rs.caja.resumen.bancos);
   var hg = ss.getSheetByName('Gastos');
@@ -64,20 +66,20 @@ function posPruebaEnCopia() {
 
   // Ajuste
   var stockAj = posProductos_(ss).filter(function (p) { return p.ref === p2.ref; })[0].stock;
-  posAtender_(ss, { accion: 'ajuste', id: 'a1', ajuste: { ref: p2.ref, cantidad: -1, motivo: 'Dañado', nota: 'PRUEBA' } }, ahora);
+  posAtenderYEstado_(ss, { accion: 'ajuste', id: 'a1', ajuste: { ref: p2.ref, cantidad: -1, motivo: 'Dañado', nota: 'PRUEBA' } }, ahora);
   var stockAj2 = posProductos_(ss).filter(function (p) { return p.ref === p2.ref; })[0].stock;
   ok('El ajuste baja el stock (' + stockAj + ' → ' + stockAj2 + ')', stockAj2 === stockAj - 1, stockAj2);
 
   // Anular la venta 1
   var antesAnular = posProductos_(ss).filter(function (p) { return p.ref === p1.ref; })[0].stock;
-  posAtender_(ss, { accion: 'anular', id: 'an1', numero: n1 }, ahora);
+  posAtenderYEstado_(ss, { accion: 'anular', id: 'an1', numero: n1 }, ahora);
   var g = hv.getRange(fila1, 1, 1, 22).getValues()[0];
   ok('Anular vacía las celdas de la venta', g[0] === '' && g[5] === '' && g[6] === '', g);
   ok('Y repone la fórmula automática de precio', !!hv.getRange(fila1, 8).getFormula(), hv.getRange(fila1, 8).getFormula());
   var despues = posProductos_(ss).filter(function (p) { return p.ref === p1.ref; })[0].stock;
   ok('El stock vuelve (' + antesAnular + ' → ' + despues + ')', despues === antesAnular + 1, despues);
 
-  var cierre = posAtender_(ss, { accion: 'caja', id: 'c3', caja: { tipo: 'cierre', monto: 900 } }, ahora);
+  var cierre = posAtenderYEstado_(ss, { accion: 'caja', id: 'c3', caja: { tipo: 'cierre', monto: 900 } }, ahora);
   ok('Cierre: esperado 900 tras anular la venta en efectivo', cierre.resultado.esperado === 900 && cierre.resultado.diferencia === 0, cierre.resultado);
 
   var texto = (fallas ? '❌ ' + fallas + ' FALLAS' : '✅ TODO BIEN') + '\n' + log.join('\n');

@@ -116,18 +116,16 @@ function posAtender_(ss, req, ahora) {
     var cache = CacheService.getScriptCache();
     var idOp = posTexto_(req.id, 60);
     var previo = idOp ? cache.get('pos:' + idOp) : null;
-    if (previo) { var e0 = posEstado_(ss, ahora); e0.resultado = JSON.parse(previo); e0.resultado.repetida = true; return e0; }
+    if (previo) { var r0 = JSON.parse(previo); r0.repetida = true; return { ok: true, version: POS.VERSION, resultado: r0 }; }
     var r;
     if (a === 'venta') r = posVenta_(ss, req.venta, ahora);
     else if (a === 'anular') r = posAnular_(ss, req.numero, ahora);
     else if (a === 'ajuste') r = posAjuste_(ss, req.ajuste, ahora);
     else if (a === 'caja') r = posCaja_(ss, req.caja, ahora);
     else throw new Error('Acción desconocida.');
-    SpreadsheetApp.flush();
     if (idOp) cache.put('pos:' + idOp, JSON.stringify(r || {}), 21600);
-    var est = posEstado_(ss, ahora);
-    est.resultado = r;
-    return est;
+    // Se responde enseguida: la hoja recalcula sus fórmulas después y la app pide el estado aparte.
+    return { ok: true, version: POS.VERSION, resultado: r };
   } finally { lock.releaseLock(); }
 }
 
@@ -194,6 +192,17 @@ function posProductos_(ss) {
       stock: posNum_(f[I.STOCK - 1]), estado: String(f[I.ESTADO - 1] || ''), pedidos30: posNum_(f[I.PEDIDOS30 - 1]),
     });
   }
+  return out;
+}
+
+// Solo referencia y nombre de cada perfume: rápido aunque la hoja esté recalculando
+function posReferencias_(ss) {
+  var h = posHoja_(ss, POS.INV);
+  var n = POS.FIN_INV - POS.PRIMERA + 1;
+  var nombres = h.getRange(POS.PRIMERA, I.NOMBRE, n, 1).getValues();
+  var refs = h.getRange(POS.PRIMERA, I.REF, n, 1).getValues();
+  var out = {};
+  for (var i = 0; i < n; i++) if (refs[i][0] !== '') out[String(refs[i][0])] = { ref: String(refs[i][0]), nombre: String(nombres[i][0]) };
   return out;
 }
 
@@ -361,9 +370,7 @@ function posVenta_(ss, venta, ahora) {
   var previa = posBuscarId_(ss, posTexto_(venta.id, 60));
   if (previa) return { numero: previa.venta, repetida: true };   // ya se guardó (reintento sin señal)
 
-  var productos = posProductos_(ss);
-  var porRef = {};
-  productos.forEach(function (p) { porRef[p.ref] = p; });
+  var porRef = posReferencias_(ss);
   var lineas = venta.lineas.map(function (l) {
     var p = porRef[l.ref];
     if (!p) throw new Error('El perfume "' + posTexto_(l.ref) + '" ya no está en el Inventario.');
@@ -451,7 +458,7 @@ function posAjuste_(ss, aj, ahora) {
   var cant = Math.round(posNum_(aj.cantidad));
   if (!cant || Math.abs(cant) > 999) throw new Error('Cantidad no válida.');
   if (POS.MOTIVOS.indexOf(aj.motivo) < 0) throw new Error('Elige un motivo.');
-  var existe = posProductos_(ss).some(function (p) { return p.ref === aj.ref; });
+  var existe = !!posReferencias_(ss)[aj.ref];
   if (!existe) throw new Error('Ese perfume ya no está en el Inventario.');
   var h = posHoja_(ss, POS.AJ);
   var fila = posUltima_(h, 2, POS.FIN_AJ) + 1;

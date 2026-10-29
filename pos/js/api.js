@@ -46,7 +46,7 @@ export function quitarDeCola(id) { guardarCola(cola().filter(o => o.id !== id));
 
 let procesando = null;
 /**
- * Envía lo pendiente, una por una. Devuelve { estado, enviadas, sinRed, fallidas }.
+ * Envía lo pendiente, una por una (la hoja responde sin recalcular todo). Devuelve { estado, enviadas, sinRed, fallidas }.
  * Si una operación la rechaza la hoja (dato malo), se aparta en "errores" para revisarla y se sigue.
  */
 export function procesarCola(alResultado) {
@@ -56,10 +56,11 @@ export function procesarCola(alResultado) {
     for (const op of cola()) {
       const { creado, ...cuerpo } = op;
       try {
-        estado = await llamar(cuerpo);
+        const resp = await llamar(cuerpo);
+        if (resp.productos) estado = resp;          // versiones viejas del script devolvían todo el estado
         enviadas++;
         quitarDeCola(op.id);
-        alResultado?.(op, estado.resultado);
+        alResultado?.(op, resp.resultado);
       } catch (e) {
         if (e instanceof ErrorRed) { sinRed = true; break; }
         if (e.message === 'no-autorizado') throw e;
