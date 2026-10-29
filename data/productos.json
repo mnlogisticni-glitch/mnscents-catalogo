@@ -1,5 +1,5 @@
 {
- "actualizado": "2026-10-28T20:37:03.241Z",
+ "actualizado": "2026-10-29T18:43:46.484Z",
  "productos": [
   {
    "id": "H01",
@@ -29,7 +29,8 @@
    "etiqueta": "top",
    "foto": "mandarin-sky.webp",
    "orden": 1,
-   "top": 1
+   "top": 1,
+   "sku": "6294015149371"
   },
   {
    "id": "H02",
@@ -58,7 +59,8 @@
    "existencias": 1,
    "etiqueta": null,
    "foto": "khamrah-qahwa.webp",
-   "orden": 2
+   "orden": 2,
+   "sku": "6290360593661"
   },
   {
    "id": "H03",
@@ -86,7 +88,8 @@
    "existencias": 10,
    "etiqueta": null,
    "foto": "afnan-9pm.webp",
-   "orden": 3
+   "orden": 3,
+   "sku": "6290171002338"
   },
   {
    "id": "H04",
@@ -115,7 +118,8 @@
    "existencias": 2,
    "etiqueta": null,
    "foto": "amber-oud-gold-edition.webp",
-   "orden": 4
+   "orden": 4,
+   "sku": "6291100130498"
   },
   {
    "id": "H05",
@@ -144,7 +148,8 @@
    "etiqueta": null,
    "foto": "club-de-nuit-intense-man.webp",
    "orden": 5,
-   "top": 2
+   "top": 2,
+   "sku": "6085010044712"
   },
   {
    "id": "H06",
@@ -168,7 +173,8 @@
    "existencias": 0,
    "etiqueta": null,
    "foto": "uomo-intense.webp",
-   "orden": 6
+   "orden": 6,
+   "sku": "6294021908139"
   },
   {
    "id": "H07",
@@ -197,7 +203,8 @@
    "existencias": 9,
    "etiqueta": null,
    "foto": "nautica-voyage.webp",
-   "orden": 7
+   "orden": 7,
+   "sku": "31655531908"
   },
   {
    "id": "H08",
@@ -226,7 +233,8 @@
    "existencias": 1,
    "etiqueta": null,
    "foto": "badee-al-oud-for-glory.webp",
-   "orden": 8
+   "orden": 8,
+   "sku": "6291107458328"
   },
   {
    "id": "H09",
@@ -255,7 +263,8 @@
    "existencias": 14,
    "etiqueta": null,
    "foto": "9am-dive.webp",
-   "orden": 9
+   "orden": 9,
+   "sku": "6290171072836"
   },
   {
    "id": "H10",
@@ -285,7 +294,8 @@
    "etiqueta": "top",
    "foto": "hawas-ice.webp",
    "orden": 10,
-   "top": 3
+   "top": 3,
+   "sku": "614514331040"
   },
   {
    "id": "H11",
@@ -313,7 +323,8 @@
    "existencias": 0,
    "etiqueta": null,
    "foto": "hawas-tropical.webp",
-   "orden": 11
+   "orden": 11,
+   "sku": "614514464441"
   },
   {
    "id": "H12",
@@ -342,7 +353,8 @@
    "existencias": 1,
    "etiqueta": null,
    "foto": "hawas-elixir.webp",
-   "orden": 12
+   "orden": 12,
+   "sku": "614514331057"
   },
   {
    "id": "H13",
@@ -371,7 +383,8 @@
    "existencias": 6,
    "etiqueta": null,
    "foto": "mandarin-sky-elixir.webp",
-   "orden": 13
+   "orden": 13,
+   "sku": "629519980 5022"
   },
   {
    "id": "H14",
@@ -400,7 +413,8 @@
    "existencias": 4,
    "etiqueta": null,
    "foto": "jean-lowe-vibe.webp",
-   "orden": 14
+   "orden": 14,
+   "sku": "396155063804"
   },
   {
    "id": "H15",
@@ -429,7 +443,8 @@
    "existencias": 4,
    "etiqueta": null,
    "foto": "asad-bourbon.webp",
-   "orden": 15
+   "orden": 15,
+   "sku": "6290362340362"
   },
   {
    "id": "H16",
@@ -458,7 +473,8 @@
    "existencias": 4,
    "etiqueta": null,
    "foto": "club-de-nuit-iconic.webp",
-   "orden": 16
+   "orden": 16,
+   "sku": "6294015164152"
   },
   {
    "id": "H17",
@@ -487,7 +503,8 @@
    "existencias": 0,
    "etiqueta": null,
    "foto": "stallion53.imperial.png",
-   "orden": 17
+   "orden": 17,
+   "sku": "6294021909648"
   },
   {
    "id": "D01",
@@ -517,7 +534,8 @@
    "etiqueta": "top",
    "foto": "9am-pour-femme.webp",
    "orden": 1,
-   "top": 1
+   "top": 1,
+   "sku": "6290171072591"
   },
   {
    "id": "D02",
@@ -546,7 +564,8 @@
    "existencias": 4,
    "etiqueta": null,
    "foto": "donna-intense.webp",
-   "orden": 2
+   "orden": 2,
+   "sku": "6294021908146"
   },
   {
    "id": "D03",
@@ -574,7 +593,8 @@
    "existencias": 5,
    "etiqueta": null,
    "foto": "delilah-pour-femme.webp",
-   "orden": 3
+   "orden": 3,
+   "sku": "6291107459196"
   },
   {
    "id": "D04",
@@ -602,7 +622,8 @@
    "existencias": 5,
    "etiqueta": null,
    "foto": "odyssey-candee.webp",
-   "orden": 4
+   "orden": 4,
+   "sku": "6294015188622"
   },
   {
    "id": "D05",
@@ -631,7 +652,8 @@
    "existencias": 1,
    "etiqueta": null,
    "foto": "yara-tous.webp",
-   "orden": 5
+   "orden": 5,
+   "sku": "0"
   },
   {
    "id": "D06",
@@ -656,7 +678,8 @@
    "etiqueta": null,
    "foto": "set-yara-4-piezas.webp",
    "orden": 6,
-   "top": 2
+   "top": 2,
+   "sku": "6290362344407"
   },
   {
    "id": "D07",
@@ -685,7 +708,8 @@
    "existencias": 0,
    "etiqueta": null,
    "foto": "stallion53-paradise.webp",
-   "orden": 7
+   "orden": 7,
+   "sku": "6294021909679"
   },
   {
    "id": "D08",
@@ -714,7 +738,8 @@
    "existencias": 0,
    "etiqueta": null,
    "foto": "stallion53-la-furia.webp",
-   "orden": 8
+   "orden": 8,
+   "sku": "6294021909532"
   }
  ]
 }
