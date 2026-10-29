@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+<meta name="robots" content="noindex, nofollow">
+<meta name="referrer" content="no-referrer">
+<meta name="theme-color" content="#160c25">
+<meta name="color-scheme" content="dark">
+<title>Punto de venta · MN Scents</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="../img/marca/favicon.png" type="image/png">
+<link rel="apple-touch-icon" href="../img/marca/icono-pos-180.png">
+<link rel="preload" href="../fonts/onest-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="../fonts/unbounded-latin-700-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="pos.css">
+<script type="module" src="js/app.js"></script>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-bolsa" viewBox="0 0 24 24"><path d="M5.5 8h13l-1 12.5h-11Z"/><path d="M9 10.5V7a3 3 0 0 1 6 0v3.5"/></symbol>
+  <symbol id="i-frasco" viewBox="0 0 24 24"><path d="M10 3h4v3h-4z"/><path d="M9.5 6h5l.5 2.2a6 6 0 0 1 3 5.3V19a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2v-5.5a6 6 0 0 1 3-5.3Z"/><path d="M9 14.5h6"/></symbol>
+  <symbol id="i-caja" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="9" rx="2"/><path d="M6 11V5h9v6"/><path d="M8.5 8h4"/><path d="M7 15.5h2M11 15.5h2M15 15.5h2"/></symbol>
+  <symbol id="i-buscar" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m20 20-4.6-4.6"/></symbol>
+  <symbol id="i-cerrar" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></symbol>
+  <symbol id="i-mas" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-menos" viewBox="0 0 24 24"><path d="M5 12h14"/></symbol>
+  <symbol id="i-basura" viewBox="0 0 24 24"><path d="M5 7h14M10 7V5h4v2M7 7l1 12h8l1-12"/></symbol>
+  <symbol id="i-usuario" viewBox="0 0 24 24"><circle cx="12" cy="8.5" r="3.5"/><path d="M5 20a7 7 0 0 1 14 0"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></symbol>
+  <symbol id="i-flecha" viewBox="0 0 24 24"><path d="M5 12h13M13 6l6 6-6 6"/></symbol>
+  <symbol id="i-chat" viewBox="0 0 24 24"><path d="M4.5 19.5 5.6 16A7.5 7.5 0 1 1 8.4 18.6Z"/><path d="M9.3 9.2c.2 2.3 2.2 4.6 4.9 5.3l1.1-1.2-1.6-.9-.8.7c-1-.5-1.9-1.4-2.4-2.4l.7-.8-.9-1.6Z"/></symbol>
+  <symbol id="i-refrescar" viewBox="0 0 24 24"><path d="M20 11a8 8 0 0 0-14.5-4.5L4 8"/><path d="M4 4v4h4"/><path d="M4 13a8 8 0 0 0 14.5 4.5L20 16"/><path d="M20 20v-4h-4"/></symbol>
+  <symbol id="i-nube" viewBox="0 0 24 24"><path d="M7 18h10a4 4 0 0 0 .6-8 6 6 0 0 0-11.5 1.5A3.3 3.3 0 0 0 7 18Z"/><path d="M4 4l16 16"/></symbol>
+  <symbol id="i-aviso" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7.5v5.5"/><circle cx="12" cy="16.3" r=".6"/></symbol>
+  <symbol id="i-lapiz" viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16Z"/><path d="M13.5 6.5l4 4"/></symbol>
+  <symbol id="i-entra" viewBox="0 0 24 24"><path d="M12 4v12M6.5 10.5 12 16l5.5-5.5"/><path d="M5 20h14"/></symbol>
+  <symbol id="i-sale" viewBox="0 0 24 24"><path d="M12 16V4M6.5 9.5 12 4l5.5 5.5"/><path d="M5 20h14"/></symbol>
+  <symbol id="i-billete" viewBox="0 0 24 24"><rect x="2.5" y="6" width="19" height="12" rx="2"/><circle cx="12" cy="12" r="2.6"/><path d="M6 9.5v5M18 9.5v5"/></symbol>
+  <symbol id="i-banco" viewBox="0 0 24 24"><path d="M3 9.5 12 4l9 5.5"/><path d="M5 10v7M9.5 10v7M14.5 10v7M19 10v7"/><path d="M3 20h18"/></symbol>
+  <symbol id="i-candado" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/><circle cx="12" cy="15.5" r="1.3"/></symbol>
+  <symbol id="i-ajustar" viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></symbol>
+  <symbol id="i-deshacer" viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/></symbol>
+</svg>
+
+<header class="cab">
+  <a class="marca" href="./" aria-label="Punto de venta MN Scents">
+    <img src="../img/marca/logo.webp" alt="" width="36" height="35">
+    <span><b>MN SCENTS</b><small>Punto de venta</small></span>
+  </a>
+  <button class="red" type="button" data-accion="sincronizar" hidden><span class="red-punto"></span><span class="red-texto"></span></button>
+  <button class="btn-ico" type="button" data-accion="refrescar" aria-label="Actualizar datos de la hoja"><svg class="ico"><use href="#i-refrescar"/></svg></button>
+</header>
+
+<nav class="nav-pos" aria-label="Secciones" hidden>
+  <a href="#vender" data-vista="vender" aria-current="page"><svg class="ico" aria-hidden="true"><use href="#i-bolsa"/></svg><span>Vender</span></a>
+  <a href="#stock" data-vista="stock"><svg class="ico" aria-hidden="true"><use href="#i-frasco"/></svg><span>Stock</span><i class="nav-num" hidden></i></a>
+  <a href="#caja" data-vista="caja"><svg class="ico" aria-hidden="true"><use href="#i-caja"/></svg><span>Caja</span><i class="nav-punto" hidden></i></a>
+</nav>
+
+<main>
+  <section class="pantalla" id="v-cargando">
+    <div class="cargando"><span class="luna-carga" aria-hidden="true"></span><p>Cargando tu hoja…</p></div>
+  </section>
+
+  <section class="pantalla" id="v-vincular" hidden aria-labelledby="t-vincular">
+    <div class="vincular">
+      <span class="vin-ico"><svg class="ico"><use href="#i-candado"/></svg></span>
+      <h1 id="t-vincular">Vincula este dispositivo</h1>
+      <p>El punto de venta trabaja directo con tu hoja <b>MNScents_claude</b>. Para usarlo aquí:</p>
+      <ol>
+        <li>En tu computadora, abre la hoja <b>MNScents_claude</b>.</li>
+        <li>Toca el menú <b>🛒 Punto de venta → Vincular un teléfono o computadora</b>.</li>
+        <li>Escanea el código con la cámara de este teléfono (o abre el enlace en la computadora).</li>
+      </ol>
+      <form class="vin-pegar" data-form="vincular" novalidate>
+        <label for="vin-enlace">¿Tienes el enlace? Pégalo aquí</label>
+        <div class="fila-campo"><input id="vin-enlace" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="https://mnscents.pages.dev/pos/#vincular=…"><button class="btn sec" type="submit">Vincular</button></div>
+        <p class="error" hidden role="alert"></p>
+      </form>
+    </div>
+  </section>
+
+  <section class="pantalla" id="v-vender" hidden aria-label="Vender">
+    <div class="vender-grid">
+      <div class="vender-productos">
+        <div class="herramientas">
+          <label class="buscar"><svg class="ico" aria-hidden="true"><use href="#i-buscar"/></svg><span class="sr">Buscar perfume</span>
+            <input id="q-vender" type="search" placeholder="Buscar perfume, marca o código" autocomplete="off" autocapitalize="none" spellcheck="false" enterkeyhint="search">
+            <button class="limpiar" type="button" data-accion="limpiar-busqueda" data-para="q-vender" aria-label="Borrar búsqueda" hidden><svg class="ico"><use href="#i-cerrar"/></svg></button>
+          </label>
+          <div class="chips" role="group" aria-label="Filtrar" data-filtro="vender"></div>
+        </div>
+        <ul class="rejilla" id="rejilla-vender" aria-live="polite"></ul>
+      </div>
+      <aside class="panel-carrito" aria-label="Venta actual"><div class="carrito" data-carrito="panel"></div></aside>
+    </div>
+  </section>
+
+  <section class="pantalla" id="v-stock" hidden aria-label="Stock">
+    <div class="stock-resumen"></div>
+    <div class="herramientas">
+      <label class="buscar"><svg class="ico" aria-hidden="true"><use href="#i-buscar"/></svg><span class="sr">Buscar perfume</span>
+        <input id="q-stock" type="search" placeholder="Buscar perfume, marca o código" autocomplete="off" autocapitalize="none" spellcheck="false" enterkeyhint="search">
+        <button class="limpiar" type="button" data-accion="limpiar-busqueda" data-para="q-stock" aria-label="Borrar búsqueda" hidden><svg class="ico"><use href="#i-cerrar"/></svg></button>
+      </label>
+      <div class="chips" role="group" aria-label="Filtrar" data-filtro="stock"></div>
+    </div>
+    <ul class="lista-stock" id="lista-stock"></ul>
+  </section>
+
+  <section class="pantalla" id="v-caja" hidden aria-label="Caja">
+    <div class="caja"></div>
+  </section>
+</main>
+
+<div class="barra-cobro" hidden>
+  <button type="button" data-accion="abrir-carrito" class="bc-boton">
+    <span class="bc-cant"></span>
+    <span class="bc-texto"><b class="bc-total"></b><small class="bc-mayor"></small></span>
+    <span class="bc-ir">Ver venta<svg class="ico"><use href="#i-flecha"/></svg></span>
+  </button>
+</div>
+
+<dialog id="h-carrito" class="hoja" aria-labelledby="t-carrito">
+  <div class="hoja-cabeza"><h2 id="t-carrito">Venta</h2><button class="btn-ico cerrar" type="button" aria-label="Cerrar"><svg class="ico"><use href="#i-cerrar"/></svg></button></div>
+  <div class="hoja-cuerpo"><div class="carrito" data-carrito="hoja"></div></div>
+</dialog>
+
+<dialog id="h-cobro" class="hoja" aria-labelledby="t-cobro">
+  <div class="hoja-cabeza"><h2 id="t-cobro">Cobrar</h2><button class="btn-ico cerrar" type="button" aria-label="Cerrar"><svg class="ico"><use href="#i-cerrar"/></svg></button></div>
+  <div class="hoja-cuerpo cobro"></div>
+  <div class="hoja-pie cobro-pie"></div>
+</dialog>
+
+<dialog id="h-listo" class="hoja hoja-listo" aria-labelledby="t-listo">
+  <div class="hoja-cuerpo listo"></div>
+</dialog>
+
+<dialog id="h-cliente" class="hoja" aria-labelledby="t-cliente">
+  <div class="hoja-cabeza"><h2 id="t-cliente">Cliente</h2><button class="btn-ico cerrar" type="button" aria-label="Cerrar"><svg class="ico"><use href="#i-cerrar"/></svg></button></div>
+  <div class="hoja-cuerpo cliente"></div>
+</dialog>
+
+<dialog id="h-linea" class="hoja hoja-chica" aria-labelledby="t-linea">
+  <div class="hoja-cabeza"><h2 id="t-linea">Precio</h2><button class="btn-ico cerrar" type="button" aria-label="Cerrar"><svg class="ico"><use href="#i-cerrar"/></svg></button></div>
+  <div class="hoja-cuerpo linea-editar"></div>
+</dialog>
+
+<dialog id="h-producto" class="hoja" aria-labelledby="t-producto">
+  <div class="hoja-cabeza"><h2 id="t-producto">Perfume</h2><button class="btn-ico cerrar" type="button" aria-label="Cerrar"><svg class="ico"><use href="#i-cerrar"/></svg></button></div>
+  <div class="hoja-cuerpo producto"></div>
+</dialog>
+
+<dialog id="h-caja" class="hoja hoja-chica" aria-labelledby="t-hcaja">
+  <div class="hoja-cabeza"><h2 id="t-hcaja">Caja</h2><button class="btn-ico cerrar" type="button" aria-label="Cerrar"><svg class="ico"><use href="#i-cerrar"/></svg></button></div>
+  <div class="hoja-cuerpo caja-form"></div>
+</dialog>
+
+<dialog id="h-confirmar" class="hoja hoja-chica" aria-labelledby="t-confirmar">
+  <div class="hoja-cuerpo confirmar"></div>
+</dialog>
+
+<div class="aviso" role="status" aria-live="polite" hidden></div>
+</body>
+</html>

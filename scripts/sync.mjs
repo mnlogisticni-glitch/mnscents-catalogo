@@ -202,7 +202,8 @@ export async function convertir(texto, { comprobarFotos = true } = {}) {
       .sort((a, b) => b._pedidos - a._pedidos || a.orden - b.orden)
       .slice(0, 3).forEach((p, i) => { p.top = i + 1; });
   }
-  for (const p of productos) { delete p._sku; delete p._pedidos; }
+  // el SKU queda publicado (es el código de barras del frasco): así el punto de venta muestra la foto de cada perfume
+  for (const p of productos) { if (p._sku) p.sku = String(p._sku).trim(); delete p._sku; delete p._pedidos; }
   return { errores, avisos, productos };
 }
 

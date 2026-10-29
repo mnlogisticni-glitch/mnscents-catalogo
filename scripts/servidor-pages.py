@@ -17,7 +17,10 @@ def leer_headers():
         if not linea.startswith((' ', '\t')):
             actual = (linea.strip(), []); reglas.append(actual)
         elif actual:
-            k, v = linea.strip().split(':', 1); actual[1].append((k.strip(), v.strip()))
+            t = linea.strip()
+            if t.startswith('!'):                      # "! Cabecera" quita una cabecera puesta por una regla general
+                actual[1].append((t[1:].strip(), None)); continue
+            k, v = t.split(':', 1); actual[1].append((k.strip(), v.strip()))
     return reglas
 
 def leer_redirects():
@@ -33,10 +36,14 @@ def leer_redirects():
 class Manejador(http.server.SimpleHTTPRequestHandler):
     def _cabeceras_pages(self):
         ruta = self.path.split('?')[0]
+        finales = []
         for patron, hs in leer_headers():
             if fnmatch.fnmatch(ruta, patron):
                 for k, v in hs:
-                    self.send_header(k, v)
+                    if v is None: finales = [x for x in finales if x[0].lower() != k.lower()]
+                    else: finales.append((k, v))
+        for k, v in finales:
+            self.send_header(k, v)
 
     def end_headers(self):
         self._cabeceras_pages()
