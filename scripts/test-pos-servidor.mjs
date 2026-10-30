@@ -174,5 +174,27 @@ prueba('Las fechas que Sheets devuelve como fecha también se reconocen', () => 
   assert.equal(ctx.posDia_(d), DIA);
 });
 
+console.log('\nDirección de la app web');
+prueba('Pide la dirección una vez, la valida, la guarda y la usa en el enlace', () => {
+  const respuestas = [];
+  const ui = { Button: { OK: 'ok' }, ButtonSet: { OK: 1, OK_CANCEL: 2 }, alertas: [], dialogo: null,
+    prompt: () => { const t = respuestas.shift(); return { getSelectedButton: () => t == null ? 'cancel' : 'ok', getResponseText: () => t }; },
+    alert(...a) { this.alertas.push(a.join(' | ')); }, showModalDialog(h) { this.dialogo = h; } };
+  delete props.POS_URL;
+  assert.equal(ctx.posDireccion_(ui, false), null);                                   // canceló
+  respuestas.push('https://example.com/no');
+  assert.equal(ctx.posDireccion_(ui, false), null); assert.match(ui.alertas.pop(), /no sirve/);
+  respuestas.push('  https://script.google.com/macros/s/AKfy_buena-123/exec?x=1 ');
+  assert.equal(ctx.posDireccion_(ui, false), 'https://script.google.com/macros/s/AKfy_buena-123/exec');
+  assert.equal(ctx.posDireccion_(ui, false), 'https://script.google.com/macros/s/AKfy_buena-123/exec');   // ya no pregunta
+  const viejo = gas.SpreadsheetApp.getUi; ctx.SpreadsheetApp.getUi = () => ui;
+  ctx.HtmlService = { createHtmlOutput: h => ({ html: h, setWidth() { return this; }, setHeight() { return this; } }) };
+  try { ctx.posVincular(); } finally { ctx.SpreadsheetApp.getUi = viejo; }
+  const enlace = /#vincular=([A-Za-z0-9_-]+)/.exec(ui.dialogo.html)[1];
+  const d = JSON.parse(Buffer.from(enlace, 'base64url').toString());
+  assert.equal(d.u, 'https://script.google.com/macros/s/AKfy_buena-123/exec'); assert.ok(d.t.length >= 20);
+  assert.match(ui.dialogo.html, /Dirección de la hoja: https:\/\/script\.google\.com\/macros\/s\/AKfy_buena-123\/exec/);
+});
+
 console.log(`\n${ok} pruebas correctas, ${fallos} fallidas.`);
 process.exit(fallos ? 1 : 0);

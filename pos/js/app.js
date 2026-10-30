@@ -115,7 +115,7 @@ async function sincronizar({ silencioso = false } = {}) {
     const r = await procesarCola((op, res) => {
       if (op.accion === 'venta' && S.ultima?.id === op.id) { S.ultima.numero = res?.numero; S.ultima.estado = 'guardada'; pintarListo(); }
     });
-    if (r.sinRed) throw new ErrorRed('sin red');
+    if (r.sinRed) throw new ErrorRed(r.motivo || 'sin señal');
     if (r.fallidas) aviso(`${r.fallidas === 1 ? 'Una operación no se pudo guardar' : `${r.fallidas} operaciones no se pudieron guardar`}. Revísalas en Caja.`, 'error');
     const e = await llamar({ accion: 'estado' }, { espera: 90000 });   // la hoja puede estar recalculando
     guardarEstado(e); S.red = 'en-linea'; aplicarEstado(e);
@@ -123,6 +123,7 @@ async function sincronizar({ silencioso = false } = {}) {
   } catch (e) {
     if (e.message === 'no-autorizado') { olvidarConexion(); mostrarVincular('Este dispositivo ya no está vinculado (cambiaste la clave). Vincúlalo otra vez.'); return; }
     S.red = e instanceof ErrorRed ? 'sin-senal' : 'en-linea';
+    S.motivo = e.message;
     if (!(e instanceof ErrorRed)) aviso(e.message, 'error');
     if (S.ultima?.estado === 'guardando') { S.ultima.estado = 'pendiente'; pintarListo(); }
   } finally {
@@ -663,7 +664,7 @@ function arrancar() {
   if (!guardado) { for (const s of $$('.pantalla')) s.hidden = s.id !== 'v-cargando'; }
   cargarFotos().then(() => S.estado && pintarTodo());
   sincronizar({ silencioso: true }).then(() => {
-    if (!S.estado) { $('.cargando p').textContent = 'No pudimos conectar con tu hoja. Revisa tu internet y toca actualizar.'; $('[data-accion="refrescar"]').hidden = false; }
+    if (!S.estado) { $('.cargando p').textContent = `No pudimos conectar con tu hoja${S.motivo ? ` (${S.motivo})` : ''}. Revisa tu internet y toca actualizar.`; $('[data-accion="refrescar"]').hidden = false; }
   });
 }
 arrancar();

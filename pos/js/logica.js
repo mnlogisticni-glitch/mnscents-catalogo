@@ -129,7 +129,7 @@ export function leerVinculo(hash) {
     const t = m[1].replace(/-/g, '+').replace(/_/g, '/');
     const txt = decodeURIComponent(escape(atob(t + '='.repeat((4 - (t.length % 4)) % 4))));
     const d = JSON.parse(txt);
-    if (!/^https:\/\/script\.google\.com\/macros\/s\/[A-Za-z0-9_-]+\/exec$/.test(d.u) || typeof d.t !== 'string' || d.t.length < 20) return null;
+    if (!/^https:\/\/script\.google\.com\/(a\/[^/]+\/)?macros\/s\/[A-Za-z0-9_-]+\/exec$/.test(d.u) || typeof d.t !== 'string' || d.t.length < 20) return null;
     return { url: d.u, clave: d.t };
   } catch { return null; }
 }

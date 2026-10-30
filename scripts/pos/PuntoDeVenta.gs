@@ -36,6 +36,7 @@ function onOpen() {
   SpreadsheetApp.getUi().createMenu('🛒 Punto de venta')
     .addItem('Vincular un teléfono o computadora', 'posVincular')
     .addSeparator()
+    .addItem('Cambiar la dirección de la app web', 'posCambiarDireccion')
     .addItem('Cambiar la clave (desvincula todos)', 'posCambiarClave')
     .addToUi();
 }
@@ -50,13 +51,35 @@ function posClave_(crear) {
   return t;
 }
 
+// La dirección de la app web se guarda una vez (Google a veces informa otra con ScriptApp.getService().getUrl()).
+var POS_URL_OK = /^https:\/\/script\.google\.com\/(a\/[^\/]+\/)?macros\/s\/[A-Za-z0-9_-]+\/exec$/;
+
+function posDireccion_(ui, pedir) {
+  var props = PropertiesService.getScriptProperties();
+  var url = props.getProperty('POS_URL');
+  if (url && !pedir) return url;
+  var r = ui.prompt('Dirección de la app web',
+    'Pega la URL de la app web. La encuentras en Extensiones → Apps Script → Implementar → Gestionar implementaciones → App web → URL (termina en /exec).',
+    ui.ButtonSet.OK_CANCEL);
+  if (r.getSelectedButton() !== ui.Button.OK) return null;
+  url = String(r.getResponseText() || '').trim().replace(/[?#].*$/, '');
+  if (!POS_URL_OK.test(url)) {
+    ui.alert('Esa dirección no sirve', 'Debe empezar con https://script.google.com/macros/s/ y terminar en /exec.', ui.ButtonSet.OK);
+    return null;
+  }
+  props.setProperty('POS_URL', url);
+  return url;
+}
+
+function posCambiarDireccion() {
+  var ui = SpreadsheetApp.getUi();
+  if (posDireccion_(ui, true)) ui.alert('Dirección guardada. Vuelve a vincular tus dispositivos desde 🛒 Punto de venta → Vincular.');
+}
+
 function posVincular() {
   var ui = SpreadsheetApp.getUi();
-  var url = ScriptApp.getService().getUrl();
-  if (!url || !/\/exec$/.test(url)) {
-    ui.alert('Falta publicar el script', 'Primero publícalo como aplicación web: Implementar → Nueva implementación → Aplicación web (Ejecutar como: Yo, Quién tiene acceso: Cualquier persona).', ui.ButtonSet.OK);
-    return;
-  }
+  var url = posDireccion_(ui, false);
+  if (!url) return;
   var datos = Utilities.base64EncodeWebSafe(JSON.stringify({ u: url, t: posClave_(true) })).replace(/=+$/, '');
   var enlace = 'https://mnscents.pages.dev/pos/#vincular=' + datos;
   var html = HtmlService.createHtmlOutput(
@@ -65,9 +88,10 @@ function posVincular() {
     '<div id="qr" style="display:inline-block;padding:8px;background:#fff"></div>' +
     '<p><a href="' + enlace + '" target="_blank" style="color:#6a3fc0;font-weight:bold">Abrir el punto de venta en esta computadora</a></p>' +
     '<p style="font-size:12px;color:#6f5f8c">Este código es como una contraseña: no lo compartas.</p>' +
+    '<p style="font-size:10px;color:#6f5f8c;word-break:break-all">Dirección de la hoja: ' + url + '</p>' +
     '<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>' +
     '<script>var q=qrcode(0,"M");q.addData(' + JSON.stringify(enlace) + ');q.make();document.getElementById("qr").innerHTML=q.createSvgTag(5,0);</script>' +
-    '</div>').setWidth(380).setHeight(470);
+    '</div>').setWidth(380).setHeight(520);
   ui.showModalDialog(html, 'Vincular el punto de venta');
 }
 

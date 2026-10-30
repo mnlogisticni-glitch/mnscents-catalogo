@@ -28,10 +28,12 @@ export async function llamar(cuerpo, { espera = 30000 } = {}) {
   try {
     // texto plano: así Google responde sin pedir permisos extra al navegador
     r = await fetch(c.url, { method: 'POST', body: JSON.stringify({ ...cuerpo, t: c.clave }), redirect: 'follow', signal: ctrl.signal, cache: 'no-store' });
-  } catch { throw new ErrorRed('Sin conexión'); }
+  } catch (e) {
+    throw new ErrorRed(e?.name === 'AbortError' ? 'la hoja tardó demasiado en responder' : 'no se pudo llegar a la dirección de la hoja');
+  }
   finally { clearTimeout(t); }
   let d;
-  try { d = await r.json(); } catch { throw new ErrorRed('Respuesta incompleta'); }
+  try { d = await r.json(); } catch { throw new ErrorRed(`la dirección no respondió como la app (código ${r.status})`); }
   if (!d || d.ok !== true) throw new ErrorHoja(d?.error || 'Error de la hoja');
   return d;
 }
@@ -46,13 +48,13 @@ export function quitarDeCola(id) { guardarCola(cola().filter(o => o.id !== id));
 
 let procesando = null;
 /**
- * Envía lo pendiente, una por una (la hoja responde sin recalcular todo). Devuelve { estado, enviadas, sinRed, fallidas }.
+ * Envía lo pendiente, una por una (la hoja responde sin recalcular todo). Devuelve { estado, enviadas, sinRed, fallidas, motivo }.
  * Si una operación la rechaza la hoja (dato malo), se aparta en "errores" para revisarla y se sigue.
  */
 export function procesarCola(alResultado) {
   if (procesando) return procesando;
   procesando = (async () => {
-    let estado = null, enviadas = 0, sinRed = false, fallidas = 0;
+    let estado = null, enviadas = 0, sinRed = false, fallidas = 0, motivo = '';
     for (const op of cola()) {
       const { creado, ...cuerpo } = op;
       try {
@@ -62,7 +64,7 @@ export function procesarCola(alResultado) {
         quitarDeCola(op.id);
         alResultado?.(op, resp.resultado);
       } catch (e) {
-        if (e instanceof ErrorRed) { sinRed = true; break; }
+        if (e instanceof ErrorRed) { sinRed = true; motivo = e.message; break; }
         if (e.message === 'no-autorizado') throw e;
         fallidas++;
         quitarDeCola(op.id);
@@ -70,7 +72,7 @@ export function procesarCola(alResultado) {
       }
     }
     if (estado) guardarEstado(estado);
-    return { estado, enviadas, sinRed, fallidas };
+    return { estado, enviadas, sinRed, fallidas, motivo };
   })().finally(() => { procesando = null; });
   return procesando;
 }
