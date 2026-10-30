@@ -1,5 +1,5 @@
 {
- "actualizado": "2026-10-30T15:45:45.412Z",
+ "actualizado": "2026-10-30T20:34:08.779Z",
  "productos": [
   {
    "id": "H01",
@@ -619,7 +619,7 @@
     }
    },
    "estado": "disponible",
-   "existencias": 5,
+   "existencias": 4,
    "etiqueta": null,
    "foto": "odyssey-candee.webp",
    "orden": 4,
