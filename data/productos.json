@@ -1,5 +1,5 @@
 {
- "actualizado": "2026-10-30T20:34:08.779Z",
+ "actualizado": "2026-10-31T19:34:16.221Z",
  "productos": [
   {
    "id": "H01",
@@ -261,7 +261,7 @@
     }
    },
    "estado": "disponible",
-   "existencias": 14,
+   "existencias": 13,
    "etiqueta": null,
    "foto": "9am-dive.webp",
    "orden": 9,
