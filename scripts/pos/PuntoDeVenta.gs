@@ -13,20 +13,23 @@
  */
 
 var POS = {
-  VENTAS: 'Ventas', INV: 'Inventario', CLI: 'Clientes', CAJA: 'Caja', AJ: 'Ajustes', GASTOS: 'Gastos', CONF: 'Configuración',
+  VENTAS: 'Ventas', INV: 'Inventario', CLI: 'Clientes', CAJA: 'Caja', AJ: 'Ajustes', GASTOS: 'Gastos', CONF: 'Configuración', FID: 'Fidelidad',
   ZONA: 'America/Managua',
   PRIMERA: 4,                    // primera fila de datos en todas las hojas
   FIN_VENTAS: 1003, FIN_INV: 303, FIN_CLI: 303, FIN_AJ: 503, FIN_GASTOS: 503,
   BANCOS: ['BAC', 'Banpro', 'Lafise'],
   METODOS: ['Efectivo', 'Transferencia bancaria'],
   MOTIVOS: ['Mal conteo', 'Pérdida o robo', 'Dañado', 'Regalo o muestra', 'Uso personal'],
-  VERSION: 1,
+  TIPOS: ['Detalle', 'Mayorista', 'Canje'],     // columna "Tipo de venta" (W) de Ventas
+  PREMIO: /stallion\s*53/i,                     // el perfume gratis de la tarjeta se elige de esta línea
+  VERSION: 2,
 };
 
 // Columnas (número, base 1)
-var V = { FECHA: 1, NUM: 2, CLIENTE: 3, TEL: 4, CIUDAD: 5, PRODUCTO: 6, CANT: 7, PRECIO: 8, DESC: 9, TOTAL: 10, METODO: 11, ESTADO: 12, ENVIO: 13, GANANCIA: 14, BANCO: 22 };
+var V = { FECHA: 1, NUM: 2, CLIENTE: 3, TEL: 4, CIUDAD: 5, PRODUCTO: 6, CANT: 7, PRECIO: 8, DESC: 9, TOTAL: 10, METODO: 11, ESTADO: 12, ENVIO: 13, GANANCIA: 14, BANCO: 22, TIPO: 23 };
 var I = { SKU: 1, MARCA: 2, NOMBRE: 3, PRES: 4, FAMILIA: 5, GENERO: 6, COSTO: 11, PRECIO: 12, STOCK: 18, ESTADO: 20, REF: 23, MAYOR: 34, PEDIDOS30: 35 };
 var POS_TZ = 'America/Los_Angeles';   // zona de la hoja; se lee en cada pedido
+var FID_COLS = ['Fecha y hora', 'Cliente', 'Movimiento', 'Sellos', 'Nota', 'ID (no tocar)'];
 var CAJA_COLS = ['Fecha y hora', 'Tipo', 'Concepto', 'Método', 'Banco', 'Monto', 'Número de venta', 'Efectivo contado', 'Diferencia', 'ID (no tocar)'];
 
 // ======================================================================
@@ -146,6 +149,7 @@ function posAtender_(ss, req, ahora) {
     else if (a === 'anular') r = posAnular_(ss, req.numero, ahora);
     else if (a === 'ajuste') r = posAjuste_(ss, req.ajuste, ahora);
     else if (a === 'caja') r = posCaja_(ss, req.caja, ahora);
+    else if (a === 'sellos') r = posSellos_(ss, req.sellos, ahora);
     else throw new Error('Acción desconocida.');
     if (idOp) cache.put('pos:' + idOp, JSON.stringify(r || {}), 21600);
     // Se responde enseguida: la hoja recalcula sus fórmulas después y la app pide el estado aparte.
@@ -223,10 +227,10 @@ function posProductos_(ss) {
 function posReferencias_(ss) {
   var h = posHoja_(ss, POS.INV);
   var n = POS.FIN_INV - POS.PRIMERA + 1;
-  var nombres = h.getRange(POS.PRIMERA, I.NOMBRE, n, 1).getValues();
+  var nm = h.getRange(POS.PRIMERA, I.MARCA, n, 2).getValues();
   var refs = h.getRange(POS.PRIMERA, I.REF, n, 1).getValues();
   var out = {};
-  for (var i = 0; i < n; i++) if (refs[i][0] !== '') out[String(refs[i][0])] = { ref: String(refs[i][0]), nombre: String(nombres[i][0]) };
+  for (var i = 0; i < n; i++) if (refs[i][0] !== '') out[String(refs[i][0])] = { ref: String(refs[i][0]), marca: String(nm[i][0]), nombre: String(nm[i][1]) };
   return out;
 }
 
@@ -247,7 +251,7 @@ function posConfig_(ss) {
   var b = h.getRange(4, 2, 7, 1).getValues();
   var ciudades = h.getRange(4, 5, 17, 1).getValues().map(function (x) { return String(x[0]); }).filter(String);
   var gastos = h.getRange(4, 10, 8, 1).getValues().map(function (x) { return String(x[0]); }).filter(String);
-  return { tipoCambio: posNum_(b[1][0]), stockMinimo: posNum_(b[5][0]) || 3, minimoMayor: posNum_(b[6][0]) || 6, ciudades: ciudades, gastos: gastos, bancos: POS.BANCOS, motivos: POS.MOTIVOS };
+  return { metaVentas: posNum_(b[3][0]), metaGanancia: posNum_(b[4][0]), tipoCambio: posNum_(b[1][0]), stockMinimo: posNum_(b[5][0]) || 3, minimoMayor: posNum_(b[6][0]) || 6, ciudades: ciudades, gastos: gastos, bancos: POS.BANCOS, motivos: POS.MOTIVOS };
 }
 
 function posHojaCaja_(ss) {
@@ -306,17 +310,23 @@ function posResumenCaja_(movs) {
   return r;
 }
 
-// Ventas del día desde la hoja Ventas (incluye las que anotas a mano)
-function posVentasDia_(ss, dia) {
+// Todas las filas usadas de Ventas (una sola lectura). Lee hasta "Tipo de venta" si la columna ya existe.
+function posLeerVentas_(ss) {
   var h = posHoja_(ss, POS.VENTAS);
   var ult = posUltima_(h, V.PRODUCTO, POS.FIN_VENTAS);
+  if (ult < POS.PRIMERA) return [];
+  var cols = Math.min(h.getMaxColumns(), V.TIPO);
+  var vals = h.getRange(POS.PRIMERA, 1, ult - POS.PRIMERA + 1, cols).getValues();
+  return vals.filter(function (f) { return f[V.PRODUCTO - 1] !== ''; });
+}
+
+// Ventas del día desde la hoja Ventas (incluye las que anotas a mano)
+function posVentasDia_(filas, dia) {
   var res = { numeros: [], total: 0, ganancia: 0, unidades: 0, porMetodo: {}, lineas: [] };
-  if (ult < POS.PRIMERA) return res;
-  var vals = h.getRange(POS.PRIMERA, 1, ult - POS.PRIMERA + 1, V.BANCO).getValues();
   var nums = {};
-  for (var i = 0; i < vals.length; i++) {
-    var f = vals[i];
-    if (f[V.PRODUCTO - 1] === '' || posDia_(f[V.FECHA - 1]) !== dia) continue;
+  for (var i = 0; i < filas.length; i++) {
+    var f = filas[i];
+    if (posDia_(f[V.FECHA - 1]) !== dia) continue;
     var tot = posNum_(f[V.TOTAL - 1]);
     var num = posNum_(f[V.NUM - 1]);
     nums[num] = true;
@@ -331,6 +341,24 @@ function posVentasDia_(ss, dia) {
   return res;
 }
 
+// Historial compacto para reportes, tarjeta de fidelidad, racha y reposición (los cálculos los hace la app).
+// [día, número, cliente, código del perfume (o su nombre si ya no está), cantidad, precio, descuento, total, método, banco, ganancia, tipo]
+function posHistorial_(filas, productos) {
+  var sku = {};
+  productos.forEach(function (p) { sku[p.ref] = p.sku; });
+  var out = [];
+  for (var i = 0; i < filas.length; i++) {
+    var f = filas[i];
+    var dia = posDia_(f[V.FECHA - 1]);
+    if (dia === null) continue;
+    var ref = String(f[V.PRODUCTO - 1]);
+    var r2 = function (v) { return Math.round(posNum_(v) * 100) / 100; };
+    out.push([dia, posNum_(f[V.NUM - 1]), posTexto_(f[V.CLIENTE - 1], 60), sku[ref] || ref, posNum_(f[V.CANT - 1]), r2(f[V.PRECIO - 1]), r2(f[V.DESC - 1]),
+      r2(f[V.TOTAL - 1]), String(f[V.METODO - 1] || ''), String(f[V.BANCO - 1] || ''), r2(f[V.GANANCIA - 1]), String(f[V.TIPO - 1] || '')]);
+  }
+  return out;
+}
+
 function posSiguienteVenta_(ss) {
   var h = posHoja_(ss, POS.VENTAS);
   var vals = h.getRange(POS.PRIMERA, V.NUM, POS.FIN_VENTAS - POS.PRIMERA + 1, 1).getValues();
@@ -343,12 +371,16 @@ function posEstado_(ss, ahora) {
   var hoy = posHoyNica_(ahora);
   var dia = Math.floor(posSerie_(hoy));
   var movs = posMovimientosDia_(ss, dia);
+  var productos = posProductos_(ss);
+  var filas = posLeerVentas_(ss);
   return {
-    ok: true, version: POS.VERSION, fecha: hoy.texto,
-    config: posConfig_(ss), productos: posProductos_(ss), clientes: posClientes_(ss),
+    ok: true, version: POS.VERSION, fecha: hoy.texto, dia: dia,
+    config: posConfig_(ss), productos: productos, clientes: posClientes_(ss),
     siguienteVenta: posSiguienteVenta_(ss),
     caja: { resumen: posResumenCaja_(movs), movimientos: movs },
-    hoy: posVentasDia_(ss, dia),
+    hoy: posVentasDia_(filas, dia),
+    historial: posHistorial_(filas, productos),
+    fidelidad: posFidelidad_(ss),
   };
 }
 
@@ -395,19 +427,27 @@ function posVenta_(ss, venta, ahora) {
   if (previa) return { numero: previa.venta, repetida: true };   // ya se guardó (reintento sin señal)
 
   var porRef = posReferencias_(ss);
+  var conCliente = !!(venta.cliente && posTexto_(venta.cliente.nombre, 60));
   var lineas = venta.lineas.map(function (l) {
     var p = porRef[l.ref];
     if (!p) throw new Error('El perfume "' + posTexto_(l.ref) + '" ya no está en el Inventario.');
     var cant = Math.round(posNum_(l.cantidad));
-    var precio = Math.round(posNum_(l.precio) * 100) / 100;
-    var desc = Math.round(posNum_(l.descuento) * 100) / 100;
+    var canje = l.canje === true;
+    var precio = canje ? 0 : Math.round(posNum_(l.precio) * 100) / 100;
+    var desc = canje ? 0 : Math.round(posNum_(l.descuento) * 100) / 100;
     if (cant < 1 || cant > 999) throw new Error('Cantidad no válida en ' + p.nombre + '.');
-    if (precio <= 0) throw new Error('Falta el precio de ' + p.nombre + '.');
+    if (canje) {
+      if (cant !== 1) throw new Error('El premio de la tarjeta es 1 perfume.');
+      if (!conCliente) throw new Error('El premio de la tarjeta necesita el nombre del cliente.');
+      if (!POS.PREMIO.test(p.marca + ' ' + p.nombre)) throw new Error('El premio de la tarjeta es de la línea Stallion 53.');
+    } else if (precio <= 0) throw new Error('Falta el precio de ' + p.nombre + '.');
     if (desc < 0 || desc > cant * precio) throw new Error('Descuento no válido en ' + p.nombre + '.');
-    return { ref: p.ref, cant: cant, precio: precio, desc: desc };
+    var tipo = canje ? 'Canje' : (POS.TIPOS.indexOf(l.tipo) >= 0 && l.tipo !== 'Canje' ? l.tipo : 'Detalle');
+    return { ref: p.ref, cant: cant, precio: precio, desc: desc, tipo: tipo };
   });
+  var soloCanje = lineas.every(function (l) { return l.tipo === 'Canje'; });
   var pago = venta.pago || {};
-  var metodo = POS.METODOS.indexOf(pago.metodo) >= 0 ? pago.metodo : null;
+  var metodo = POS.METODOS.indexOf(pago.metodo) >= 0 ? pago.metodo : soloCanje ? 'Efectivo' : null;
   if (!metodo) throw new Error('Elige cómo pagó.');
   var banco = metodo === 'Transferencia bancaria' ? pago.banco : '';
   if (metodo === 'Transferencia bancaria' && POS.BANCOS.indexOf(banco) < 0) throw new Error('Elige el banco de la transferencia.');
@@ -432,11 +472,13 @@ function posVenta_(ss, venta, ahora) {
   h.getRange(inicio, V.METODO, n, 2).setValues(lineas.map(function () { return [metodo, 'Pagado']; }));
   h.getRange(inicio, V.BANCO, n, 1).setValues(lineas.map(function () { return [banco]; }));
   if (!String(h.getRange(3, V.BANCO).getValue())) h.getRange(3, V.BANCO).setValue('Banco');
+  posColumnaTipo_(h);
+  h.getRange(inicio, V.TIPO, n, 1).setValues(lineas.map(function (l) { return [l.tipo]; }));
 
   var total = lineas.reduce(function (s, l) { return s + l.cant * l.precio - l.desc; }, 0);
   total = Math.round(total * 100) / 100;
   var unidades = lineas.reduce(function (s, l) { return s + l.cant; }, 0);
-  posAgregarCaja_(ss, [posSerieAhora_(ahora), 'Venta', 'Venta #' + numero + (cliente ? ' · ' + cliente : '') + ' · ' + unidades + (unidades === 1 ? ' perfume' : ' perfumes'),
+  posAgregarCaja_(ss, [posSerieAhora_(ahora), 'Venta', 'Venta #' + numero + (cliente ? ' · ' + cliente : '') + ' · ' + unidades + (unidades === 1 ? ' perfume' : ' perfumes') + (lineas.some(function (l) { return l.tipo === 'Canje'; }) ? ' · premio de la tarjeta' : ''),
     metodo, banco, total, numero, '', '', posTexto_(venta.id, 60)]);
   return { numero: numero, total: total, unidades: unidades, cliente: cliente };
 }
@@ -467,6 +509,7 @@ function posAnular_(ss, numero, ahora) {
     h.getRange(f, V.CIUDAD, 1, 5).clearContent();
     h.getRange(f, V.METODO, 1, 3).clearContent();
     h.getRange(f, V.BANCO).clearContent();
+    if (h.getMaxColumns() >= V.TIPO) h.getRange(f, V.TIPO).clearContent();
     if (formula) h.getRange(f, V.PRECIO).setFormulaR1C1(formula); else h.getRange(f, V.PRECIO).clearContent();
   });
   total = Math.round(total * 100) / 100;
@@ -532,4 +575,71 @@ function posCaja_(ss, op, ahora) {
     return { tipo: 'cierre', esperado: res.esperado, contado: contado, diferencia: dif };
   }
   throw new Error('Operación de caja desconocida.');
+}
+
+// ======================================================================
+// Columna "Tipo de venta" (W) y tarjeta de fidelidad
+// ======================================================================
+// La hoja Ventas termina en la columna V: se agrega W al final (no mueve ninguna fórmula).
+function posColumnaTipo_(h) {
+  if (h.getMaxColumns() < V.TIPO) h.insertColumnsAfter(h.getMaxColumns(), V.TIPO - h.getMaxColumns());
+  var cab = h.getRange(3, V.TIPO);
+  if (!String(cab.getValue())) {
+    h.getRange(3, V.BANCO).copyTo(cab, SpreadsheetApp.CopyPasteType.PASTE_FORMAT, false);
+    cab.setValue('Tipo de venta');
+    cab.setNote('La llena la app del punto de venta: Detalle, Mayorista o Canje (perfume gratis de la tarjeta). Cuenta para los sellos y la racha mayorista.');
+  }
+}
+
+function posHojaFid_(ss) {
+  var h = ss.getSheetByName(POS.FID);
+  if (h) return h;
+  h = ss.insertSheet(POS.FID);
+  h.getRange(1, 1).setValue('⭐  FIDELIDAD — MNScents');
+  h.getRange(2, 1).setValue('Los sellos se cuentan solos desde Ventas (1 por compra al detalle, 2 de regalo con la primera). Aquí quedan solo los ajustes a mano, por ejemplo al pasar una tarjeta de papel.');
+  h.getRange(3, 1, 1, FID_COLS.length).setValues([FID_COLS]);
+  h.getRange(1, 1, 1, FID_COLS.length).setBackground('#4a1942').setFontColor('#ffffff').setFontWeight('bold').setFontSize(16);
+  h.getRange(2, 1, 1, FID_COLS.length).setFontColor('#6f5f8c').setFontStyle('italic');
+  h.getRange(3, 1, 1, FID_COLS.length).setBackground('#6e2c5a').setFontColor('#ffffff').setFontWeight('bold');
+  h.setFrozenRows(3);
+  h.getRange('A4:A').setNumberFormat('dd/mm/yyyy HH:mm');
+  h.setColumnWidth(1, 130); h.setColumnWidth(2, 200); h.setColumnWidth(5, 260); h.setColumnWidth(6, 90);
+  return h;
+}
+
+// [día, cliente, sellos, nota] de cada ajuste a mano
+function posFidelidad_(ss) {
+  var h = ss.getSheetByName(POS.FID);
+  if (!h) return [];
+  var ult = h.getLastRow();
+  if (ult < POS.PRIMERA) return [];
+  var vals = h.getRange(POS.PRIMERA, 1, ult - POS.PRIMERA + 1, FID_COLS.length).getValues();
+  var out = [];
+  for (var i = 0; i < vals.length; i++) {
+    var f = vals[i];
+    if (f[1] === '' || !posNum_(f[3])) continue;
+    out.push([posDia_(f[0]), posTexto_(f[1], 60), Math.round(posNum_(f[3])), posTexto_(f[4], 120)]);
+  }
+  return out;
+}
+
+// Ajuste a mano de sellos: { cliente, sellos (+/-), nota }
+function posSellos_(ss, op, ahora) {
+  if (!op) throw new Error('Ajuste vacío.');
+  var cliente = posTexto_(op.cliente, 60);
+  if (!cliente) throw new Error('Falta el cliente.');
+  var n = Math.round(posNum_(op.sellos));
+  if (!n || Math.abs(n) > 50) throw new Error('Cantidad de sellos no válida.');
+  var h = posHojaFid_(ss);
+  var id = posTexto_(op.id, 60);
+  if (id) {
+    var ult = h.getLastRow();
+    if (ult >= POS.PRIMERA) {
+      var ids = h.getRange(POS.PRIMERA, FID_COLS.length, ult - POS.PRIMERA + 1, 1).getValues();
+      for (var i = 0; i < ids.length; i++) if (String(ids[i][0]) === id) return { repetida: true };
+    }
+  }
+  var r = Math.max(h.getLastRow() + 1, POS.PRIMERA);
+  h.getRange(r, 1, 1, FID_COLS.length).setValues([[posSerieAhora_(ahora), cliente, 'Ajuste', n, posTexto_(op.nota, 120), id]]);
+  return { cliente: cliente, sellos: n };
 }

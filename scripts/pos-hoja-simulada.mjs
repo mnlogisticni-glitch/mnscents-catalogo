@@ -7,13 +7,17 @@ import assert from 'node:assert/strict';
 export class Hoja {
   constructor(nombre, filas = 1003, cols = 26) {
     this.nombre = nombre; this.v = Array.from({ length: filas }, () => Array(cols).fill('')); this.f = {}; this.fmt = {};
-    this.alEscribir = null;
+    this.alEscribir = null; this.maxCols = cols; this.notas = {};
   }
+  getMaxColumns() { return this.maxCols; }
+  insertColumnsAfter(despues, n) { this.maxCols += n; }
   celda(r, c) { while (this.v.length < r) this.v.push(Array(this.v[0].length).fill('')); while (this.v[r - 1].length < c) this.v[r - 1].push(''); return this.v[r - 1][c - 1]; }
   poner(r, c, x) { this.celda(r, c); this.v[r - 1][c - 1] = x; }
   getRange(r, c, nr = 1, nc = 1) {
     if (typeof r === 'string') { const m = /^([A-Z]+)(\d+)?(?::([A-Z]+)(\d+)?)?$/.exec(r); const col = s => [...s].reduce((a, ch) => a * 26 + ch.charCodeAt(0) - 64, 0); r = +(m[2] || 4); c = col(m[1]); nr = 1; nc = m[3] ? col(m[3]) - c + 1 : 1; }
     const h = this;
+    // como Google: pedir columnas que la hoja no tiene es un error
+    if (c + nc - 1 > h.maxCols) throw new Error(`Las coordenadas del rango están fuera de las dimensiones de la hoja (${h.nombre}, columna ${c + nc - 1} > ${h.maxCols}).`);
     const rango = {
       getValues: () => Array.from({ length: nr }, (_, i) => Array.from({ length: nc }, (_, j) => h.celda(r + i, c + j))),
       setValues: vals => { assert.equal(vals.length, nr, 'filas'); vals.forEach((f, i) => { assert.equal(f.length, nc, 'columnas'); f.forEach((x, j) => h.poner(r + i, c + j, x)); }); h.alEscribir?.(r, nr); return rango; },
@@ -21,6 +25,7 @@ export class Hoja {
       clearContent: () => { for (let i = 0; i < nr; i++) for (let j = 0; j < nc; j++) { h.poner(r + i, c + j, ''); delete h.f[`${r + i},${c + j}`]; } return rango; },
       getNumberFormat: () => h.fmt[`${r},${c}`] || 'General', setNumberFormat: x => { for (let i = 0; i < nr; i++) h.fmt[`${r + i},${c}`] = x; return rango; },
       getFormulaR1C1: () => h.f[`${r},${c}`] || '', getFormula: () => h.f[`${r},${c}`] || '', setFormulaR1C1: x => { h.f[`${r},${c}`] = x; h.poner(r, c, ''); return rango; },
+      setNote: x => { h.notas[`${r},${c}`] = x; return rango; }, copyTo: () => rango,
       setBackground: () => rango, setFontColor: () => rango, setFontWeight: () => rango, setFontSize: () => rango, setFontStyle: () => rango, setWrap: () => rango,
     };
     return rango;
@@ -74,7 +79,7 @@ export function libroBase() {
 export const props = {};
 export const cacheMem = {};
 export const gas = {
-  SpreadsheetApp: { flush() {}, getActiveSpreadsheet: () => gas._libro, getUi() { throw new Error('sin UI'); } },
+  SpreadsheetApp: { CopyPasteType: { PASTE_FORMAT: 'formato' }, flush() {}, getActiveSpreadsheet: () => gas._libro, getUi() { throw new Error('sin UI'); } },
   LockService: { getScriptLock: () => ({ waitLock() {}, releaseLock() {} }) },
   CacheService: { getScriptCache: () => ({ get: k => cacheMem[k] ?? null, put: (k, v) => { cacheMem[k] = v; } }) },
   PropertiesService: { getScriptProperties: () => ({ getProperty: k => props[k] ?? null, setProperty: (k, v) => { props[k] = v; }, deleteProperty: k => { delete props[k]; } }) },

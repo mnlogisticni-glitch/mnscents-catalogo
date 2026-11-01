@@ -174,6 +174,67 @@ prueba('Las fechas que Sheets devuelve como fecha también se reconocen', () => 
   assert.equal(ctx.posDia_(d), DIA);
 });
 
+console.log('\nTipo de venta, premio de la tarjeta, sellos e historial');
+const conStallion = () => {
+  const L = libroBase(); const inv = L.hojas['Inventario'];
+  ['444', 'STALLION 53', 'IMPERIAL', '100ML', 'Amaderada', 'Hombre'].forEach((x, j) => inv.poner(7, j + 1, x));
+  inv.poner(7, 11, 900); inv.poner(7, 12, 1400); inv.poner(7, 18, 5); inv.poner(7, 23, 'STALLION 53 IMPERIAL - 100ML (444)'); inv.poner(7, 34, 1000);
+  return L;
+};
+const STALLION = 'STALLION 53 IMPERIAL - 100ML (444)';
+prueba('Agrega la columna "Tipo de venta" al final de Ventas y la llena por línea', () => {
+  const L = libroBase(); const v = L.hojas['Ventas'];
+  assert.equal(v.getMaxColumns(), 22);
+  atender(L, { accion: 'venta', venta: ventaBase({ lineas: [{ ref: 'ARMAF MANDARIN SKY - 100ML (111)', cantidad: 6, precio: 985, tipo: 'Mayorista' }] }) }, AHORA);
+  assert.equal(v.getMaxColumns(), 23); assert.equal(v.celda(3, 23), 'Tipo de venta'); assert.equal(v.celda(5, 23), 'Mayorista');
+  atender(L, { accion: 'venta', venta: ventaBase({ id: 'otra', lineas: [{ ref: 'AFNAN 9PM - 100ML (222)', cantidad: 1, precio: 1490, tipo: 'Inventado' }] }) }, AHORA);
+  assert.equal(v.celda(6, 23), 'Detalle', 'un tipo desconocido queda como Detalle'); assert.equal(v.getMaxColumns(), 23);
+});
+prueba('El premio de la tarjeta: Stallion 53 a C$0 con cliente; sin cliente u otra marca no', () => {
+  const L = conStallion();
+  const e = atender(L, { accion: 'venta', venta: ventaBase({ cliente: { nombre: 'ANA' }, lineas: [{ ref: STALLION, cantidad: 1, precio: 1400, canje: true }], pago: {} }) }, AHORA);
+  const v = L.hojas['Ventas'];
+  assert.deepEqual([v.celda(5, 3), v.celda(5, 6), v.celda(5, 8), v.celda(5, 11), v.celda(5, 23)], ['ANA', STALLION, 0, 'Efectivo', 'Canje']);
+  assert.equal(e.resultado.total, 0); assert.match(e.caja.movimientos[0].concepto, /premio de la tarjeta/);
+  for (const malo of [
+    ventaBase({ id: 'a', lineas: [{ ref: STALLION, cantidad: 1, canje: true }] }),                                         // sin cliente
+    ventaBase({ id: 'b', cliente: { nombre: 'ANA' }, lineas: [{ ref: 'AFNAN 9PM - 100ML (222)', cantidad: 1, canje: true }] }),   // no es Stallion 53
+    ventaBase({ id: 'c', cliente: { nombre: 'ANA' }, lineas: [{ ref: STALLION, cantidad: 2, canje: true }] }),               // dos gratis
+  ]) assert.throws(() => atender(conStallion(), { accion: 'venta', venta: malo }, AHORA));
+  // premio + compra normal en la misma venta: se cobra solo lo comprado
+  const L2 = conStallion();
+  atender(L2, { accion: 'venta', venta: ventaBase({ cliente: { nombre: 'ANA' }, lineas: [{ ref: STALLION, cantidad: 1, canje: true }, { ref: 'AFNAN 9PM - 100ML (222)', cantidad: 1, precio: 1490, tipo: 'Detalle' }] }) }, AHORA);
+  assert.deepEqual([L2.hojas['Ventas'].celda(5, 23), L2.hojas['Ventas'].celda(6, 23), L2.hojas['Ventas'].celda(6, 11)], ['Canje', 'Detalle', 'Efectivo']);
+});
+prueba('Ajuste de sellos: crea la hoja Fidelidad, no se repite y vuelve en el estado', () => {
+  const L = libroBase();
+  atender(L, { accion: 'sellos', id: 's1', sellos: { id: 's1', cliente: 'ANA', sellos: 5, nota: 'Tarjeta de papel' } }, AHORA);
+  const r = atender(L, { accion: 'sellos', id: 's1', sellos: { id: 's1', cliente: 'ANA', sellos: 5 } }, AHORA);
+  assert.equal(r.resultado.repetida, true);
+  const f = L.hojas['Fidelidad'];
+  assert.deepEqual([f.celda(3, 1), f.celda(4, 2), f.celda(4, 3), f.celda(4, 4), f.celda(4, 5)], ['Fecha y hora', 'ANA', 'Ajuste', 5, 'Tarjeta de papel']);
+  assert.equal(f.celda(5, 2), '');
+  assert.deepEqual(JSON.parse(JSON.stringify(r.fidelidad)), [[DIA, 'ANA', 5, 'Tarjeta de papel']]);
+  for (const malo of [{ cliente: '', sellos: 1 }, { cliente: 'ANA', sellos: 0 }, { cliente: 'ANA', sellos: 99 }]) assert.throws(() => atender(libroBase(), { accion: 'sellos', sellos: malo }, AHORA));
+});
+prueba('El estado trae historial compacto (con código del perfume), metas y día', () => {
+  const L = libroBase();
+  const e = atender(L, { accion: 'venta', venta: ventaBase({ cliente: { nombre: 'ANA' }, lineas: [{ ref: 'AFNAN 9PM - 100ML (222)', cantidad: 1, precio: 1490, descuento: 90, tipo: 'Detalle' }] }) }, AHORA);
+  assert.equal(e.dia, DIA);
+  const h = JSON.parse(JSON.stringify(e.historial));
+  assert.deepEqual(h[0].slice(0, 9), [45000, 7, 'ANA', '111', 1, 1460, 0, 1460, 'Efectivo']);
+  const ult = h[h.length - 1];
+  assert.deepEqual([ult[0], ult[1], ult[2], ult[3], ult[4], ult[5], ult[6], ult[7], ult[11]], [DIA, 8, 'ANA', '222', 1, 1490, 90, 1400, 'Detalle']);
+  assert.equal(typeof e.config.metaVentas, 'number'); assert.equal(typeof e.config.metaGanancia, 'number');
+  assert.equal(e.fidelidad.length, 0);
+});
+prueba('Anular una venta también borra su tipo', () => {
+  const L = libroBase();
+  atender(L, { accion: 'venta', venta: ventaBase({ lineas: [{ ref: 'ARMAF MANDARIN SKY - 100ML (111)', cantidad: 1, precio: 1460, tipo: 'Detalle' }] }) }, AHORA);
+  atender(L, { accion: 'anular', numero: 8 }, AHORA);
+  assert.equal(L.hojas['Ventas'].celda(5, 23), '');
+});
+
 console.log('\nDirección de la app web');
 prueba('Pide la dirección una vez, la valida, la guarda y la usa en el enlace', () => {
   const respuestas = [];

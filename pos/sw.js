@@ -1,6 +1,6 @@
 // MN Scents — Punto de venta: abre aunque no haya señal (las ventas quedan en el teléfono hasta que vuelva).
-const CACHE = 'mnpos-v2';
-const BASE = ['./', 'index.html', 'pos.css', 'js/app.js', 'js/logica.js', 'js/api.js', 'manifest.webmanifest',
+const CACHE = 'mnpos-v3';
+const BASE = ['./', 'index.html', 'pos.css', 'js/app.js', 'js/logica.js', 'js/negocio.js', 'js/recibo-imagen.js', 'js/api.js', 'manifest.webmanifest',
   '../img/marca/logo.webp', '../img/marca/favicon.png', '../img/marca/icono-pos-192.png',
   '../fonts/onest-latin-400-normal.woff2', '../fonts/onest-latin-500-normal.woff2', '../fonts/onest-latin-700-normal.woff2', '../fonts/unbounded-latin-700-normal.woff2'];
 

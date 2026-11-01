@@ -1,5 +1,7 @@
 // MN Scents — Punto de venta (Android y PC). Trabaja directo con la hoja MNScents_claude.
 import { BANCOS, fmtCS, fmtUSD, redondear, titulo, nivelStock, coincide, calcularVenta, vuelto, billetesSugeridos, stockVisible, armarVenta, telWa, recibo, leerVinculo, nuevoId, norm } from './logica.js';
+import { agruparVentas, ventasPendientes, tarjetaCliente, rachaCliente, esPremio, TARJETA, reposicion, porReponer, listaCompra, PERIODOS, periodo, reporte, metaDelMes, hoyNica, fechaCorta, fechaDeDia, MESES } from './negocio.js';
+import { dibujarRecibo, aBlob, compartirRecibo, descargar } from './recibo-imagen.js';
 import { conexion, guardarConexion, olvidarConexion, estadoGuardado, guardarEstado, cola, encolar, procesarCola, llamar, errores, borrarErrores, ErrorRed } from './api.js';
 
 const $ = (s, r = document) => r.querySelector(s);
@@ -17,6 +19,7 @@ const S = {
   generoVender: 'todos', qVender: '', qStock: '', filtroStock: 'todos', ordenStock: 'menos',
   cobro: { metodo: null, banco: null, recibido: '' },
   permitidos: new Set(), ultima: null, ajuste: { cantidad: -1, motivo: null, nota: '' },
+  periodo: leerLS('mnpos-periodo-v1', 'mes'), pedido: new Map(), recibo: null,
 };
 const guardarCarrito = () => { guardarLS('mnpos-carrito-v1', S.carrito); guardarLS('mnpos-cliente-v1', S.cliente); };
 
@@ -83,6 +86,28 @@ const pendientes = () => cola();
 const minimo = () => S.estado?.config?.stockMinimo || 3;
 const stockDe = p => stockVisible(p, pendientes());
 
+// ---------------------------------------------------------------- negocio: historial de la hoja + lo que sigue en el teléfono
+const hoy = () => hoyNica();
+const minMayor = () => S.estado?.config?.minimoMayor || 6;
+let cacheVentas = { estado: null, cola: '', ventas: [] };
+function ventasTodas() {
+  if (!S.estado) return [];
+  const c = pendientes(); const firma = JSON.stringify(c);
+  if (cacheVentas.estado === S.estado && cacheVentas.cola === firma) return cacheVentas.ventas;
+  const ventas = [...agruparVentas(S.estado.historial || [], S.estado.productos, { minimoMayor: minMayor() }), ...ventasPendientes(c, S.estado.productos, hoy(), { minimoMayor: minMayor() })];
+  cacheVentas = { estado: S.estado, cola: firma, ventas };
+  return ventas;
+}
+const ajustesSellos = () => [...(S.estado?.fidelidad || []), ...pendientes().filter(o => o.accion === 'sellos').map(o => [hoy(), o.sellos.cliente, o.sellos.sellos, o.sellos.nota])];
+function infoCliente(nombre) {
+  if (!nombre || !S.estado) return null;
+  const v = ventasTodas();
+  return { tarjeta: tarjetaCliente(nombre, v, ajustesSellos()), racha: rachaCliente(nombre, v, hoy(), { minimoMayor: minMayor() }) };
+}
+const filasReposicion = () => reposicion(S.estado.productos, ventasTodas(), hoy(), { stockDe });
+const plural = (n, uno, varios) => `${n} ${n === 1 ? uno : varios}`;
+const enDias = d => (d === 0 ? 'hoy' : d === 1 ? 'mañana' : `en ${d} días`);
+
 async function cargarFotos() {
   try {
     const r = await fetch('../data/productos.json', { cache: 'no-cache' });
@@ -136,15 +161,16 @@ async function sincronizar({ silencioso = false } = {}) {
 addEventListener('online', () => sincronizar());
 
 // ---------------------------------------------------------------- pantallas
-const VISTAS = ['vender', 'stock', 'caja'];
+const VISTAS = ['vender', 'stock', 'caja', 'reportes'];
 function ponerVista(v) {
   if (!VISTAS.includes(v)) v = 'vender';
   S.vista = v;
   for (const id of VISTAS) $(`#v-${id}`).hidden = id !== v;
   for (const a of $$('.nav-pos a')) a.dataset.vista === v ? a.setAttribute('aria-current', 'page') : a.removeAttribute('aria-current');
   document.body.dataset.vista = v;
-  document.title = { vender: 'Vender', stock: 'Stock', caja: 'Caja' }[v] + ' · MN Scents';
+  document.title = { vender: 'Vender', stock: 'Stock', caja: 'Caja', reportes: 'Reportes' }[v] + ' · MN Scents';
   pintarBarraCobro();
+  if (v === 'reportes' && S.estado) pintarReportes();
   scrollTo({ top: 0, behavior: 'instant' });
 }
 addEventListener('hashchange', () => { const h = location.hash.slice(1); if (leerVinculo(h)) return arrancar(); if (VISTAS.includes(h) && S.estado) ponerVista(h); });
@@ -161,6 +187,7 @@ function pintarTodo() {
   $('.nav-pos').hidden = false; $('[data-accion="refrescar"]').hidden = false;
   if (!VISTAS.some(v => !$(`#v-${v}`).hidden)) ponerVista(S.vista);
   pintarChips(); pintarVender(); pintarCarrito(); pintarStock(); pintarCaja(); pintarNav(); pintarRed();
+  if (S.vista === 'reportes') pintarReportes();
 }
 
 function pintarNav() {
@@ -177,10 +204,10 @@ function pintarChips() {
   $('[data-filtro="vender"]').innerHTML = g.map(([k, t]) => `<button type="button" class="chip" data-accion="genero" data-v="${k}" aria-pressed="${S.generoVender === k}">${t}</button>`).join('');
   const f = [['todos', 'Todos'], ['bajo', 'Bajo stock'], ['agotado', 'Agotados']];
   $('[data-filtro="stock"]').innerHTML = f.map(([k, t]) => `<button type="button" class="chip" data-accion="filtro-stock" data-v="${k}" aria-pressed="${S.filtroStock === k}">${t}</button>`).join('')
-    + `<label class="orden"><span class="sr">Ordenar</span><select data-accion="orden-stock">${[['menos', 'Menos stock primero'], ['mas', 'Más stock primero'], ['vendidos', 'Más vendidos (30 días)'], ['nombre', 'Nombre A–Z']].map(([k, t]) => `<option value="${k}"${S.ordenStock === k ? ' selected' : ''}>${t}</option>`).join('')}</select></label>`;
+    + `<label class="orden"><span class="sr">Ordenar</span><select data-accion="orden-stock">${[['menos', 'Menos stock primero'], ['dura', 'Se acaban primero'], ['mas', 'Más stock primero'], ['vendidos', 'Más vendidos (30 días)'], ['nombre', 'Nombre A–Z']].map(([k, t]) => `<option value="${k}"${S.ordenStock === k ? ' selected' : ''}>${t}</option>`).join('')}</select></label>`;
 }
 
-const enCarrito = ref => S.carrito.find(i => i.ref === ref)?.cantidad || 0;
+const enCarrito = ref => S.carrito.find(i => i.ref === ref && !i.canje)?.cantidad || 0;
 
 function pintarVender() {
   const lista = S.estado.productos
@@ -208,7 +235,7 @@ async function agregar(ref, cuanto = 1) {
     if (!ok) return;
     S.permitidos.add(ref);
   }
-  const it = S.carrito.find(i => i.ref === ref);
+  const it = S.carrito.find(i => i.ref === ref && !i.canje);
   if (it) it.cantidad = Math.max(0, it.cantidad + cuanto);
   else if (cuanto > 0) S.carrito.push({ ref, cantidad: cuanto });
   S.carrito = S.carrito.filter(i => i.cantidad > 0);
@@ -217,8 +244,49 @@ async function agregar(ref, cuanto = 1) {
   const b = $('.bc-boton'); b.classList.remove('salto'); void b.offsetWidth; b.classList.add('salto');
 }
 
-const calc = () => calcularVenta(S.carrito, S.porRef, { minimoMayor: S.estado?.config?.minimoMayor || 6, forzarMayor: S.forzarMayor });
+// La racha mayorista del cliente se aplica sola cuando la venta llega a su mínimo
+function calc() {
+  const base = calcularVenta(S.carrito, S.porRef, { minimoMayor: minMayor(), forzarMayor: S.forzarMayor });
+  if (base.porMayor || !S.cliente) return base;
+  const r = infoCliente(S.cliente.nombre)?.racha;
+  if (!r?.activa || base.unidades < r.minimo) return base;
+  const c = calcularVenta(S.carrito, S.porRef, { minimoMayor: minMayor(), forzarMayor: true });
+  c.porRacha = r;
+  return c;
+}
 const numeroSiguiente = () => (S.estado?.siguienteVenta || 1) + pendientes().filter(o => o.accion === 'venta').length;
+
+// Sellos de la tarjeta, premio y racha del cliente elegido
+function htmlBeneficios(c) {
+  if (!S.cliente) return '';
+  const i = infoCliente(S.cliente.nombre); if (!i) return '';
+  const { tarjeta: t, racha: r } = i;
+  const premiosLibres = t.premios - c.regalos;
+  const puntos = Array.from({ length: TARJETA.meta }, (_, k) => `<i class="${k < t.enTarjeta ? 'lleno' : ''}"></i>`).join('');
+  const tarjeta = t.compras || t.sellos || t.canjes || !r.activa ? `<div class="sellos">
+      <span class="sl-puntos" aria-hidden="true">${puntos}</span>
+      <span class="sl-txt">${t.premios ? `<b>¡Tarjeta completa!</b> ${t.premios > 1 ? `${t.premios} premios` : '1 premio'} disponible${t.premios > 1 ? 's' : ''}` : t.compras === 0 && t.sellos === 0 ? '<b>Tarjeta nueva</b> · con esta compra al detalle recibe 3 sellos (2 de regalo)' : `<b>${t.sellos} de ${TARJETA.meta} sellos</b> · ${t.faltan === 1 ? 'le falta 1' : `le faltan ${t.faltan}`} para su perfume gratis`}</span>
+      <button type="button" class="btn-texto chico" data-accion="ajustar-sellos">Ajustar</button>
+    </div>` : '';
+  const premio = premiosLibres > 0 ? `<button type="button" class="btn premio-btn" data-accion="abrir-premio">${ico('regalo')}Canjear su perfume gratis (Stallion 53)</button>` : '';
+  const racha = r.activa ? `<p class="racha-chip">${ico('rayo')}<span><b>Racha mayorista</b> · ${r.etapa === 'primera' ? 'puede llevar desde 1 perfume' : `desde ${r.minimo} perfumes`} a precio mayorista · vence ${enDias(r.dias)} (${fechaCorta(r.vence)})</span></p>`
+    : r.vencida ? `<p class="racha-chip apagada">${ico('rayo')}<span>Su racha mayorista venció el ${fechaCorta(r.vencio)}. Con ${minMayor()} perfumes la reactiva.</span></p>` : '';
+  return tarjeta || premio || racha ? `<div class="beneficios">${tarjeta}${premio}${racha}</div>` : '';
+}
+
+// Lo que ganó el cliente con la venta (se muestra al terminar y va en el recibo)
+function beneficiosDeVenta(c, antes, despues) {
+  const out = [];
+  if (!despues) return out;
+  if (c.regalos) out.push({ tipo: 'oro', ico: 'regalo', texto: `<b>Premio entregado.</b> La tarjeta vuelve a empezar.` });
+  const ganados = despues.tarjeta.sellos - antes.tarjeta.sellos + c.regalos * TARJETA.meta;
+  if (ganados > 0) out.push({ tipo: 'oro', ico: 'estrella', texto: `<b>+${plural(ganados, 'sello', 'sellos')}</b>${ganados > 1 ? ' (2 de regalo por su primera compra)' : ''} · lleva ${despues.tarjeta.enTarjeta} de ${TARJETA.meta}` });
+  if (despues.tarjeta.premios > 0 && (antes.tarjeta.premios - c.regalos) < despues.tarjeta.premios) out.push({ tipo: 'oro', ico: 'regalo', texto: '<b>¡Completó su tarjeta!</b> En su próxima visita lleva un Stallion 53 gratis.' });
+  const ra = antes.racha, rd = despues.racha;
+  if (rd.activa && rd.etapa === 'primera' && !(ra.activa && ra.etapa === 'primera' && ra.vence === rd.vence)) out.push({ tipo: 'lila', ico: 'rayo', texto: `<b>Racha mayorista activada.</b> Hasta el ${fechaCorta(rd.vence)} puede llevar desde 1 perfume a precio mayorista.` });
+  else if (rd.activa && rd.etapa === 'mantener' && (!ra.activa || rd.vence > ra.vence)) out.push({ tipo: 'lila', ico: 'rayo', texto: `<b>Racha mayorista renovada</b> hasta el ${fechaCorta(rd.vence)} (desde ${rd.minimo} perfumes).` });
+  return out;
+}
 
 function pintarCarrito() {
   if (!S.estado) return;
@@ -228,12 +296,18 @@ function pintarCarrito() {
   const html = !c.lineas.length ? `<div class="carrito-vacio">${ico('bolsa')}<p><b>Venta #${numeroSiguiente()}</b></p><p>Toca un perfume para agregarlo.</p></div>` : `
     <div class="cv-cabeza"><h3>Venta #${numeroSiguiente()}</h3><button type="button" class="btn-texto" data-accion="vaciar">Vaciar</button></div>
     <button type="button" class="cliente-btn" data-accion="abrir-cliente">${ico('usuario')}<span>${S.cliente ? `<b>${esc(S.cliente.nombre)}</b><small>${esc([S.cliente.telefono, S.cliente.ciudad].filter(Boolean).join(' · ') || 'Cliente')}${S.cliente.nuevo ? ' · nuevo' : ''}</small>` : '<b>Sin cliente</b><small>Toca para elegir o agregar uno</small>'}</span>${ico('flecha')}</button>
+    ${htmlBeneficios(c)}
     <div class="mayoreo ${c.porMayor ? 'si' : ''}">
       <div class="my-barra"><i style="width:${Math.min(100, (c.unidades / minMayor) * 100)}%"></i></div>
-      <p>${c.porMayor ? `${ico('check')}<b>Precio mayorista</b>${S.forzarMayor && c.unidades < minMayor ? ' (aplicado a mano)' : ''}${c.ahorro > 0 ? ` · ahorra ${fmtCS(c.ahorro)}` : ''}` : `<b>${c.unidades} de ${minMayor}</b> · faltan ${c.faltanMayor} para precio mayorista`}</p>
-      ${c.unidades < minMayor ? `<label class="interruptor"><input type="checkbox" data-accion="forzar-mayor"${S.forzarMayor ? ' checked' : ''}><span></span>Aplicar precio mayorista (racha)</label>` : ''}
+      <p>${c.porRacha ? `${ico('rayo')}<b>Precio mayorista por su racha</b>${c.ahorro > 0 ? ` · ahorra ${fmtCS(c.ahorro)}` : ''}` : c.porMayor ? `${ico('check')}<b>Precio mayorista</b>${S.forzarMayor && c.unidades < minMayor ? ' (aplicado a mano)' : ''}${c.ahorro > 0 ? ` · ahorra ${fmtCS(c.ahorro)}` : ''}` : `<b>${c.unidades} de ${minMayor}</b> · faltan ${c.faltanMayor} para precio mayorista`}</p>
+      ${c.unidades < minMayor && !c.porRacha ? `<label class="interruptor"><input type="checkbox" data-accion="forzar-mayor"${S.forzarMayor ? ' checked' : ''}><span></span>Aplicar precio mayorista a mano</label>` : ''}
     </div>
-    <ul class="lineas">${c.lineas.map(l => `<li class="linea">
+    <ul class="lineas">${c.lineas.map(l => l.canje ? `<li class="linea canje">
+      <span class="l-foto">${foto(l.producto, 80)}</span>
+      <div class="l-info"><b>${esc(titulo(l.producto.nombre))}</b><span class="l-premio">${ico('regalo')}Premio de la tarjeta</span></div>
+      <div class="paso"><button type="button" data-accion="quitar-premio" data-ref="${esc(l.ref)}" aria-label="Quitar el premio">${ico('basura')}</button></div>
+      <b class="l-total oro">Gratis</b>
+    </li>` : `<li class="linea">
       <span class="l-foto">${foto(l.producto, 80)}</span>
       <div class="l-info"><b>${esc(titulo(l.producto.nombre))}</b>
         <button type="button" class="l-precio${l.manual ? ' manual' : ''}${l.mayorista ? ' mayor' : ''}" data-accion="editar-linea" data-ref="${esc(l.ref)}">${fmtCS(l.precio)} c/u${l.descuento ? ` · −${fmtCS(l.descuento)}` : ''}${ico('lapiz')}</button></div>
@@ -242,9 +316,9 @@ function pintarCarrito() {
     </li>`).join('')}</ul>
     <dl class="totales">
       ${c.descuentos ? `<div><dt>Subtotal</dt><dd>${fmtCS(c.subtotal)}</dd></div><div><dt>Descuentos</dt><dd>−${fmtCS(c.descuentos)}</dd></div>` : ''}
-      <div class="t-final"><dt>Total · ${c.unidades} ${c.unidades === 1 ? 'perfume' : 'perfumes'}</dt><dd>${fmtCS(c.total)}<small>${tc ? `≈ ${fmtUSD(c.total / tc)}` : ''}</small></dd></div>
+      <div class="t-final"><dt>Total · ${c.unidades} ${c.unidades === 1 ? 'perfume' : 'perfumes'}${c.regalos ? ` + ${c.regalos} gratis` : ''}</dt><dd>${fmtCS(c.total)}<small>${tc ? `≈ ${fmtUSD(c.total / tc)}` : ''}</small></dd></div>
     </dl>
-    <button type="button" class="btn pri btn-cobrar" data-accion="cobrar">${ico('billete')}Cobrar ${fmtCS(c.total)}</button>`;
+    <button type="button" class="btn pri btn-cobrar" data-accion="cobrar">${c.total > 0 ? `${ico('billete')}Cobrar ${fmtCS(c.total)}` : `${ico('regalo')}Entregar premio`}</button>`;
   for (const el of $$('[data-carrito]')) el.innerHTML = html;
   pintarBarraCobro();
 }
@@ -252,19 +326,19 @@ function pintarCarrito() {
 function pintarBarraCobro() {
   const c = S.estado ? calc() : { unidades: 0 };
   const b = $('.barra-cobro');
-  b.hidden = !S.estado || S.vista !== 'vender' || !c.unidades;
+  b.hidden = !S.estado || S.vista !== 'vender' || !(c.unidades || c.regalos);
   if (b.hidden) return;
-  $('.bc-cant', b).textContent = c.unidades;
+  $('.bc-cant', b).textContent = c.unidades + (c.regalos || 0);
   $('.bc-total', b).textContent = fmtCS(c.total);
-  $('.bc-mayor', b).textContent = c.porMayor ? 'Precio mayorista' : `Faltan ${c.faltanMayor} para mayorista`;
+  $('.bc-mayor', b).textContent = c.porRacha ? 'Precio mayorista (racha)' : c.porMayor ? 'Precio mayorista' : `Faltan ${c.faltanMayor} para mayorista`;
   b.classList.toggle('mayor', c.porMayor);
 }
 
 // editar precio / descuento de una línea
 function abrirLinea(ref) {
-  const it = S.carrito.find(i => i.ref === ref); const p = S.porRef.get(ref);
+  const it = S.carrito.find(i => i.ref === ref && !i.canje); const p = S.porRef.get(ref);
   if (!it || !p) return;
-  const l = calc().lineas.find(x => x.ref === ref);
+  const l = calc().lineas.find(x => x.ref === ref && !x.canje);
   $('.linea-editar').innerHTML = `<form data-form="linea" data-ref="${esc(ref)}" novalidate>
     <p class="le-nombre">${esc(titulo(p.nombre))} · ${l.cantidad} ${l.cantidad === 1 ? 'unidad' : 'unidades'}</p>
     <p class="le-ayuda">Detalle ${fmtCS(p.precio)} · Mayorista ${p.mayor ? fmtCS(p.mayor) : '—'}</p>
@@ -282,7 +356,11 @@ function pintarClientes(q = '') {
   const lista = (S.estado.clientes || []).filter(c => !q || norm(`${c.nombre} ${c.telefono}`).includes(norm(q)))
     .sort((a, b) => b.compras - a.compras || a.nombre.localeCompare(b.nombre)).slice(0, 40);
   $('.cl-lista').innerHTML = `<li><button type="button" class="cl-op" data-accion="elegir-cliente" data-i="-1">${ico('bolsa')}<span><b>Sin cliente</b><small>Venta de mostrador</small></span></button></li>`
-    + lista.map(c => `<li><button type="button" class="cl-op${S.cliente?.nombre === c.nombre ? ' sel' : ''}" data-accion="elegir-cliente" data-nombre="${esc(c.nombre)}">${ico('usuario')}<span><b>${esc(c.nombre)}</b><small>${esc([c.telefono, c.ciudad, c.compras ? `${c.compras} ${c.compras === 1 ? 'compra' : 'compras'}` : '', c.nota].filter(Boolean).join(' · '))}</small></span></button></li>`).join('')
+    + lista.map(c => {
+      const i = infoCliente(c.nombre);
+      const marcas = [i?.racha?.activa ? `<span class="cl-marca racha">${ico('rayo')}Racha</span>` : '', i?.tarjeta?.premios ? `<span class="cl-marca premio">${ico('regalo')}Premio</span>` : i?.tarjeta?.sellos ? `<span class="cl-marca">${ico('estrella')}${i.tarjeta.enTarjeta}/${TARJETA.meta}</span>` : ''].join('');
+      return `<li><button type="button" class="cl-op${S.cliente?.nombre === c.nombre ? ' sel' : ''}" data-accion="elegir-cliente" data-nombre="${esc(c.nombre)}">${ico('usuario')}<span><b>${esc(c.nombre)}</b><small>${esc([c.telefono, c.ciudad, c.compras ? `${c.compras} ${c.compras === 1 ? 'compra' : 'compras'}` : '', c.nota].filter(Boolean).join(' · '))}</small></span>${marcas ? `<span class="cl-marcas">${marcas}</span>` : ''}</button></li>`;
+    }).join('')
     + (q && !lista.length ? `<li class="vacio">No hay clientes con “${esc(q)}”.</li>` : '');
 }
 function abrirCliente() {
@@ -309,6 +387,12 @@ function pintarCobro() {
   const { metodo, banco, recibido } = S.cobro;
   const v = metodo === 'Efectivo' ? vuelto(c.total, recibido) : 0;
   const tc = S.estado.config.tipoCambio;
+  if (c.total <= 0) {
+    $('.cobro').innerHTML = `<div class="cb-total premio"><small>Premio de la tarjeta de fidelidad</small><b>Gratis</b><span>${esc(S.cliente?.nombre || '')} canjea 10 sellos por ${plural(c.regalos, 'perfume', 'perfumes')}.</span></div>
+      <p class="nota-banco">${ico('check')}Se anota en tu hoja a C$0 (sale del stock y la tarjeta vuelve a empezar).</p>`;
+    $('.cobro-pie').innerHTML = `<button type="button" class="btn pri" data-accion="confirmar-venta">${ico('regalo')}Entregar premio</button>`;
+    return;
+  }
   $('.cobro').innerHTML = `
     <div class="cb-total"><small>Total a cobrar</small><b>${fmtCS(c.total)}</b><span>${tc ? `≈ ${fmtUSD(c.total / tc)} · ` : ''}${c.unidades} ${c.unidades === 1 ? 'perfume' : 'perfumes'}${c.porMayor ? ' · precio mayorista' : ''}</span></div>
     <p class="cb-sub">¿Cómo pagó?</p>
@@ -326,8 +410,9 @@ function pintarCobro() {
   $('.cobro-pie').innerHTML = `<button type="button" class="btn pri" data-accion="confirmar-venta" ${listo ? '' : 'aria-disabled="true"'}>${ico('check')}Confirmar venta</button>`;
 }
 function abrirCobro() {
-  if (!calc().lineas.length) return;
-  S.cobro = { metodo: null, banco: null, recibido: '' };
+  const c = calc();
+  if (!c.lineas.length) return;
+  S.cobro = { metodo: c.total > 0 ? null : 'Efectivo', banco: null, recibido: '' };
   pintarCobro();
   cerrar($('#h-carrito'));
   abrir($('#h-cobro'));
@@ -339,8 +424,14 @@ async function confirmarVenta() {
   if (!c.lineas.length || !metodo || vuelto(c.total, recibido) === null) return;
   const id = nuevoId();
   const venta = armarVenta(c, { id, cliente: S.cliente, metodo: metodo === 'Efectivo' ? 'Efectivo' : 'Transferencia', banco, recibido });
+  const antes = S.cliente ? infoCliente(S.cliente.nombre) : null;
   encolar({ id, accion: 'venta', venta });
-  S.ultima = { id, numero: null, estado: 'guardando', calc: c, metodo, banco, recibido, cliente: S.cliente, fecha: S.estado.fecha };
+  const despues = S.cliente ? infoCliente(S.cliente.nombre) : null;   // ya cuenta esta venta (está en la cola)
+  const hora = new Intl.DateTimeFormat('es-NI', { timeZone: 'America/Managua', hour: 'numeric', minute: '2-digit' }).format(new Date());
+  S.ultima = { id, numero: null, estado: 'guardando', calc: c, metodo, banco, recibido, cliente: S.cliente, fecha: fechaCorta(hoy()), hora,
+    beneficios: beneficiosDeVenta(c, antes, despues), tarjeta: despues?.tarjeta || null, racha: despues?.racha || null,
+    ganados: antes && despues ? Math.max(0, despues.tarjeta.sellos - antes.tarjeta.sellos + c.regalos * TARJETA.meta) : 0 };
+  S.recibo = null;
   S.carrito = []; S.cliente = null; S.forzarMayor = false; S.permitidos.clear(); guardarCarrito();
   cerrar($('#h-cobro'));
   pintarListo(); abrir($('#h-listo')); vibrar([10, 40, 20]);
@@ -359,9 +450,11 @@ function pintarListo() {
     <h2 id="t-listo">${fmtCS(u.calc.total)}</h2>
     <p class="ls-estado ${estado[0]}">${esc(estado[1])}</p>
     ${u.metodo === 'Efectivo' && v > 0 ? `<p class="ls-vuelto">Vuelto <b>${fmtCS(v)}</b></p>` : ''}
-    <p class="ls-pago">${u.metodo === 'Efectivo' ? 'Efectivo' : `Transferencia ${esc(u.banco)}`}${u.cliente ? ` · ${esc(u.cliente.nombre)}` : ''}</p>
+    <p class="ls-pago">${u.calc.total <= 0 ? 'Premio de la tarjeta' : u.metodo === 'Efectivo' ? 'Efectivo' : `Transferencia ${esc(u.banco)}`}${u.cliente ? ` · ${esc(u.cliente.nombre)}` : ''}</p>
+    ${u.beneficios?.length ? `<ul class="ls-beneficios">${u.beneficios.map(b => `<li class="${b.tipo}">${ico(b.ico)}<span>${b.texto}</span></li>`).join('')}</ul>` : ''}
     <div class="acciones col">
-      <a class="btn sec" href="https://wa.me/${tel}?text=${encodeURIComponent(texto)}" target="_blank" rel="noopener">${ico('chat')}Enviar recibo por WhatsApp</a>
+      <button class="btn sec" type="button" data-accion="ver-recibo">${ico('imagen')}Recibo con tu logo${u.numero ? '' : u.estado === 'guardando' ? ' (esperando número…)' : ''}</button>
+      <a class="btn sec" href="https://wa.me/${tel}?text=${encodeURIComponent(texto)}" target="_blank" rel="noopener">${ico('chat')}Recibo en texto por WhatsApp</a>
       <button class="btn pri" type="button" data-accion="nueva-venta">Nueva venta</button>
     </div>`;
 }
@@ -378,7 +471,15 @@ function pintarStock() {
     <div class="sr-item"><b>${fmtCS(Math.round(valor))}</b><span>valor al costo</span></div>
     <button type="button" class="sr-item bajo" data-accion="filtro-stock" data-v="bajo"><b>${bajo}</b><span>bajo stock</span></button>
     <button type="button" class="sr-item agotado" data-accion="filtro-stock" data-v="agotado"><b>${agot}</b><span>agotados</span></button>`;
+  const rep = filasReposicion(); const porRef = new Map(rep.map(r => [r.p.ref, r]));
+  const lista0 = porReponer(rep);
+  const agotVenta = lista0.filter(r => r.nivel === 'agotado').length, urg = lista0.filter(r => r.nivel === 'urgente').length;
+  $('.reponer-aviso').innerHTML = lista0.length ? `<button type="button" class="tarjeta reponer-btn" data-accion="abrir-reponer">
+      <span class="rp-ico">${ico('camion')}</span>
+      <span class="rp-txt"><b>${plural(lista0.length, 'perfume por reponer', 'perfumes por reponer')}</b><small>${[agotVenta ? `${agotVenta} ${agotVenta === 1 ? 'agotado que se vende' : 'agotados que se venden'}` : '', urg ? `${urg} se ${urg === 1 ? 'acaba' : 'acaban'} esta semana` : '', ].filter(Boolean).join(' · ') || 'según tus ventas de 30 días'}</small></span>
+      <span class="rp-ir">Ver pedido${ico('flecha')}</span></button>` : (S.estado.historial || []).length ? `<p class="reponer-ok">${ico('check')}Al ritmo de tus ventas, todo tiene stock para más de 2 semanas.</p>` : '';
   const ord = {
+    dura: (a, b) => (porRef.get(a.ref)?.dias ?? 1e9) - (porRef.get(b.ref)?.dias ?? 1e9),
     menos: (a, b) => stockDe(a) - stockDe(b), mas: (a, b) => stockDe(b) - stockDe(a),
     vendidos: (a, b) => b.pedidos30 - a.pedidos30, nombre: (a, b) => a.nombre.localeCompare(b.nombre),
   }[S.ordenStock];
@@ -389,7 +490,8 @@ function pintarStock() {
     return `<li><button type="button" class="st-fila nivel-${nv}" data-accion="ver-producto" data-ref="${esc(p.ref)}">
       <span class="st-foto">${foto(p, 96)}</span>
       <span class="st-texto"><b>${esc(titulo(p.nombre))}</b><small>${esc(titulo(p.marca))} · ${esc(p.pres)}${p.genero ? ` · ${esc(p.genero)}` : ''}</small>
-        <small class="st-precios">${fmtCS(p.precio)}${p.mayor ? ` · mayor ${fmtCS(p.mayor)}` : ''}${p.pedidos30 ? ` · ${p.pedidos30} ${p.pedidos30 === 1 ? 'venta' : 'ventas'} en 30 días` : ''}</small></span>
+        <small class="st-precios">${fmtCS(p.precio)}${p.mayor ? ` · mayor ${fmtCS(p.mayor)}` : ''}${p.pedidos30 ? ` · ${p.pedidos30} ${p.pedidos30 === 1 ? 'venta' : 'ventas'} en 30 días` : ''}</small>
+        ${(() => { const r = porRef.get(p.ref); if (!r) return ''; return r.nivel === 'agotado' ? `<small class="st-dura agotado">Agotado · vendiste ${r.vendidos} en 30 días</small>` : r.nivel === 'urgente' || r.nivel === 'pronto' ? `<small class="st-dura ${r.nivel}">Se acaba ${enDias(r.dias)} a este ritmo</small>` : ''; })()}</span>
       <span class="st-num"><b>${st}</b><small>${nv === 'agotado' ? 'agotado' : nv === 'bajo' ? 'bajo' : 'en stock'}</small></span>
     </button></li>`;
   }).join('') : `<li class="vacio">${S.qStock ? `No encontramos “${esc(S.qStock)}”.` : 'Nada por aquí.'}</li>`;
@@ -416,6 +518,7 @@ function pintarProducto() {
       <div><dt>Costo real</dt><dd>${fmtCS(p.costo)}</dd></div>
       <div><dt>Margen al detalle</dt><dd>${margen === null ? '—' : `${margen}%`}</dd></div>
       <div><dt>Vendidos en 30 días</dt><dd>${p.pedidos30}</dd></div>
+      ${(() => { const r = filasReposicion().find(x => x.p.ref === p.ref); return r && r.ritmo ? `<div><dt>A este ritmo dura</dt><dd>${r.stock ? `~${plural(r.dias, 'día', 'días')}` : 'Agotado'}</dd></div><div><dt>Pedir para 30 días</dt><dd>${r.sugerido || '—'}</dd></div>` : ''; })()}
       <div><dt>Familia · género</dt><dd>${esc([p.familia, p.genero].filter(Boolean).join(' · ') || '—')}</dd></div>
     </dl>
     <div class="ajuste">
@@ -507,6 +610,161 @@ async function operar(op, okTexto) {
   aviso(sigue ? 'Sin señal: quedó guardado en el teléfono y se enviará solo.' : okTexto, sigue ? '' : 'ok');
 }
 
+
+// ---------------------------------------------------------------- PREMIO Y SELLOS
+function abrirPremio() {
+  const ps = S.estado.productos.filter(esPremio).sort((a, b) => (stockDe(b) > 0) - (stockDe(a) > 0) || a.nombre.localeCompare(b.nombre));
+  $('.premio-lista').innerHTML = `<p class="ayuda">${esc(S.cliente?.nombre || '')} completó su tarjeta: elige el Stallion 53 que se lleva. Va a C$0 y se descuentan 10 sellos.</p>
+    ${ps.length ? `<ul class="pm-lista">${ps.map(p => { const st = stockDe(p); return `<li><button type="button" class="st-fila nivel-${nivelStock(st, minimo())}" data-accion="elegir-premio" data-ref="${esc(p.ref)}">
+      <span class="st-foto">${foto(p, 96)}</span><span class="st-texto"><b>${esc(titulo(p.nombre))}</b><small>${esc(titulo(p.marca))} · ${esc(p.pres)}${p.genero ? ` · ${esc(p.genero)}` : ''}</small></span>
+      <span class="st-num"><b>${st}</b><small>${st > 0 ? 'en stock' : 'agotado'}</small></span></button></li>`; }).join('')}</ul>`
+    : '<p class="vacio">No encontré perfumes Stallion 53 en tu Inventario.</p>'}`;
+  abrir($('#h-premio'));
+}
+async function elegirPremio(ref) {
+  const p = S.porRef.get(ref); if (!p) return;
+  if (stockDe(p) <= 0 && !(await confirmar({ titulo: 'Tu hoja dice que no queda', texto: `${esc(titulo(p.nombre))}: si lo tienes en la mano, puedes entregarlo igual.`, si: 'Entregar igual' }))) return;
+  S.carrito.push({ ref, cantidad: 1, canje: true });
+  guardarCarrito(); cerrar($('#h-premio')); pintarVender(); pintarCarrito(); vibrar(10);
+}
+function abrirSellos() {
+  const i = infoCliente(S.cliente?.nombre); if (!i) return;
+  $('.sellos-form').innerHTML = `<form data-form="sellos" novalidate>
+    <p class="le-nombre">${esc(S.cliente.nombre)}</p>
+    <p class="le-ayuda">Según tus ventas lleva <b>${i.tarjeta.sellos}</b> ${i.tarjeta.sellos === 1 ? 'sello' : 'sellos'}. Si tiene una tarjeta de papel con otro número, escríbelo y la app lo corrige (queda anotado en tu hoja Fidelidad).</p>
+    <label class="campo"><span>Sellos que tiene ahora</span><input name="sellos" type="text" inputmode="numeric" value="${i.tarjeta.sellos}" autocomplete="off"></label>
+    <label class="campo"><span>Nota <small>(opcional)</small></span><input name="nota" type="text" maxlength="120" placeholder="Ej.: pasé su tarjeta de papel"></label>
+    <p class="error" hidden role="alert"></p>
+    <button class="btn pri" type="submit">Guardar</button>
+  </form>`;
+  abrir($('#h-sellos'));
+  setTimeout(() => $('.sellos-form input[name="sellos"]')?.select(), 250);
+}
+
+// ---------------------------------------------------------------- REPONER
+function pintarReponer() {
+  const lista = porReponer(filasReposicion());
+  for (const r of lista) if (!S.pedido.has(r.p.ref)) S.pedido.set(r.p.ref, r.sugerido);
+  const tc = S.estado.config.tipoCambio;
+  let unidades = 0, costo = 0;
+  for (const r of lista) { const q = S.pedido.get(r.p.ref) || 0; unidades += q; costo += q * (r.p.costo || 0); }
+  $('.reponer').innerHTML = `<p class="ayuda">Lo que vendiste en los últimos 30 días, para tener stock para 30 días más. Ajusta las cantidades antes de mandarlo.</p>
+    <ul class="rp-lista">${lista.map(r => { const q = S.pedido.get(r.p.ref) || 0; return `<li class="rp-fila ${r.nivel}">
+      <span class="st-foto">${foto(r.p, 80)}</span>
+      <span class="st-texto"><b>${esc(titulo(r.p.nombre))}</b><small>${esc(titulo(r.p.marca))} · ${esc(r.p.pres)}</small>
+        <small class="st-dura ${r.nivel}">${r.nivel === 'agotado' ? 'Agotado' : `Quedan ${r.stock} · se acaba ${enDias(r.dias)}`} · vendiste ${r.vendidos} en 30 días</small></span>
+      <span class="paso"><button type="button" data-accion="rp-menos" data-ref="${esc(r.p.ref)}" aria-label="Uno menos">${ico('menos')}</button><span>${q}</span><button type="button" data-accion="rp-mas" data-ref="${esc(r.p.ref)}" aria-label="Uno más">${ico('mas')}</button></span>
+    </li>`; }).join('')}</ul>
+    <dl class="totales"><div><dt>Perfumes a pedir</dt><dd>${unidades}</dd></div><div class="t-final"><dt>Costo estimado<small>con el costo de tu Inventario</small></dt><dd>${fmtCS(costo)}<small>${tc ? `≈ ${fmtUSD(costo / tc)}` : ''}</small></dd></div></dl>`;
+  $('.reponer-pie').innerHTML = `<button type="button" class="btn sec" data-accion="rp-copiar">${ico('copiar')}Copiar</button><button type="button" class="btn pri" data-accion="rp-wa">${ico('chat')}WhatsApp</button>`;
+}
+function textoPedido() {
+  const filas = porReponer(filasReposicion()).map(r => ({ ...r, sugerido: S.pedido.get(r.p.ref) ?? r.sugerido })).filter(r => r.sugerido > 0);
+  return listaCompra(filas, { fecha: fechaCorta(hoy()), titulo });
+}
+
+// ---------------------------------------------------------------- RECIBO CON LOGO
+async function verRecibo() {
+  const u = S.ultima; if (!u) return;
+  $('.recibo-vista').innerHTML = '<div class="cargando chico"><span class="luna-carga" aria-hidden="true"></span><p>Preparando el recibo…</p></div>';
+  $('.recibo-pie').innerHTML = '';
+  abrir($('#h-recibo'));
+  try {
+    const v = u.metodo === 'Efectivo' ? vuelto(u.calc.total, u.recibido) : null;
+    const cv = await dibujarRecibo({ numero: u.numero, fecha: u.fecha, hora: u.hora, cliente: u.cliente, calc: u.calc, metodo: u.metodo, banco: u.banco, recibido: u.recibido, vuelto: v,
+      tipoCambio: S.estado.config.tipoCambio, tarjeta: u.cliente && u.tarjeta && (u.tarjeta.compras || u.tarjeta.sellos || u.calc.regalos) ? u.tarjeta : null, ganados: u.ganados,
+      racha: u.racha?.activa ? { ...u.racha, venceTexto: fechaCorta(u.racha.vence) } : null,
+      regalias: u.calc.total > 0 && !u.calc.porMayor });
+    const blob = await aBlob(cv);
+    if (S.recibo?.url) URL.revokeObjectURL(S.recibo.url);
+    S.recibo = { blob, url: URL.createObjectURL(blob), nombre: `Recibo-MNScents-${u.numero || 'pendiente'}.png` };
+    $('.recibo-vista').innerHTML = `<img class="recibo-img" src="${S.recibo.url}" alt="Recibo de la venta ${u.numero ? `#${u.numero}` : ''} con el logo de MN Scents">
+      ${u.numero ? '' : '<p class="ayuda">La venta todavía no tiene número (se está guardando). Si esperas un momento y vuelves a abrir el recibo, sale con su número.</p>'}`;
+    const puede = !!navigator.canShare?.({ files: [new File([blob], S.recibo.nombre, { type: 'image/png' })] });
+    $('.recibo-pie').innerHTML = `<button type="button" class="btn sec" data-accion="descargar-recibo">${ico('descargar')}Descargar</button>${puede ? `<button type="button" class="btn pri" data-accion="compartir-recibo">${ico('compartir')}Compartir</button>` : ''}`;
+  } catch (e) {
+    $('.recibo-vista').innerHTML = `<p class="error">No se pudo preparar la imagen (${esc(e.message)}). Puedes mandar el recibo en texto por WhatsApp.</p>`;
+  }
+}
+
+// ---------------------------------------------------------------- REPORTES
+const pct = x => `${Math.round(x * 100)}%`;
+function chipCambio(x, invertir = false) {
+  if (x === null || x === undefined) return '<span class="cambio sin">sin datos antes</span>';
+  const r = Math.round(x * 100);
+  if (r === 0) return '<span class="cambio igual">= igual</span>';
+  const sube = r > 0;
+  return `<span class="cambio ${sube !== invertir ? 'bien' : 'mal'}">${sube ? '▲' : '▼'} ${Math.abs(r)}%</span>`;
+}
+function barrasH(filas, { valor, etiqueta, texto }) {
+  const max = Math.max(...filas.map(valor), 0) || 1;
+  return `<ul class="hbarras">${filas.map(f => `<li><span class="hb-nombre">${etiqueta(f)}</span><span class="hb-pista"><i style="width:${Math.max(2, (valor(f) / max) * 100)}%"></i></span><b class="hb-valor">${texto(f)}</b></li>`).join('')}</ul>`;
+}
+function grafica(serie, porMes) {
+  const max = Math.max(...serie.map(x => x.ventas), 0);
+  if (!max) return '<p class="vacio">Sin ventas en este período.</p>';
+  const cada = serie.length > 16 ? Math.ceil(serie.length / 8) : 1;
+  const hoyD = hoy();
+  return `<div class="grafica" role="img" aria-label="Ventas por ${porMes ? 'mes' : 'día'}; la más alta ${fmtCS(max)}">
+    <span class="gf-max">${fmtCS(max)}</span>
+    <div class="gf-barras" style="--n:${serie.length}">${serie.map((x, i) => `<button type="button" class="gf-barra${x.dia === hoyD ? ' hoy' : ''}" data-tip="${esc(`${porMes ? MESES[i] : `${x.etiqueta}`} · ${fmtCS(x.ventas)} vendido · ${fmtCS(x.ganancia)} ganancia`)}" aria-label="${esc(`${porMes ? MESES[i] : x.etiqueta}: ${fmtCS(x.ventas)}`)}"><i style="height:${x.ventas ? Math.max(2, (x.ventas / max) * 100) : 0}%"></i></button>`).join('')}</div>
+    <div class="gf-ejes" style="--n:${serie.length}">${serie.map((x, i) => `<span>${(i % cada === 0 && serie.length - 1 - i >= cada / 2) || i === serie.length - 1 ? esc(porMes ? x.etiqueta : x.corta) : ''}</span>`).join('')}</div>
+    <p class="gf-tip" aria-live="polite">Toca una barra para ver el detalle.</p>
+  </div>`;
+}
+function pintarReportes() {
+  const el = $('.reportes'); if (!el || !S.estado) return;
+  const ventas = ventasTodas();
+  const h = hoy();
+  const per = periodo(S.periodo, h);
+  const r = reporte(ventas, per);
+  const meta = metaDelMes(ventas, h, S.estado.config);
+  const f = fechaDeDia(h);
+  const a = r.actual;
+  const sinHistorial = !(S.estado.historial || []).length;
+  const kpi = (titulo2, valor, cambio, extra = '') => `<div class="kpi"><span>${titulo2}</span><b>${valor}</b>${cambio}${extra}</div>`;
+  const totTipo = r.tipos.Detalle.ventas + r.tipos.Mayorista.ventas;
+  el.innerHTML = `
+    <div class="rp-cabeza"><h1>Reportes</h1><p>${esc(per.nombre)} · comparado con ${esc(per.comparado)}</p></div>
+    <div class="chips periodos" role="group" aria-label="Período">${PERIODOS.map(([k, t]) => `<button type="button" class="chip" data-accion="periodo" data-v="${k}" aria-pressed="${S.periodo === k}">${t}</button>`).join('')}</div>
+    ${sinHistorial ? '<div class="tarjeta pendiente">' + ico('aviso') + '<p>Tu hoja todavía no manda el historial de ventas. Actualiza el script del punto de venta para ver los reportes.</p></div>' : ''}
+    ${meta.metaVentas > 0 ? `<section class="tarjeta meta">
+      <p class="ec-titulo">Meta de ${MESES[f.m - 1]} <small>· día ${meta.dia} de ${meta.diasMes}</small></p>
+      <div class="mt-fila"><span>Ventas</span><b>${fmtCS(meta.ventas)}</b><small>de ${fmtCS(meta.metaVentas)}</small></div>
+      <div class="mt-barra"><i style="width:${Math.min(100, meta.avanceVentas * 100)}%"></i><em style="left:${Math.min(100, (meta.dia / meta.diasMes) * 100)}%" title="Hoy"></em></div>
+      <p class="mt-nota">${meta.avanceVentas >= 1 ? `${ico('check')}<b>¡Meta cumplida!</b> Vas en ${pct(meta.avanceVentas)}.` : `Vas en <b>${pct(meta.avanceVentas)}</b>.${meta.dia >= 5 ? ` A este ritmo cierras el mes en <b>${fmtCS(meta.proyVentas)}</b>${meta.proyVentas >= meta.metaVentas ? ' y la cumples' : ''}.` : ''}${meta.porDiaParaMeta ? ` Para llegar necesitas <b>${fmtCS(meta.porDiaParaMeta)}</b> por día los ${meta.quedan} días que quedan.` : ''}`}</p>
+      ${meta.metaGanancia > 0 ? `<div class="mt-fila"><span>Ganancia</span><b>${fmtCS(meta.ganancia)}</b><small>de ${fmtCS(meta.metaGanancia)}</small></div>
+      <div class="mt-barra oro"><i style="width:${Math.min(100, meta.avanceGanancia * 100)}%"></i><em style="left:${Math.min(100, (meta.dia / meta.diasMes) * 100)}%"></em></div>
+      <p class="mt-nota">${meta.avanceGanancia >= 1 ? `${ico('check')}<b>¡Meta de ganancia cumplida!</b>` : `Vas en <b>${pct(meta.avanceGanancia)}</b>${meta.dia >= 5 ? ` · a este ritmo cierras en ${fmtCS(meta.proyGanancia)}` : ''}.`}</p>` : ''}
+    </section>` : ''}
+    <div class="kpis">
+      ${kpi('Vendido', fmtCS(a.ventas), chipCambio(r.cambios.ventas))}
+      ${kpi('Ganancia', fmtCS(a.ganancia), chipCambio(r.cambios.ganancia))}
+      ${kpi('Ventas', a.numero, chipCambio(r.cambios.numero))}
+      ${kpi('Ticket promedio', fmtCS(Math.round(a.ticket)), chipCambio(r.cambios.ticket))}
+      ${kpi('Perfumes', a.unidades, chipCambio(r.cambios.unidades), a.canjes ? `<small class="kpi-extra">+ ${a.canjes} de premio</small>` : '')}
+      ${kpi('Margen', a.ventas ? pct(a.margen) : '—', `<span class="cambio sin">${r.anterior.ventas ? `antes ${pct(r.anterior.margen)}` : 'ganancia ÷ ventas'}</span>`)}
+    </div>
+    <section class="tarjeta"><p class="ec-titulo">Ventas por ${per.porMes ? 'mes' : 'día'}</p>${grafica(r.serie, per.porMes)}</section>
+    <div class="rp-dos">
+      <section class="tarjeta"><p class="ec-titulo">Más vendidos <small>(unidades)</small></p>${r.masVendidos.length ? barrasH(r.masVendidos, { valor: x => x.unidades, etiqueta: x => esc(titulo(x.p?.nombre || x.cod)), texto: x => x.unidades }) : '<p class="vacio">Sin ventas.</p>'}</section>
+      <section class="tarjeta"><p class="ec-titulo">Los que más ganancia dejan</p>${r.masGanancia.length ? barrasH(r.masGanancia, { valor: x => Math.max(0, x.ganancia), etiqueta: x => esc(titulo(x.p?.nombre || x.cod)), texto: x => fmtCS(x.ganancia) }) : '<p class="vacio">Sin ventas.</p>'}</section>
+    </div>
+    <div class="rp-dos">
+      <section class="tarjeta"><p class="ec-titulo">Cómo te pagan</p>${r.metodos.length ? barrasH(r.metodos, { valor: x => x[1], etiqueta: x => esc(x[0]), texto: x => fmtCS(x[1]) }) : '<p class="vacio">Sin ventas.</p>'}</section>
+      <section class="tarjeta"><p class="ec-titulo">Detalle y mayorista</p>
+        ${totTipo ? `<div class="split" role="img" aria-label="Detalle ${fmtCS(r.tipos.Detalle.ventas)}, mayorista ${fmtCS(r.tipos.Mayorista.ventas)}">${r.tipos.Detalle.ventas ? `<i class="det" style="flex:${r.tipos.Detalle.ventas}"></i>` : ''}${r.tipos.Mayorista.ventas ? `<i class="may" style="flex:${r.tipos.Mayorista.ventas}"></i>` : ''}</div>
+        <ul class="leyenda"><li><i class="det"></i><span>Detalle</span><b>${fmtCS(r.tipos.Detalle.ventas)}</b><small>${pct(r.tipos.Detalle.ventas / totTipo)} · ${plural(r.tipos.Detalle.numero, 'venta', 'ventas')}</small></li>
+          <li><i class="may"></i><span>Mayorista</span><b>${fmtCS(r.tipos.Mayorista.ventas)}</b><small>${pct(r.tipos.Mayorista.ventas / totTipo)} · ${plural(r.tipos.Mayorista.numero, 'venta', 'ventas')} · ${r.tipos.Mayorista.unidades} perfumes</small></li></ul>` : '<p class="vacio">Sin ventas.</p>'}
+      </section>
+    </div>
+    <div class="rp-dos">
+      <section class="tarjeta"><p class="ec-titulo">Tus días más fuertes <small>(promedio vendido por día)</small></p>${a.ventas ? barrasH(r.semana.filter(x => x.dias), { valor: x => x.promedio, etiqueta: x => x.nombre, texto: x => fmtCS(x.promedio) }) : '<p class="vacio">Sin ventas.</p>'}</section>
+      <section class="tarjeta"><p class="ec-titulo">Clientes <small>· ${plural(r.clientesTotal, 'cliente con nombre', 'clientes con nombre')}${r.clientesNuevos ? ` · ${plural(r.clientesNuevos, 'nuevo', 'nuevos')}` : ''}</small></p>${r.clientes.length ? barrasH(r.clientes, { valor: x => x.ventas, etiqueta: x => esc(x.nombre), texto: x => fmtCS(x.ventas) }) : '<p class="vacio">Ninguna venta con cliente anotado.</p>'}</section>
+    </div>
+    <p class="rp-pie">Todo sale de tu hoja Ventas (también lo que anotas a mano). Las ventas sin "Tipo de venta" se clasifican por su precio.</p>`;
+}
+
 // ---------------------------------------------------------------- eventos
 document.addEventListener('click', async e => {
   const b = e.target.closest('[data-accion]');
@@ -520,12 +778,26 @@ document.addEventListener('click', async e => {
     case 'abrir-carrito': if (matchMedia('(min-width: 1000px)').matches) $('.panel-carrito').scrollIntoView({ behavior: 'smooth' }); else abrir($('#h-carrito')); break;
     case 'cobrar': abrirCobro(); break;
     case 'editar-linea': abrirLinea(ref); break;
-    case 'precio-auto': { const it = S.carrito.find(i => i.ref === ref); if (it) { delete it.precio; delete it.descuento; } guardarCarrito(); pintarCarrito(); cerrar($('#h-linea')); break; }
-    case 'quitar-linea': S.carrito = S.carrito.filter(i => i.ref !== ref); guardarCarrito(); pintarVender(); pintarCarrito(); cerrar($('#h-linea')); break;
+    case 'precio-auto': { const it = S.carrito.find(i => i.ref === ref && !i.canje); if (it) { delete it.precio; delete it.descuento; } guardarCarrito(); pintarCarrito(); cerrar($('#h-linea')); break; }
+    case 'quitar-linea': S.carrito = S.carrito.filter(i => i.ref !== ref || i.canje); guardarCarrito(); pintarVender(); pintarCarrito(); cerrar($('#h-linea')); break;
     case 'abrir-cliente': abrirCliente(); break;
+    case 'abrir-premio': abrirPremio(); break;
+    case 'elegir-premio': elegirPremio(ref); break;
+    case 'quitar-premio': { const k = S.carrito.findIndex(i => i.ref === ref && i.canje); if (k >= 0) S.carrito.splice(k, 1); guardarCarrito(); pintarVender(); pintarCarrito(); break; }
+    case 'ajustar-sellos': abrirSellos(); break;
+    case 'abrir-reponer': S.pedido.clear(); pintarReponer(); abrir($('#h-reponer')); break;
+    case 'rp-menos': case 'rp-mas': { const q = Math.max(0, (S.pedido.get(ref) || 0) + (b.dataset.accion === 'rp-mas' ? 1 : -1)); S.pedido.set(ref, q); pintarReponer(); break; }
+    case 'rp-copiar': try { await navigator.clipboard.writeText(textoPedido()); aviso('Lista copiada. Pégala en el chat con tu proveedor.', 'ok'); } catch { aviso('No se pudo copiar en este navegador.', 'error'); } break;
+    case 'rp-wa': window.open(`https://wa.me/?text=${encodeURIComponent(textoPedido())}`, '_blank', 'noopener'); break;
+    case 'ver-recibo': verRecibo(); break;
+    case 'descargar-recibo': if (S.recibo) { descargar(S.recibo.blob, S.recibo.nombre); aviso('Recibo descargado. Adjúntalo en WhatsApp.', 'ok'); } break;
+    case 'compartir-recibo': if (S.recibo) { const r = await compartirRecibo(S.recibo.blob, S.recibo.nombre, `Recibo de MN Scents${S.ultima?.numero ? ` · venta #${S.ultima.numero}` : ''}`); if (r === 'descargado') aviso('Recibo descargado. Adjúntalo en WhatsApp.', 'ok'); } break;
+    case 'periodo': S.periodo = b.dataset.v; guardarLS('mnpos-periodo-v1', S.periodo); pintarReportes(); break;
     case 'elegir-cliente': {
+      const antes = S.cliente?.nombre;
       S.cliente = b.dataset.i === '-1' ? null : (() => { const c = S.estado.clientes.find(x => x.nombre === b.dataset.nombre); return c ? { nombre: c.nombre, telefono: c.telefono, ciudad: c.ciudad } : null; })();
-      guardarCarrito(); pintarCarrito(); cerrar($('#h-cliente')); break;
+      if (S.cliente?.nombre !== antes) S.carrito = S.carrito.filter(i => !i.canje);   // el premio es de quien completó la tarjeta
+      guardarCarrito(); pintarVender(); pintarCarrito(); cerrar($('#h-cliente')); break;
     }
     case 'metodo': S.cobro.metodo = b.dataset.m; S.cobro.banco = b.dataset.b || null; pintarCobro(); if (b.dataset.m === 'Efectivo') setTimeout(() => $('[data-campo="recibido"]')?.focus(), 50); break;
     case 'recibido': S.cobro.recibido = b.dataset.m; pintarCobro(); break;
@@ -562,6 +834,12 @@ document.addEventListener('click', async e => {
       break;
   }
 });
+
+// detalle de la barra de la gráfica al tocarla o pasar el mouse
+const tipBarra = e => { const b = e.target.closest?.('.gf-barra'); if (!b) return; const t = b.closest('.grafica').querySelector('.gf-tip'); t.textContent = b.dataset.tip; for (const x of $$('.gf-barra.activa')) x.classList.remove('activa'); b.classList.add('activa'); };
+document.addEventListener('pointerover', tipBarra);
+document.addEventListener('focusin', tipBarra);
+document.addEventListener('click', tipBarra);
 
 document.addEventListener('change', e => {
   const t = e.target;
@@ -616,7 +894,20 @@ document.addEventListener('submit', async e => {
       if (nombre.length < 2) return err('Escribe el nombre del cliente.');
       const existe = S.estado.clientes.find(c => norm(c.nombre) === norm(nombre));
       S.cliente = existe ? { nombre: existe.nombre, telefono: existe.telefono, ciudad: existe.ciudad } : { nombre, telefono: f.telefono.value.trim(), ciudad: f.ciudad.value, nuevo: true };
+      S.carrito = S.carrito.filter(i => !i.canje);
       guardarCarrito(); pintarCarrito(); cerrar($('#h-cliente')); break;
+    }
+    case 'sellos': {
+      const i = infoCliente(S.cliente?.nombre); if (!i) return;
+      const n = Math.round(Number(String(f.sellos.value).replace(/[^\d]/g, '')));
+      if (!Number.isFinite(n) || f.sellos.value.trim() === '' || n > 60) return err('Escribe cuántos sellos tiene (0 a 60).');
+      const delta = n - i.tarjeta.sellos;
+      cerrar($('#h-sellos'));
+      if (!delta) break;
+      const id = nuevoId();
+      await operar({ id, accion: 'sellos', sellos: { id, cliente: S.cliente.nombre, sellos: delta, nota: f.nota.value.trim() || 'Ajuste desde el punto de venta' } }, `Tarjeta de ${S.cliente.nombre}: ${n} ${n === 1 ? 'sello' : 'sellos'}.`);
+      pintarCarrito();
+      break;
     }
     case 'apertura': {
       const m = leerMonto(f.monto.value);

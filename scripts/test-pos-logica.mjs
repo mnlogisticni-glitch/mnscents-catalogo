@@ -55,7 +55,15 @@ prueba('La venta para la hoja lleva método y banco correctos', () => {
   assert.deepEqual(v1.pago, { metodo: 'Efectivo', banco: '', recibido: 2000 });
   const v2 = armarVenta(c, { id: 'y', metodo: 'Transferencia', banco: 'Lafise', cliente: { nombre: 'Ana', nuevo: true } });
   assert.deepEqual(v2.pago, { metodo: 'Transferencia bancaria', banco: 'Lafise', recibido: 0 });
-  assert.equal(v2.cliente.nuevo, true); assert.deepEqual(v2.lineas, [{ ref: 'A', cantidad: 1, precio: 1460, descuento: 0 }]);
+  assert.equal(v2.cliente.nuevo, true); assert.deepEqual(v2.lineas, [{ ref: 'A', cantidad: 1, precio: 1460, descuento: 0, tipo: 'Detalle' }]);
+});
+prueba('Premio de la tarjeta: va a C$0, no cuenta para mayoreo y se manda como canje', () => {
+  const c = calcularVenta([{ ref: 'A', cantidad: 5 }, { ref: 'B', cantidad: 1, canje: true }], M);
+  assert.equal(c.unidades, 5); assert.equal(c.regalos, 1); assert.equal(c.porMayor, false); assert.equal(c.total, 5 * 1460);
+  const v = armarVenta(c, { id: 'z', metodo: 'Efectivo' });
+  assert.deepEqual(v.lineas[1], { ref: 'B', cantidad: 1, precio: 0, descuento: 0, canje: true, tipo: 'Canje' });
+  assert.equal(calcularVenta([{ ref: 'A', cantidad: 6 }], M).lineas[0].tipo, 'Mayorista');
+  assert.match(recibo({ numero: 3, fecha: 'x', calc: c, metodo: 'Efectivo' }), /premio de tu tarjeta/);
 });
 prueba('Recibo para WhatsApp', () => {
   const c = calcularVenta([{ ref: 'A', cantidad: 2 }], M);

@@ -41,6 +41,15 @@
   <symbol id="i-candado" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/><circle cx="12" cy="15.5" r="1.3"/></symbol>
   <symbol id="i-ajustar" viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></symbol>
   <symbol id="i-deshacer" viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/></symbol>
+  <symbol id="i-grafica" viewBox="0 0 24 24"><path d="M4 20h16"/><path d="M7 16v-4M12 16V7M17 16v-7"/></symbol>
+  <symbol id="i-estrella" viewBox="0 0 24 24"><path d="m12 4 2.4 4.9 5.4.8-3.9 3.8.9 5.4L12 16.4l-4.8 2.5.9-5.4-3.9-3.8 5.4-.8Z"/></symbol>
+  <symbol id="i-regalo" viewBox="0 0 24 24"><rect x="4" y="9" width="16" height="11" rx="1.5"/><path d="M3 9h18M12 9v11"/><path d="M12 9c-1.5-3.5-5.5-4-5.5-1.5S10 9 12 9c2 0 5.5-.5 5.5-1.5S13.5 5.5 12 9Z"/></symbol>
+  <symbol id="i-rayo" viewBox="0 0 24 24"><path d="M13 3 5 13.5h6l-1 7.5 8-10.5h-6Z"/></symbol>
+  <symbol id="i-camion" viewBox="0 0 24 24"><path d="M3 6h11v10H3zM14 9.5h4l3 3.5v3h-7"/><circle cx="7" cy="17.5" r="1.8"/><circle cx="17" cy="17.5" r="1.8"/></symbol>
+  <symbol id="i-copiar" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3"/></symbol>
+  <symbol id="i-imagen" viewBox="0 0 24 24"><rect x="3.5" y="4.5" width="17" height="15" rx="2"/><circle cx="9" cy="10" r="1.8"/><path d="m4 18 5-5 3.5 3.5L15 14l5 4.5"/></symbol>
+  <symbol id="i-descargar" viewBox="0 0 24 24"><path d="M12 4v11M7 10.5 12 15.5l5-5"/><path d="M5 20h14"/></symbol>
+  <symbol id="i-compartir" viewBox="0 0 24 24"><circle cx="18" cy="5.5" r="2.5"/><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="18.5" r="2.5"/><path d="m8.2 10.8 7.6-4M8.2 13.2l7.6 4"/></symbol>
 </svg>
 
 <header class="cab">
@@ -56,6 +65,7 @@
   <a href="#vender" data-vista="vender" aria-current="page"><svg class="ico" aria-hidden="true"><use href="#i-bolsa"/></svg><span>Vender</span></a>
   <a href="#stock" data-vista="stock"><svg class="ico" aria-hidden="true"><use href="#i-frasco"/></svg><span>Stock</span><i class="nav-num" hidden></i></a>
   <a href="#caja" data-vista="caja"><svg class="ico" aria-hidden="true"><use href="#i-caja"/></svg><span>Caja</span><i class="nav-punto" hidden></i></a>
+  <a href="#reportes" data-vista="reportes"><svg class="ico" aria-hidden="true"><use href="#i-grafica"/></svg><span>Reportes</span></a>
 </nav>
 
 <main>
@@ -99,6 +109,7 @@
 
   <section class="pantalla" id="v-stock" hidden aria-label="Stock">
     <div class="stock-resumen"></div>
+    <div class="reponer-aviso"></div>
     <div class="herramientas">
       <label class="buscar"><svg class="ico" aria-hidden="true"><use href="#i-buscar"/></svg><span class="sr">Buscar perfume</span>
         <input id="q-stock" type="search" placeholder="Buscar perfume, marca o código" autocomplete="off" autocapitalize="none" spellcheck="false" enterkeyhint="search">
@@ -111,6 +122,10 @@
 
   <section class="pantalla" id="v-caja" hidden aria-label="Caja">
     <div class="caja"></div>
+  </section>
+
+  <section class="pantalla" id="v-reportes" hidden aria-label="Reportes">
+    <div class="reportes"></div>
   </section>
 </main>
 
@@ -155,6 +170,28 @@
 <dialog id="h-caja" class="hoja hoja-chica" aria-labelledby="t-hcaja">
   <div class="hoja-cabeza"><h2 id="t-hcaja">Caja</h2><button class="btn-ico cerrar" type="button" aria-label="Cerrar"><svg class="ico"><use href="#i-cerrar"/></svg></button></div>
   <div class="hoja-cuerpo caja-form"></div>
+</dialog>
+
+<dialog id="h-premio" class="hoja" aria-labelledby="t-premio">
+  <div class="hoja-cabeza"><h2 id="t-premio">Perfume gratis de la tarjeta</h2><button class="btn-ico cerrar" type="button" aria-label="Cerrar"><svg class="ico"><use href="#i-cerrar"/></svg></button></div>
+  <div class="hoja-cuerpo premio-lista"></div>
+</dialog>
+
+<dialog id="h-sellos" class="hoja hoja-chica" aria-labelledby="t-sellos">
+  <div class="hoja-cabeza"><h2 id="t-sellos">Sellos de la tarjeta</h2><button class="btn-ico cerrar" type="button" aria-label="Cerrar"><svg class="ico"><use href="#i-cerrar"/></svg></button></div>
+  <div class="hoja-cuerpo sellos-form"></div>
+</dialog>
+
+<dialog id="h-reponer" class="hoja" aria-labelledby="t-reponer">
+  <div class="hoja-cabeza"><h2 id="t-reponer">Pedido sugerido</h2><button class="btn-ico cerrar" type="button" aria-label="Cerrar"><svg class="ico"><use href="#i-cerrar"/></svg></button></div>
+  <div class="hoja-cuerpo reponer"></div>
+  <div class="hoja-pie reponer-pie"></div>
+</dialog>
+
+<dialog id="h-recibo" class="hoja" aria-labelledby="t-recibo">
+  <div class="hoja-cabeza"><h2 id="t-recibo">Recibo</h2><button class="btn-ico cerrar" type="button" aria-label="Cerrar"><svg class="ico"><use href="#i-cerrar"/></svg></button></div>
+  <div class="hoja-cuerpo recibo-vista"></div>
+  <div class="hoja-pie recibo-pie"></div>
 </dialog>
 
 <dialog id="h-confirmar" class="hoja hoja-chica" aria-labelledby="t-confirmar">

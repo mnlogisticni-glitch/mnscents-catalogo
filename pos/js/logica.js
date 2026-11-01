@@ -32,7 +32,7 @@ export function coincide(p, q) {
 
 /**
  * Calcula la venta.
- * carrito: [{ref, cantidad, precio?(manual), descuento?}]
+ * carrito: [{ref, cantidad, precio?(manual), descuento?, canje?}]  (canje = perfume gratis de la tarjeta: va a C$0 y no cuenta para mayoreo)
  * productos: Map ref → producto {precio, mayor, ...}
  * opciones: { minimoMayor, forzarMayor }
  * Si la venta llega al mínimo (o se fuerza, p. ej. por racha), cada perfume va a su precio mayorista.
@@ -41,27 +41,29 @@ export function coincide(p, q) {
 export function calcularVenta(carrito, productos, { minimoMayor = 6, forzarMayor = false } = {}) {
   const lineas = [];
   let unidades = 0;
+  let regalos = 0;
   for (const it of carrito) {
     const p = productos.get(it.ref);
     if (!p) continue;
-    const cantidad = Math.max(1, Math.round(Number(it.cantidad) || 1));
-    unidades += cantidad;
+    const cantidad = it.canje ? 1 : Math.max(1, Math.round(Number(it.cantidad) || 1));
+    if (it.canje) regalos += cantidad; else unidades += cantidad;
     lineas.push({ it, p, cantidad });
   }
   const porMayor = forzarMayor || (minimoMayor > 0 && unidades >= minimoMayor);
   let subtotal = 0, descuentos = 0, detalleTotal = 0;
   const out = lineas.map(({ it, p, cantidad }) => {
+    if (it.canje) return { ref: p.ref, producto: p, cantidad, precio: 0, manual: false, descuento: 0, total: 0, mayorista: false, canje: true, tipo: 'Canje' };
     const auto = porMayor && p.mayor > 0 ? p.mayor : p.precio;
     const manual = Number(it.precio) > 0 ? redondear(it.precio) : null;
     const precio = manual ?? auto;
     const descuento = Math.min(redondear(it.descuento), cantidad * precio);
     const total = redondear(cantidad * precio - descuento);
     subtotal += cantidad * precio; descuentos += descuento; detalleTotal += cantidad * p.precio;
-    return { ref: p.ref, producto: p, cantidad, precio, manual: manual !== null, descuento, total, mayorista: !manual && porMayor && p.mayor > 0 };
+    return { ref: p.ref, producto: p, cantidad, precio, manual: manual !== null, descuento, total, mayorista: !manual && porMayor && p.mayor > 0, canje: false, tipo: porMayor ? 'Mayorista' : 'Detalle' };
   });
   const total = redondear(subtotal - descuentos);
   return {
-    lineas: out, unidades, porMayor, faltanMayor: porMayor ? 0 : Math.max(0, minimoMayor - unidades),
+    lineas: out, unidades, regalos, porMayor, faltanMayor: porMayor ? 0 : Math.max(0, minimoMayor - unidades),
     subtotal: redondear(subtotal), descuentos: redondear(descuentos), total,
     ahorro: redondear(detalleTotal - subtotal + descuentos),
   };
@@ -96,7 +98,7 @@ export function armarVenta(calc, { id, cliente, metodo, banco, recibido }) {
   return {
     id,
     cliente: cliente ? { nombre: cliente.nombre, telefono: cliente.telefono || '', ciudad: cliente.ciudad || '', nuevo: !!cliente.nuevo } : null,
-    lineas: calc.lineas.map(l => ({ ref: l.ref, cantidad: l.cantidad, precio: l.precio, descuento: l.descuento || 0 })),
+    lineas: calc.lineas.map(l => (l.canje ? { ref: l.ref, cantidad: 1, precio: 0, descuento: 0, canje: true, tipo: 'Canje' } : { ref: l.ref, cantidad: l.cantidad, precio: l.precio, descuento: l.descuento || 0, tipo: l.tipo })),
     pago: { metodo: metodo === 'Efectivo' ? 'Efectivo' : 'Transferencia bancaria', banco: metodo === 'Efectivo' ? '' : banco, recibido: Number(recibido) || 0 },
   };
 }
@@ -112,7 +114,7 @@ export function telWa(t) {
 export function recibo({ numero, fecha, calc, metodo, banco, recibido, cliente }) {
   const L = [`*MN Scents* · Recibo${numero ? ` de venta #${numero}` : ''}`, fecha, ''];
   if (cliente?.nombre) L.push(`Cliente: ${cliente.nombre}`, '');
-  for (const l of calc.lineas) L.push(`${l.cantidad} × ${titulo(l.producto.nombre)} — ${fmtCS(l.total)}`);
+  for (const l of calc.lineas) L.push(l.canje ? `🎁 1 × ${titulo(l.producto.nombre)} — premio de tu tarjeta (gratis)` : `${l.cantidad} × ${titulo(l.producto.nombre)} — ${fmtCS(l.total)}`);
   L.push('', `*Total: ${fmtCS(calc.total)}*`);
   L.push(`Pago: ${metodo === 'Efectivo' ? 'Efectivo' : `Transferencia ${banco}`}`);
   const v = metodo === 'Efectivo' ? vuelto(calc.total, recibido) : 0;
