@@ -1,6 +1,6 @@
 // MN Scents — Punto de venta (Android y PC). Trabaja directo con la hoja MNScents_claude.
 import { BANCOS, fmtCS, fmtUSD, redondear, titulo, nivelStock, coincide, calcularVenta, vuelto, billetesSugeridos, stockVisible, armarVenta, telWa, recibo, leerVinculo, nuevoId, norm } from './logica.js';
-import { agruparVentas, ventasPendientes, tarjetaCliente, rachaCliente, esPremio, TARJETA, reposicion, porReponer, listaCompra, PERIODOS, periodo, reporte, metaDelMes, hoyNica, fechaCorta, fechaDeDia, MESES } from './negocio.js';
+import { agruparVentas, ventasPendientes, tarjetaCliente, ajustesDe, rachaCliente, esPremio, TARJETA, reposicion, porReponer, listaCompra, PERIODOS, periodo, reporte, metaDelMes, hoyNica, fechaCorta, fechaDeDia, MESES } from './negocio.js';
 import { dibujarRecibo, aBlob, compartirRecibo, descargar } from './recibo-imagen.js';
 import { conexion, guardarConexion, olvidarConexion, estadoGuardado, guardarEstado, cola, encolar, procesarCola, llamar, errores, borrarErrores, ErrorRed } from './api.js';
 
@@ -20,6 +20,8 @@ const S = {
   cobro: { metodo: null, banco: null, recibido: '' },
   permitidos: new Set(), ultima: null, ajuste: { cantidad: -1, motivo: null, nota: '' },
   periodo: leerLS('mnpos-periodo-v1', 'mes'), pedido: new Map(), recibo: null,
+  sello: null,                       // null = automático (sin sello si hay precio especial); true/false = lo decidiste en esta venta
+  ajSellos: { delta: 1, motivo: null, nota: '' },
 };
 const guardarCarrito = () => { guardarLS('mnpos-carrito-v1', S.carrito); guardarLS('mnpos-cliente-v1', S.cliente); };
 
@@ -256,6 +258,11 @@ function calc() {
 }
 const numeroSiguiente = () => (S.estado?.siguienteVenta || 1) + pendientes().filter(o => o.accion === 'venta').length;
 
+// ¿Esta venta suma sello? Solo al detalle y con cliente. Con precio a mano o descuento, por defecto no.
+const selloAplica = c => !!S.cliente && !c.porMayor && c.unidades > 0;
+const sumaSello = c => selloAplica(c) && (S.sello ?? !c.especial);
+const MOTIVOS_SELLO = ['Promoción o regalo', 'Compensación', 'Corrección', 'Tarjeta de papel', 'Otro'];
+
 // Sellos de la tarjeta, premio y racha del cliente elegido
 function htmlBeneficios(c) {
   if (!S.cliente) return '';
@@ -266,18 +273,21 @@ function htmlBeneficios(c) {
   const tarjeta = t.compras || t.sellos || t.canjes || !r.activa ? `<div class="sellos">
       <span class="sl-puntos" aria-hidden="true">${puntos}</span>
       <span class="sl-txt">${t.premios ? `<b>¡Tarjeta completa!</b> ${t.premios > 1 ? `${t.premios} premios` : '1 premio'} disponible${t.premios > 1 ? 's' : ''}` : t.compras === 0 && t.sellos === 0 ? '<b>Tarjeta nueva</b> · con esta compra al detalle recibe 3 sellos (2 de regalo)' : `<b>${t.sellos} de ${TARJETA.meta} sellos</b> · ${t.faltan === 1 ? 'le falta 1' : `le faltan ${t.faltan}`} para su perfume gratis`}</span>
-      <button type="button" class="btn-texto chico" data-accion="ajustar-sellos">Ajustar</button>
+      <button type="button" class="btn-texto chico" data-accion="ajustar-sellos">Sumar o quitar</button>
     </div>` : '';
+  const on = sumaSello(c);
+  const interruptor = selloAplica(c) ? `<label class="interruptor sello-switch"><input type="checkbox" data-accion="sello"${on ? ' checked' : ''}><span></span><i class="sw-txt">${on ? 'Esta compra suma 1 sello' : `Esta compra <b>no</b> suma sello${c.especial && S.sello === null ? ' (tiene precio especial)' : ''}`}</i></label>` : '';
   const premio = premiosLibres > 0 ? `<button type="button" class="btn premio-btn" data-accion="abrir-premio">${ico('regalo')}Canjear su perfume gratis (Stallion 53)</button>` : '';
   const racha = r.activa ? `<p class="racha-chip">${ico('rayo')}<span><b>Racha mayorista</b> · ${r.etapa === 'primera' ? 'puede llevar desde 1 perfume' : `desde ${r.minimo} perfumes`} a precio mayorista · vence ${enDias(r.dias)} (${fechaCorta(r.vence)})</span></p>`
     : r.vencida ? `<p class="racha-chip apagada">${ico('rayo')}<span>Su racha mayorista venció el ${fechaCorta(r.vencio)}. Con ${minMayor()} perfumes la reactiva.</span></p>` : '';
-  return tarjeta || premio || racha ? `<div class="beneficios">${tarjeta}${premio}${racha}</div>` : '';
+  return tarjeta || premio || racha || interruptor ? `<div class="beneficios">${tarjeta}${interruptor}${premio}${racha}</div>` : '';
 }
 
 // Lo que ganó el cliente con la venta (se muestra al terminar y va en el recibo)
-function beneficiosDeVenta(c, antes, despues) {
+function beneficiosDeVenta(c, antes, despues, sinSello) {
   const out = [];
   if (!despues) return out;
+  if (sinSello) out.push({ tipo: 'gris', ico: 'estrella', texto: '<b>Sin sello</b> en esta compra (precio especial).' });
   if (c.regalos) out.push({ tipo: 'oro', ico: 'regalo', texto: `<b>Premio entregado.</b> La tarjeta vuelve a empezar.` });
   const ganados = despues.tarjeta.sellos - antes.tarjeta.sellos + c.regalos * TARJETA.meta;
   if (ganados > 0) out.push({ tipo: 'oro', ico: 'estrella', texto: `<b>+${plural(ganados, 'sello', 'sellos')}</b>${ganados > 1 ? ' (2 de regalo por su primera compra)' : ''} · lleva ${despues.tarjeta.enTarjeta} de ${TARJETA.meta}` });
@@ -423,16 +433,17 @@ async function confirmarVenta() {
   const { metodo, banco, recibido } = S.cobro;
   if (!c.lineas.length || !metodo || vuelto(c.total, recibido) === null) return;
   const id = nuevoId();
-  const venta = armarVenta(c, { id, cliente: S.cliente, metodo: metodo === 'Efectivo' ? 'Efectivo' : 'Transferencia', banco, recibido });
+  const sinSello = selloAplica(c) && !sumaSello(c);
+  const venta = armarVenta(c, { id, cliente: S.cliente, metodo: metodo === 'Efectivo' ? 'Efectivo' : 'Transferencia', banco, recibido, sinSello });
   const antes = S.cliente ? infoCliente(S.cliente.nombre) : null;
   encolar({ id, accion: 'venta', venta });
   const despues = S.cliente ? infoCliente(S.cliente.nombre) : null;   // ya cuenta esta venta (está en la cola)
   const hora = new Intl.DateTimeFormat('es-NI', { timeZone: 'America/Managua', hour: 'numeric', minute: '2-digit' }).format(new Date());
   S.ultima = { id, numero: null, estado: 'guardando', calc: c, metodo, banco, recibido, cliente: S.cliente, fecha: fechaCorta(hoy()), hora,
-    beneficios: beneficiosDeVenta(c, antes, despues), tarjeta: despues?.tarjeta || null, racha: despues?.racha || null,
+    beneficios: beneficiosDeVenta(c, antes, despues, sinSello), sinSello, tarjeta: despues?.tarjeta || null, racha: despues?.racha || null,
     ganados: antes && despues ? Math.max(0, despues.tarjeta.sellos - antes.tarjeta.sellos + c.regalos * TARJETA.meta) : 0 };
   S.recibo = null;
-  S.carrito = []; S.cliente = null; S.forzarMayor = false; S.permitidos.clear(); guardarCarrito();
+  S.carrito = []; S.cliente = null; S.forzarMayor = false; S.sello = null; S.permitidos.clear(); guardarCarrito();
   cerrar($('#h-cobro'));
   pintarListo(); abrir($('#h-listo')); vibrar([10, 40, 20]);
   pintarTodo();
@@ -628,17 +639,27 @@ async function elegirPremio(ref) {
   guardarCarrito(); cerrar($('#h-premio')); pintarVender(); pintarCarrito(); vibrar(10);
 }
 function abrirSellos() {
+  if (!infoCliente(S.cliente?.nombre)) return;
+  S.ajSellos = { delta: 1, motivo: null, nota: '' };
+  pintarSellos();
+  abrir($('#h-sellos'));
+}
+function pintarSellos() {
   const i = infoCliente(S.cliente?.nombre); if (!i) return;
+  const a = S.ajSellos, t = i.tarjeta;
+  const queda = Math.max(0, t.sellos + a.delta);
+  const movs = ajustesDe(S.cliente.nombre, ajustesSellos()).slice(-5).reverse();
   $('.sellos-form').innerHTML = `<form data-form="sellos" novalidate>
     <p class="le-nombre">${esc(S.cliente.nombre)}</p>
-    <p class="le-ayuda">Según tus ventas lleva <b>${i.tarjeta.sellos}</b> ${i.tarjeta.sellos === 1 ? 'sello' : 'sellos'}. Si tiene una tarjeta de papel con otro número, escríbelo y la app lo corrige (queda anotado en tu hoja Fidelidad).</p>
-    <label class="campo"><span>Sellos que tiene ahora</span><input name="sellos" type="text" inputmode="numeric" value="${i.tarjeta.sellos}" autocomplete="off"></label>
-    <label class="campo"><span>Nota <small>(opcional)</small></span><input name="nota" type="text" maxlength="120" placeholder="Ej.: pasé su tarjeta de papel"></label>
+    <p class="le-ayuda">Tiene <b>${plural(t.sellos, 'sello', 'sellos')}</b>. Agrega o quita los que quieras; queda anotado con su motivo en tu hoja Fidelidad.</p>
+    <div class="aj-paso"><button type="button" data-accion="sl-menos" aria-label="Quitar un sello" ${t.sellos + a.delta <= 0 ? 'aria-disabled="true"' : ''}>${ico('menos')}</button><output class="${a.delta > 0 ? 'sobra' : 'falta'}">${a.delta > 0 ? '+' : ''}${a.delta}</output><button type="button" data-accion="sl-mas" aria-label="Agregar un sello">${ico('mas')}</button></div>
+    <p class="aj-txt">${a.delta > 0 ? `Agregar ${plural(a.delta, 'sello', 'sellos')}` : `Quitar ${plural(-a.delta, 'sello', 'sellos')}`} · quedaría en <b>${queda}</b>${queda >= TARJETA.meta ? ' (con premio)' : ''}</p>
+    <div class="chips motivos" role="group" aria-label="Motivo">${MOTIVOS_SELLO.map(m => `<button type="button" class="chip" data-accion="sl-motivo" data-m="${esc(m)}" aria-pressed="${a.motivo === m}">${esc(m)}</button>`).join('')}</div>
+    <label class="campo"><span>Nota <small>(opcional)</small></span><input name="nota" type="text" maxlength="100" value="${esc(a.nota)}" placeholder="Ej.: cumpleaños, se equivocó el conteo"></label>
     <p class="error" hidden role="alert"></p>
-    <button class="btn pri" type="submit">Guardar</button>
+    <button class="btn pri" type="submit" ${a.motivo ? '' : 'aria-disabled="true"'}>${a.motivo ? 'Guardar' : 'Elige el motivo'}</button>
+    ${movs.length ? `<div class="sl-movs"><p class="ec-titulo">Movimientos a mano</p><ul>${movs.map(m => `<li><span>${esc(fechaCorta(m.dia))}</span><b class="${m.sellos > 0 ? 'mas' : 'menos'}">${m.sellos > 0 ? '+' : ''}${m.sellos}</b><small>${esc(m.nota)}</small></li>`).join('')}</ul></div>` : ''}
   </form>`;
-  abrir($('#h-sellos'));
-  setTimeout(() => $('.sellos-form input[name="sellos"]')?.select(), 250);
 }
 
 // ---------------------------------------------------------------- REPONER
@@ -672,7 +693,7 @@ async function verRecibo() {
   try {
     const v = u.metodo === 'Efectivo' ? vuelto(u.calc.total, u.recibido) : null;
     const cv = await dibujarRecibo({ numero: u.numero, fecha: u.fecha, hora: u.hora, cliente: u.cliente, calc: u.calc, metodo: u.metodo, banco: u.banco, recibido: u.recibido, vuelto: v,
-      tipoCambio: S.estado.config.tipoCambio, tarjeta: u.cliente && u.tarjeta && (u.tarjeta.compras || u.tarjeta.sellos || u.calc.regalos) ? u.tarjeta : null, ganados: u.ganados,
+      tipoCambio: S.estado.config.tipoCambio, tarjeta: u.cliente && u.tarjeta && (u.tarjeta.compras || u.tarjeta.sellos || u.calc.regalos || u.sinSello) ? u.tarjeta : null, ganados: u.ganados, sinSello: u.sinSello,
       racha: u.racha?.activa ? { ...u.racha, venceTexto: fechaCorta(u.racha.vence) } : null,
       regalias: u.calc.total > 0 && !u.calc.porMayor });
     const blob = await aBlob(cv);
@@ -774,7 +795,7 @@ document.addEventListener('click', async e => {
     case 'agregar': agregar(ref, 1); break;
     case 'mas': agregar(ref, 1); break;
     case 'menos': agregar(ref, -1); break;
-    case 'vaciar': if (await confirmar({ titulo: '¿Vaciar la venta?', si: 'Vaciar', peligro: true })) { S.carrito = []; S.cliente = null; S.forzarMayor = false; guardarCarrito(); pintarVender(); pintarCarrito(); cerrar($('#h-carrito')); } break;
+    case 'vaciar': if (await confirmar({ titulo: '¿Vaciar la venta?', si: 'Vaciar', peligro: true })) { S.carrito = []; S.cliente = null; S.forzarMayor = false; S.sello = null; guardarCarrito(); pintarVender(); pintarCarrito(); cerrar($('#h-carrito')); } break;
     case 'abrir-carrito': if (matchMedia('(min-width: 1000px)').matches) $('.panel-carrito').scrollIntoView({ behavior: 'smooth' }); else abrir($('#h-carrito')); break;
     case 'cobrar': abrirCobro(); break;
     case 'editar-linea': abrirLinea(ref); break;
@@ -785,6 +806,9 @@ document.addEventListener('click', async e => {
     case 'elegir-premio': elegirPremio(ref); break;
     case 'quitar-premio': { const k = S.carrito.findIndex(i => i.ref === ref && i.canje); if (k >= 0) S.carrito.splice(k, 1); guardarCarrito(); pintarVender(); pintarCarrito(); break; }
     case 'ajustar-sellos': abrirSellos(); break;
+    case 'sl-menos': S.ajSellos.delta = S.ajSellos.delta === 1 ? -1 : S.ajSellos.delta - 1; pintarSellos(); break;
+    case 'sl-mas': S.ajSellos.delta = S.ajSellos.delta === -1 ? 1 : S.ajSellos.delta + 1; pintarSellos(); break;
+    case 'sl-motivo': S.ajSellos.motivo = b.dataset.m; S.ajSellos.nota = $('.sellos-form input[name="nota"]')?.value || ''; pintarSellos(); break;
     case 'abrir-reponer': S.pedido.clear(); pintarReponer(); abrir($('#h-reponer')); break;
     case 'rp-menos': case 'rp-mas': { const q = Math.max(0, (S.pedido.get(ref) || 0) + (b.dataset.accion === 'rp-mas' ? 1 : -1)); S.pedido.set(ref, q); pintarReponer(); break; }
     case 'rp-copiar': try { await navigator.clipboard.writeText(textoPedido()); aviso('Lista copiada. Pégala en el chat con tu proveedor.', 'ok'); } catch { aviso('No se pudo copiar en este navegador.', 'error'); } break;
@@ -844,6 +868,7 @@ document.addEventListener('click', tipBarra);
 document.addEventListener('change', e => {
   const t = e.target;
   if (t.matches('[data-accion="forzar-mayor"]')) { S.forzarMayor = t.checked; pintarCarrito(); }
+  if (t.matches('[data-accion="sello"]')) { S.sello = t.checked; pintarCarrito(); }
   if (t.matches('[data-accion="orden-stock"]')) { S.ordenStock = t.value; pintarStock(); }
   if (t.matches('input[name="esGasto"]')) { const c = $('.categorias', t.form); c.hidden = !t.checked; }
 });
@@ -865,6 +890,7 @@ document.addEventListener('input', e => {
     $('[data-accion="confirmar-venta"]').setAttribute('aria-disabled', String(v === null));
   }
   if (t.dataset.campo === 'aj-nota') S.ajuste.nota = t.value;
+  if (t.name === 'nota' && t.closest('.sellos-form')) S.ajSellos.nota = t.value;
   if (t.form?.dataset.tipo === 'cierre' && t.name === 'monto') {
     const r = S.estado.caja.resumen; const n = leerMonto(t.value);
     const d = redondear(n - r.esperado);
@@ -899,13 +925,14 @@ document.addEventListener('submit', async e => {
     }
     case 'sellos': {
       const i = infoCliente(S.cliente?.nombre); if (!i) return;
-      const n = Math.round(Number(String(f.sellos.value).replace(/[^\d]/g, '')));
-      if (!Number.isFinite(n) || f.sellos.value.trim() === '' || n > 60) return err('Escribe cuántos sellos tiene (0 a 60).');
-      const delta = n - i.tarjeta.sellos;
+      const a = S.ajSellos;
+      if (!a.motivo) return err('Elige el motivo.');
+      const delta = Math.max(a.delta, -i.tarjeta.sellos);
+      if (!delta) return err('No hay sellos que quitar.');
       cerrar($('#h-sellos'));
-      if (!delta) break;
       const id = nuevoId();
-      await operar({ id, accion: 'sellos', sellos: { id, cliente: S.cliente.nombre, sellos: delta, nota: f.nota.value.trim() || 'Ajuste desde el punto de venta' } }, `Tarjeta de ${S.cliente.nombre}: ${n} ${n === 1 ? 'sello' : 'sellos'}.`);
+      const nota = `${a.motivo}${f.nota.value.trim() ? ` — ${f.nota.value.trim()}` : ''}`;
+      await operar({ id, accion: 'sellos', sellos: { id, cliente: S.cliente.nombre, sellos: delta, nota } }, `${delta > 0 ? `+${delta}` : delta} ${Math.abs(delta) === 1 ? 'sello' : 'sellos'} a ${S.cliente.nombre} (${a.motivo}).`);
       pintarCarrito();
       break;
     }

@@ -1,7 +1,7 @@
 // Pruebas de pos/js/negocio.js: tarjeta de fidelidad, racha mayorista, reposición y reportes.
 // Uso: node scripts/test-pos-negocio.mjs
 import assert from 'node:assert/strict';
-import { agruparVentas, ventasPendientes, tarjetaCliente, rachaCliente, reposicion, porReponer, listaCompra, periodo, reporte, metaDelMes, diaDeFecha, fechaDeDia, fechaCorta, hoyNica, cambio } from '../pos/js/negocio.js';
+import { agruparVentas, ventasPendientes, tarjetaCliente, ajustesDe, SIN_SELLO, rachaCliente, reposicion, porReponer, listaCompra, periodo, reporte, metaDelMes, diaDeFecha, fechaDeDia, fechaCorta, hoyNica, cambio } from '../pos/js/negocio.js';
 
 let ok = 0, fallos = 0;
 const prueba = (n, fn) => { try { fn(); ok++; console.log('  ✓ ' + n); } catch (e) { fallos++; console.log('  ✗ ' + n + '\n    ' + (e.stack || e.message).split('\n').slice(0, 4).join('\n    ')); } };
@@ -60,6 +60,25 @@ prueba('Con 10 sellos hay premio; canjearlo descuenta 10; los ajustes a mano sum
   assert.deepEqual([t.sellos, t.canjes, t.faltan], [0, 1, 10]);
   t = tarjetaCliente('Ana', agruparVentas(filas, P), [[D(9, 21), 'ANA', 3, 'tarjeta de papel'], [D(9, 22), 'Otra', 5, '']]);
   assert.equal(t.sellos, 3);
+});
+
+prueba('Precio especial: "Detalle sin sello" no suma (ni da los 2 de regalo); las viejas con descuento tampoco', () => {
+  const v = agruparVentas([
+    fila(D(10, 1), 1, 'Ana', '111', 1, 1300, SIN_SELLO),
+    fila(D(10, 2), 2, 'Ana', '111', 1, 1460, '', 'Efectivo', '', 100),    // vieja con descuento
+  ], P);
+  assert.deepEqual(v.map(x => [x.tipo, x.sello]), [['Detalle', false], ['Detalle', false]]);
+  assert.equal(tarjetaCliente('Ana', v).sellos, 0);
+  const v2 = agruparVentas([fila(D(10, 1), 1, 'Ana', '111', 1, 1300, SIN_SELLO), fila(D(10, 3), 3, 'Ana', '111', 1, 1460, 'Detalle')], P);
+  assert.equal(tarjetaCliente('Ana', v2).sellos, 3, 'la primera con sello trae los 2 de regalo');
+  const r = rachaCliente('Ana', agruparVentas([fila(D(10, 28), 1, 'Ana', '111', 6, 985, 'Mayorista'), fila(D(10, 30), 2, 'Ana', '111', 3, 1200, SIN_SELLO)], P), HOY);
+  assert.equal(r.vence, D(10, 30) + 30, 'para la racha sí cuenta la compra');
+});
+prueba('Sellos sumados o quitados a mano, con su motivo', () => {
+  const aj = [[D(10, 1), 'ANA', 2, 'Promoción o regalo — cumpleaños'], [D(10, 2), 'Ana', -1, 'Corrección'], [D(10, 3), 'Otra', 5, '']];
+  assert.equal(tarjetaCliente('Ana', [], aj).sellos, 1);
+  assert.deepEqual(ajustesDe('ana', aj).map(x => x.sellos), [2, -1]);
+  assert.equal(tarjetaCliente('Ana', [], [[D(10, 1), 'Ana', -4, 'Corrección']]).sellos, 0, 'nunca baja de 0');
 });
 
 console.log('\nRacha mayorista');

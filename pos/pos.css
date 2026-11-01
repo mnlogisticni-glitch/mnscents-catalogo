@@ -568,3 +568,16 @@ dialog.hoja::backdrop { background: rgb(8 3 16 / 0.62); animation: velo 300ms va
 .cl-op .cl-marcas { display: flex; }
 .cl-op .cl-marca { display: inline-flex; flex-direction: row; white-space: nowrap; }
 .reponer .t-final dt { display: grid; }
+.sello-switch { padding: 2px 4px; }
+.sello-switch b { color: var(--rojo); }
+.ls-beneficios li.gris { background: var(--noche-2); } .ls-beneficios li.gris .ico { color: var(--tinta-3); }
+.sellos-form .aj-paso { margin: 14px 0 6px; }
+.sellos-form .motivos { flex-wrap: wrap; margin: 12px 0; }
+.sellos-form .btn[type="submit"] { width: 100%; }
+.sellos-form .btn[aria-disabled="true"] { opacity: 0.5; pointer-events: auto; }
+.sl-movs { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--linea-suave); }
+.sl-movs ul { display: grid; gap: 6px; }
+.sl-movs li { display: grid; grid-template-columns: auto auto minmax(0, 1fr); gap: 10px; align-items: baseline; font-size: 13px; color: var(--tinta-3); }
+.sl-movs li b.mas { color: var(--verde); } .sl-movs li b.menos { color: var(--rojo); }
+.sl-movs li small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--tinta-2); }
+.sw-txt { font-style: normal; }

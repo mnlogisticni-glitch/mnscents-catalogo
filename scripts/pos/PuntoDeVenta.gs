@@ -20,9 +20,9 @@ var POS = {
   BANCOS: ['BAC', 'Banpro', 'Lafise'],
   METODOS: ['Efectivo', 'Transferencia bancaria'],
   MOTIVOS: ['Mal conteo', 'Pérdida o robo', 'Dañado', 'Regalo o muestra', 'Uso personal'],
-  TIPOS: ['Detalle', 'Mayorista', 'Canje'],     // columna "Tipo de venta" (W) de Ventas
+  TIPOS: ['Detalle', 'Detalle sin sello', 'Mayorista', 'Canje'],   // columna "Tipo de venta" (W) de Ventas; "sin sello" = precio especial, no suma a la tarjeta
   PREMIO: /stallion\s*53/i,                     // el perfume gratis de la tarjeta se elige de esta línea
-  VERSION: 2,
+  VERSION: 3,
 };
 
 // Columnas (número, base 1)
@@ -587,7 +587,7 @@ function posColumnaTipo_(h) {
   if (!String(cab.getValue())) {
     h.getRange(3, V.BANCO).copyTo(cab, SpreadsheetApp.CopyPasteType.PASTE_FORMAT, false);
     cab.setValue('Tipo de venta');
-    cab.setNote('La llena la app del punto de venta: Detalle, Mayorista o Canje (perfume gratis de la tarjeta). Cuenta para los sellos y la racha mayorista.');
+    cab.setNote('La llena la app del punto de venta: Detalle, Detalle sin sello (precio especial: no suma a la tarjeta), Mayorista o Canje (perfume gratis de la tarjeta). Cuenta para los sellos y la racha mayorista.');
   }
 }
 
@@ -596,7 +596,7 @@ function posHojaFid_(ss) {
   if (h) return h;
   h = ss.insertSheet(POS.FID);
   h.getRange(1, 1).setValue('⭐  FIDELIDAD — MNScents');
-  h.getRange(2, 1).setValue('Los sellos se cuentan solos desde Ventas (1 por compra al detalle, 2 de regalo con la primera). Aquí quedan solo los ajustes a mano, por ejemplo al pasar una tarjeta de papel.');
+  h.getRange(2, 1).setValue('Los sellos se cuentan solos desde Ventas (1 por compra al detalle, 2 de regalo con la primera; las de precio especial no suman). Aquí quedan los sellos que agregas o quitas a mano, con su motivo.');
   h.getRange(3, 1, 1, FID_COLS.length).setValues([FID_COLS]);
   h.getRange(1, 1, 1, FID_COLS.length).setBackground('#4a1942').setFontColor('#ffffff').setFontWeight('bold').setFontSize(16);
   h.getRange(2, 1, 1, FID_COLS.length).setFontColor('#6f5f8c').setFontStyle('italic');

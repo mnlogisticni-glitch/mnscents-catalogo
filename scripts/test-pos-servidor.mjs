@@ -190,6 +190,11 @@ prueba('Agrega la columna "Tipo de venta" al final de Ventas y la llena por lín
   atender(L, { accion: 'venta', venta: ventaBase({ id: 'otra', lineas: [{ ref: 'AFNAN 9PM - 100ML (222)', cantidad: 1, precio: 1490, tipo: 'Inventado' }] }) }, AHORA);
   assert.equal(v.celda(6, 23), 'Detalle', 'un tipo desconocido queda como Detalle'); assert.equal(v.getMaxColumns(), 23);
 });
+prueba('"Detalle sin sello" (precio especial) se guarda tal cual', () => {
+  const L = libroBase();
+  atender(L, { accion: 'venta', venta: ventaBase({ lineas: [{ ref: 'ARMAF MANDARIN SKY - 100ML (111)', cantidad: 1, precio: 1300, tipo: 'Detalle sin sello' }] }) }, AHORA);
+  assert.equal(L.hojas['Ventas'].celda(5, 23), 'Detalle sin sello');
+});
 prueba('El premio de la tarjeta: Stallion 53 a C$0 con cliente; sin cliente u otra marca no', () => {
   const L = conStallion();
   const e = atender(L, { accion: 'venta', venta: ventaBase({ cliente: { nombre: 'ANA' }, lineas: [{ ref: STALLION, cantidad: 1, precio: 1400, canje: true }], pago: {} }) }, AHORA);

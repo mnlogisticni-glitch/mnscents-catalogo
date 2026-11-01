@@ -57,6 +57,14 @@ prueba('La venta para la hoja lleva método y banco correctos', () => {
   assert.deepEqual(v2.pago, { metodo: 'Transferencia bancaria', banco: 'Lafise', recibido: 0 });
   assert.equal(v2.cliente.nuevo, true); assert.deepEqual(v2.lineas, [{ ref: 'A', cantidad: 1, precio: 1460, descuento: 0, tipo: 'Detalle' }]);
 });
+prueba('Precio especial: la venta lo sabe y puede mandarse "sin sello"', () => {
+  assert.equal(calcularVenta([{ ref: 'A', cantidad: 1 }], M).especial, false);
+  const c = calcularVenta([{ ref: 'A', cantidad: 1, descuento: 50 }, { ref: 'B', cantidad: 1 }], M);
+  assert.equal(c.especial, true); assert.equal(calcularVenta([{ ref: 'A', cantidad: 1, precio: 1300 }], M).especial, true);
+  const v = armarVenta(c, { id: 'q', metodo: 'Efectivo', sinSello: true });
+  assert.deepEqual(v.lineas.map(l => l.tipo), ['Detalle sin sello', 'Detalle sin sello']);
+  assert.equal(armarVenta(calcularVenta([{ ref: 'A', cantidad: 6 }], M), { id: 'r', metodo: 'Efectivo', sinSello: true }).lineas[0].tipo, 'Mayorista');
+});
 prueba('Premio de la tarjeta: va a C$0, no cuenta para mayoreo y se manda como canje', () => {
   const c = calcularVenta([{ ref: 'A', cantidad: 5 }, { ref: 'B', cantidad: 1, canje: true }], M);
   assert.equal(c.unidades, 5); assert.equal(c.regalos, 1); assert.equal(c.porMayor, false); assert.equal(c.total, 5 * 1460);

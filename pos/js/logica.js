@@ -63,7 +63,9 @@ export function calcularVenta(carrito, productos, { minimoMayor = 6, forzarMayor
   });
   const total = redondear(subtotal - descuentos);
   return {
-    lineas: out, unidades, regalos, porMayor, faltanMayor: porMayor ? 0 : Math.max(0, minimoMayor - unidades),
+    lineas: out, unidades, regalos, porMayor,
+    especial: out.some(l => !l.canje && (l.manual || l.descuento > 0)),   // precio a mano o descuento en alguna línea
+    faltanMayor: porMayor ? 0 : Math.max(0, minimoMayor - unidades),
     subtotal: redondear(subtotal), descuentos: redondear(descuentos), total,
     ahorro: redondear(detalleTotal - subtotal + descuentos),
   };
@@ -94,11 +96,12 @@ export function stockVisible(producto, pendientes) {
 }
 
 // Lo que se manda a la hoja
-export function armarVenta(calc, { id, cliente, metodo, banco, recibido }) {
+// sinSello: venta al detalle con precio especial que no suma a la tarjeta de fidelidad
+export function armarVenta(calc, { id, cliente, metodo, banco, recibido, sinSello = false }) {
   return {
     id,
     cliente: cliente ? { nombre: cliente.nombre, telefono: cliente.telefono || '', ciudad: cliente.ciudad || '', nuevo: !!cliente.nuevo } : null,
-    lineas: calc.lineas.map(l => (l.canje ? { ref: l.ref, cantidad: 1, precio: 0, descuento: 0, canje: true, tipo: 'Canje' } : { ref: l.ref, cantidad: l.cantidad, precio: l.precio, descuento: l.descuento || 0, tipo: l.tipo })),
+    lineas: calc.lineas.map(l => (l.canje ? { ref: l.ref, cantidad: 1, precio: 0, descuento: 0, canje: true, tipo: 'Canje' } : { ref: l.ref, cantidad: l.cantidad, precio: l.precio, descuento: l.descuento || 0, tipo: sinSello && l.tipo === 'Detalle' ? 'Detalle sin sello' : l.tipo })),
     pago: { metodo: metodo === 'Efectivo' ? 'Efectivo' : 'Transferencia bancaria', banco: metodo === 'Efectivo' ? '' : banco, recibido: Number(recibido) || 0 },
   };
 }

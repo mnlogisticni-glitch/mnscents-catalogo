@@ -48,14 +48,15 @@ function completarVenta(v, minimoMayor) {
     if (l.tipo) continue;
     if (l.precio === 0) l.tipo = 'Regalo';
     else if ((l.p && l.p.mayor > 0 && l.precio <= l.p.mayor + 0.5 && l.precio < l.p.precio - 0.5) || pagadas >= minimoMayor) l.tipo = 'Mayorista';
-    else l.tipo = 'Detalle';
+    else l.tipo = l.descuento > 0 ? SIN_SELLO : 'Detalle';     // las viejas con descuento tampoco suman sello
   }
-  const cobradas = v.lineas.filter(l => l.tipo === 'Detalle' || l.tipo === 'Mayorista');
+  const cobradas = v.lineas.filter(l => l.tipo === 'Detalle' || l.tipo === SIN_SELLO || l.tipo === 'Mayorista');
   v.unidades = cobradas.reduce((s, l) => s + l.cantidad, 0);
   v.canjes = v.lineas.filter(l => l.tipo === 'Canje').reduce((s, l) => s + l.cantidad, 0);
   v.total = redondear(v.lineas.reduce((s, l) => s + l.total, 0));
   v.ganancia = redondear(v.lineas.reduce((s, l) => s + l.ganancia, 0));
   v.tipo = cobradas.some(l => l.tipo === 'Mayorista') ? 'Mayorista' : cobradas.length ? 'Detalle' : v.canjes ? 'Canje' : 'Regalo';
+  v.sello = v.tipo === 'Detalle' && cobradas.some(l => l.tipo === 'Detalle');   // "Detalle sin sello" = precio especial
   return v;
 }
 
@@ -74,9 +75,14 @@ export function ventasPendientes(cola, productos, hoy, { minimoMayor = 6 } = {})
 }
 
 // ---------------------------------------------------------------- tarjeta de fidelidad (solo compras al detalle)
+// Una venta al detalle con precio o descuento especial se guarda como "Detalle sin sello": no suma a la tarjeta.
+export const SIN_SELLO = 'Detalle sin sello';
 // 1 sello por compra al detalle; 2 de regalo con la primera; 10 sellos = 1 perfume Stallion 53 gratis.
 export const TARJETA = { meta: 10, bienvenida: 2 };
 export const esPremio = p => /stallion\s*53/i.test(`${p?.marca || ''} ${p?.nombre || ''}`);
+
+// Movimientos a mano de un cliente (de la hoja Fidelidad y los que siguen en el teléfono)
+export const ajustesDe = (nombre, ajustes = []) => ajustes.filter(a => norm(a[1]) === norm(nombre)).map(a => ({ dia: a[0], sellos: Number(a[2]) || 0, nota: String(a[3] || '') }));
 
 export function tarjetaCliente(nombre, ventas, ajustes = []) {
   const clave = norm(nombre);
@@ -84,7 +90,7 @@ export function tarjetaCliente(nombre, ventas, ajustes = []) {
   let compras = 0, canjes = 0, extra = 0;
   for (const v of ventas) {
     if (v.clave !== clave) continue;
-    if (v.tipo === 'Detalle') compras++;
+    if (v.tipo === 'Detalle' && v.sello) compras++;
     canjes += v.canjes || 0;
   }
   for (const a of ajustes) if (norm(a[1]) === clave) extra += Number(a[2]) || 0;

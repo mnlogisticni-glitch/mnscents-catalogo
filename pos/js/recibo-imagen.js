@@ -155,7 +155,7 @@ export async function dibujarRecibo(d) {
     ctx.fillStyle = C.lila; ctx.font = F(700, 22, 'Unbounded'); ctx.fillText('TARJETA DE FIDELIDAD', M + 32, y + 52);
     const t = d.tarjeta;
     ctx.textAlign = 'right'; ctx.fillStyle = C.tinta2; ctx.font = F(500, 24);
-    ctx.fillText(d.ganados ? `+${d.ganados} ${d.ganados === 1 ? 'sello' : 'sellos'} con esta compra` : '', W - M - 32, y + 52); ctx.textAlign = 'left';
+    ctx.fillText(d.ganados ? `+${d.ganados} ${d.ganados === 1 ? 'sello' : 'sellos'} con esta compra` : d.sinSello ? 'Precio especial: esta compra no suma sello' : '', W - M - 32, y + 52); ctx.textAlign = 'left';
     const r = 26, paso = (W - 2 * M - 64) / 10;
     for (let i = 0; i < 10; i++) {
       const cx = M + 32 + paso * i + paso / 2, cy = y + 112;
