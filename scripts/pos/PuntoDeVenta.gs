@@ -22,7 +22,7 @@ var POS = {
   MOTIVOS: ['Mal conteo', 'Pérdida o robo', 'Dañado', 'Regalo o muestra', 'Uso personal'],
   TIPOS: ['Detalle', 'Detalle sin sello', 'Mayorista', 'Canje'],   // columna "Tipo de venta" (W) de Ventas; "sin sello" = precio especial, no suma a la tarjeta
   PREMIO: /stallion\s*53/i,                     // el perfume gratis de la tarjeta se elige de esta línea
-  VERSION: 3,
+  VERSION: 4,
 };
 
 // Columnas (número, base 1)
@@ -39,6 +39,7 @@ function onOpen() {
   SpreadsheetApp.getUi().createMenu('🛒 Punto de venta')
     .addItem('Vincular un teléfono o computadora', 'posVincular')
     .addSeparator()
+    .addItem('Recalcular costos', 'posMenuCostos')
     .addItem('Cambiar la dirección de la app web', 'posCambiarDireccion')
     .addItem('Cambiar la clave (desvincula todos)', 'posCambiarClave')
     .addToUi();
@@ -152,6 +153,8 @@ function posAtender_(ss, req, ahora) {
     else if (a === 'sellos') r = posSellos_(ss, req.sellos, ahora);
     else throw new Error('Acción desconocida.');
     if (idOp) cache.put('pos:' + idOp, JSON.stringify(r || {}), 21600);
+    // el costo del día queda guardado en la venta o el ajuste (si falla, la venta igual quedó)
+    if (a === 'venta' || a === 'anular' || a === 'ajuste') { try { posRecalcularCostos_(ss); } catch (e) { Logger.log('Costos: ' + e); } }
     // Se responde enseguida: la hoja recalcula sus fórmulas después y la app pide el estado aparte.
     return { ok: true, version: POS.VERSION, resultado: r };
   } finally { lock.releaseLock(); }
@@ -510,6 +513,7 @@ function posAnular_(ss, numero, ahora) {
     h.getRange(f, V.METODO, 1, 3).clearContent();
     h.getRange(f, V.BANCO).clearContent();
     if (h.getMaxColumns() >= V.TIPO) h.getRange(f, V.TIPO).clearContent();
+    if (h.getMaxColumns() >= COSTO.VEN_COSTO) h.getRange(f, COSTO.VEN_COSTO).clearContent();
     if (formula) h.getRange(f, V.PRECIO).setFormulaR1C1(formula); else h.getRange(f, V.PRECIO).clearContent();
   });
   total = Math.round(total * 100) / 100;
@@ -642,4 +646,228 @@ function posSellos_(ss, op, ahora) {
   var r = Math.max(h.getLastRow() + 1, POS.PRIMERA);
   h.getRange(r, 1, 1, FID_COLS.length).setValues([[posSerieAhora_(ahora), cliente, 'Ajuste', n, posTexto_(op.nota, 120), id]]);
   return { cliente: cliente, sellos: n };
+}
+
+// ======================================================================
+// Costo promedio de lo que hay en stock (método "promedio móvil")
+// ----------------------------------------------------------------------
+// El costo de un perfume solo cambia cuando ENTRA mercadería y se mezcla con lo que TODAVÍA queda:
+//   costo nuevo = (unidades que quedan × su costo + unidades que llegan × costo de la compra) ÷ total.
+// Vender o quitar unidades no cambia el costo. Cada venta y cada ajuste guarda el costo de su día,
+// así la ganancia de una venta vieja ya no cambia cuando llegan compras a otro precio.
+// En un mismo día: si lo que había alcanzaba para las salidas, cuentan primero las salidas; si no, primero las entradas.
+// ======================================================================
+var COSTO = {
+  INV_PRECIO: 36, INV_IMP: 37,      // Inventario AJ y AK: costo promedio (compra e importación) que escribe el script
+  VEN_COSTO: 24,                    // Ventas X: costo por unidad el día de la venta
+  AJ_COSTO: 14,                     // Ajustes N: costo por unidad el día del ajuste
+  CAB_INV: ['Costo promedio: compra (lo llena el script)', 'Costo promedio: importación (lo llena el script)'],
+  CAB_VEN: 'Costo al vender (lo llena el script)', CAB_AJ: 'Costo unitario (lo llena el script)',
+};
+
+/**
+ * Cálculo puro (se prueba con node).
+ * productos: [{ref, inicial, precio, imp}]   (stock inicial y su costo, de Inventario O, AC, AD)
+ * compras:   [{dia, ref, cantidad, precio, imp}]   (solo las "Recibido"; imp = envío + aduana + otros por unidad)
+ * ventas:    [{dia, ref, cantidad, fila}]
+ * ajustes:   [{dia, ref, cantidad (+ sobra / − falta), fila}]
+ * Devuelve { productos: {ref: {precio, imp, conocido, stock}}, ventas: {fila: costo}, ajustes: {fila: costo} }
+ */
+function posCostosCalcular_(productos, compras, ventas, ajustes) {
+  var r2 = function (n) { return Math.round(n * 100) / 100; };
+  var est = {}, eventos = {};
+  productos.forEach(function (p) {
+    var conocido = posNum_(p.precio) > 0 || posNum_(p.imp) > 0;
+    est[p.ref] = { stock: Math.max(0, posNum_(p.inicial)), precio: posNum_(p.precio), imp: posNum_(p.imp), conocido: conocido };
+    eventos[p.ref] = [];
+  });
+  var sinDia = 9e9, orden = 0;
+  compras.forEach(function (c) { if (eventos[c.ref] && c.cantidad > 0) eventos[c.ref].push({ dia: c.dia == null ? sinDia : c.dia, e: true, c: c.cantidad, precio: c.precio, imp: c.imp, n: orden++ }); });
+  ventas.forEach(function (v) { if (eventos[v.ref] && v.cantidad > 0) eventos[v.ref].push({ dia: v.dia == null ? sinDia : v.dia, e: false, c: v.cantidad, venta: v.fila, n: orden++ }); });
+  ajustes.forEach(function (a) {
+    if (!eventos[a.ref] || !a.cantidad) return;
+    if (a.cantidad < 0) eventos[a.ref].push({ dia: a.dia == null ? sinDia : a.dia, e: false, c: -a.cantidad, ajuste: a.fila, n: orden++ });
+    else eventos[a.ref].push({ dia: a.dia == null ? sinDia : a.dia, e: true, sobra: true, c: a.cantidad, ajuste: a.fila, n: orden++ });
+  });
+  var outV = {}, outA = {};
+  Object.keys(eventos).forEach(function (ref) {
+    var s = est[ref];
+    var evs = eventos[ref].sort(function (a, b) { return a.dia - b.dia || a.n - b.n; });
+    var i = 0;
+    while (i < evs.length) {
+      var j = i; while (j < evs.length && evs[j].dia === evs[i].dia) j++;
+      var dia = evs.slice(i, j);
+      var salidas = dia.filter(function (x) { return !x.e; }), entradas = dia.filter(function (x) { return x.e; });
+      var totalSal = salidas.reduce(function (t, x) { return t + x.c; }, 0);
+      var orden2 = s.stock >= totalSal ? salidas.concat(entradas) : entradas.concat(salidas);
+      orden2.forEach(function (x) {
+        if (x.e && !x.sobra) {                       // compra recibida
+          var antes = Math.max(0, s.stock);
+          if (!s.conocido || antes === 0) { s.precio = posNum_(x.precio); s.imp = posNum_(x.imp); }
+          else { s.precio = (antes * s.precio + x.c * posNum_(x.precio)) / (antes + x.c); s.imp = (antes * s.imp + x.c * posNum_(x.imp)) / (antes + x.c); }
+          s.conocido = true; s.stock = antes + x.c;
+        } else if (x.e) {                            // sobrante: entra al costo de ese momento
+          if (s.conocido) outA[x.ajuste] = r2(s.precio + s.imp);
+          s.stock += x.c;
+        } else {                                     // venta o faltante
+          var costo = s.conocido ? r2(s.precio + s.imp) : null;
+          if (x.venta != null && costo != null) outV[x.venta] = costo;
+          if (x.ajuste != null && costo != null) outA[x.ajuste] = costo;
+          s.stock -= x.c;
+        }
+      });
+      i = j;
+    }
+  });
+  var outP = {};
+  var r4 = function (n) { return Math.round(n * 10000) / 10000; };   // 4 decimales: la suma (Costo real) sale exacta al centavo
+  Object.keys(est).forEach(function (ref) { var s = est[ref]; outP[ref] = { precio: r4(s.precio), imp: r4(s.imp), conocido: s.conocido, stock: s.stock }; });
+  return { productos: outP, ventas: outV, ajustes: outA };
+}
+
+// Lee la hoja, calcula y escribe solo lo que cambió. Devuelve cuántas celdas actualizó.
+function posRecalcularCostos_(ss) {
+  if (PropertiesService.getScriptProperties().getProperty('POS_COSTOS') !== '1') return 0;
+  var inv = ss.getSheetByName(POS.INV), ven = ss.getSheetByName(POS.VENTAS), aj = ss.getSheetByName(POS.AJ), com = ss.getSheetByName('Compras');
+  if (!inv || !ven || inv.getMaxColumns() < COSTO.INV_IMP || ven.getMaxColumns() < COSTO.VEN_COSTO) return 0;   // todavía no instalado
+  var nInv = POS.FIN_INV - POS.PRIMERA + 1;
+  var vi = inv.getRange(POS.PRIMERA, 1, nInv, 30).getValues();
+  var productos = [], filaDe = {};
+  vi.forEach(function (f, k) {
+    var ref = String(f[I.REF - 1] || ''); if (!f[0] || !ref) return;
+    filaDe[ref] = k;
+    productos.push({ ref: ref, inicial: posNum_(f[14]), precio: posNum_(f[28]), imp: posNum_(f[29]) });   // O, AC, AD
+  });
+  var compras = [];
+  if (com && com.getLastRow() >= POS.PRIMERA) {
+    com.getRange(POS.PRIMERA, 1, com.getLastRow() - POS.PRIMERA + 1, 14).getValues().forEach(function (f) {
+      if (String(f[11]) !== 'Recibido' || !f[3]) return;
+      var dia = posDia_(f[13] instanceof Date || typeof f[13] === 'number' ? f[13] : f[0]);   // fecha de recepción, o la del pedido
+      compras.push({ dia: dia, ref: String(f[3]), cantidad: posNum_(f[4]), precio: posNum_(f[5]), imp: posNum_(f[7]) + posNum_(f[8]) + posNum_(f[9]) });
+    });
+  }
+  var ultV = posUltima_(ven, V.PRODUCTO, POS.FIN_VENTAS);
+  var ventas = [];
+  var vv = ultV >= POS.PRIMERA ? ven.getRange(POS.PRIMERA, 1, ultV - POS.PRIMERA + 1, V.CANT).getValues() : [];
+  vv.forEach(function (f, k) { if (f[V.PRODUCTO - 1]) ventas.push({ dia: posDia_(f[0]), ref: String(f[V.PRODUCTO - 1]), cantidad: posNum_(f[V.CANT - 1]), fila: k }); });
+  var ajustes = [], ultA = aj ? posUltima_(aj, 2, POS.FIN_AJ) : 0;
+  var va = aj && ultA >= POS.PRIMERA ? aj.getRange(POS.PRIMERA, 1, ultA - POS.PRIMERA + 1, 3).getValues() : [];
+  va.forEach(function (f, k) { if (f[1]) ajustes.push({ dia: posDia_(f[0]), ref: String(f[1]), cantidad: posNum_(f[2]), fila: k }); });
+
+  var r = posCostosCalcular_(productos, compras, ventas, ajustes);
+  var cambios = 0;
+  // Inventario AJ:AK
+  var actualP = inv.getRange(POS.PRIMERA, COSTO.INV_PRECIO, nInv, 2).getValues();
+  var nuevoP = actualP.map(function (fila, k) {
+    var ref = String(vi[k][I.REF - 1] || ''); var p = r.productos[ref];
+    return p && p.conocido ? [p.precio, p.imp] : ['', ''];
+  });
+  cambios += posEscribirCambios_(inv, POS.PRIMERA, COSTO.INV_PRECIO, actualP, nuevoP);
+  // Ventas X
+  if (vv.length) {
+    var actualV = ven.getRange(POS.PRIMERA, COSTO.VEN_COSTO, vv.length, 1).getValues();
+    var nuevoV = vv.map(function (f, k) { return [r.ventas.hasOwnProperty(k) ? r.ventas[k] : '']; });
+    cambios += posEscribirCambios_(ven, POS.PRIMERA, COSTO.VEN_COSTO, actualV, nuevoV);
+  }
+  // Ajustes N
+  if (va.length && aj.getMaxColumns() >= COSTO.AJ_COSTO) {
+    var actualA = aj.getRange(POS.PRIMERA, COSTO.AJ_COSTO, va.length, 1).getValues();
+    var nuevoA = va.map(function (f, k) { return [r.ajustes.hasOwnProperty(k) ? r.ajustes[k] : '']; });
+    cambios += posEscribirCambios_(aj, POS.PRIMERA, COSTO.AJ_COSTO, actualA, nuevoA);
+  }
+  return cambios;
+}
+
+// Escribe por tramos solo las filas que cambiaron (así la hoja recalcula lo mínimo)
+function posEscribirCambios_(hoja, fila0, col, actual, nuevo) {
+  var igual = function (a, b) { return a.length === b.length && a.every(function (x, i) { return (x === '' && b[i] === '') || (typeof x === 'number' && typeof b[i] === 'number' && Math.abs(x - b[i]) < 0.005) || x === b[i]; }); };
+  var cambios = 0, k = 0;
+  while (k < nuevo.length) {
+    if (igual(actual[k], nuevo[k])) { k++; continue; }
+    var fin = k; while (fin + 1 < nuevo.length && !igual(actual[fin + 1], nuevo[fin + 1])) fin++;
+    hoja.getRange(fila0 + k, col, fin - k + 1, nuevo[k].length).setValues(nuevo.slice(k, fin + 1));
+    cambios += fin - k + 1; k = fin + 1;
+  }
+  return cambios;
+}
+
+// Instala el método una sola vez: columnas nuevas al final y fórmulas que usan el costo del script.
+// No borra nada: las fórmulas viejas quedan como respaldo por si un perfume todavía no tiene costo calculado.
+function posInstalarCostos_(ss) {
+  var inv = posHoja_(ss, POS.INV), ven = posHoja_(ss, POS.VENTAS), aj = posHoja_(ss, POS.AJ);
+  var asegurar = function (h, n) { if (h.getMaxColumns() < n) h.insertColumnsAfter(h.getMaxColumns(), n - h.getMaxColumns()); };
+  var cabecera = function (h, col, txt, deCol) {
+    var c = h.getRange(3, col);
+    if (String(c.getValue()) === txt) return;
+    h.getRange(3, deCol).copyTo(c, SpreadsheetApp.CopyPasteType.PASTE_FORMAT, false);
+    c.setValue(txt);
+  };
+  // Inventario: AJ, AK + I y J leen de ahí
+  asegurar(inv, COSTO.INV_IMP);
+  cabecera(inv, COSTO.INV_PRECIO, COSTO.CAB_INV[0], 32); cabecera(inv, COSTO.INV_IMP, COSTO.CAB_INV[1], 32);
+  var nInv = POS.FIN_INV - POS.PRIMERA + 1;
+  ['I', 'J'].forEach(function (letra, k) {
+    var col = k === 0 ? 9 : 10, aux = k === 0 ? '$AJ' : '$AK';
+    var rango = inv.getRange(POS.PRIMERA, col, nInv, 1);
+    var fs = rango.getFormulas();
+    var cambio = false;
+    var nuevas = fs.map(function (f, i) {
+      var r = POS.PRIMERA + i, x = f[0];
+      if (!x || x.indexOf('ISNUMBER(' + aux + r + ')') >= 0) return [x];
+      cambio = true;
+      return ['=IF(ISNUMBER(' + aux + r + '),' + aux + r + ',' + x.slice(1) + ')'];
+    });
+    if (cambio) rango.setFormulas(nuevas);
+  });
+  // Ventas: W (tipo) y X (costo al vender); la ganancia usa X
+  posColumnaTipo_(ven);
+  asegurar(ven, COSTO.VEN_COSTO);
+  cabecera(ven, COSTO.VEN_COSTO, COSTO.CAB_VEN, V.BANCO);
+  var nV = POS.FIN_VENTAS - POS.PRIMERA + 1;
+  var fg = [];
+  for (var i = 0; i < nV; i++) {
+    var r = POS.PRIMERA + i;
+    fg.push(['=IF($F' + r + '="","",J' + r + '-(G' + r + '*IF(ISNUMBER($X' + r + '),$X' + r + ',IFERROR(INDEX(Inventario!$K$4:$K$303,MATCH($F' + r + ',Inventario!$W$4:$W$303,0)),0))))']);
+  }
+  ven.getRange(POS.PRIMERA, V.GANANCIA, nV, 1).setFormulas(fg);
+  // Ajustes: N (costo unitario) y el valor al costo lo usa
+  asegurar(aj, COSTO.AJ_COSTO);
+  cabecera(aj, COSTO.AJ_COSTO, COSTO.CAB_AJ, 6);
+  aj.getRange('F4').setFormula('=ARRAYFORMULA(IF((B4:B503="")+(C4:C503=""),"",C4:C503*IF(ISNUMBER(N4:N503),N4:N503,IFERROR(VLOOKUP(B4:B503,{Inventario!W4:W303,Inventario!K4:K303},2,FALSE),0))))');
+  // Instrucciones de la hoja Revisión
+  var rev = ss.getSheetByName('Revisión');
+  if (rev) {
+    var t18 = String(rev.getRange('A18').getValue()), t19 = String(rev.getRange('A19').getValue()), t21 = String(rev.getRange('A21').getValue());
+    if (/promedio ponderado/.test(t18)) rev.getRange('A18').setValue(t18.replace('recalcula el costo promedio ponderado', 'recalcula el costo promedio de lo que hay en stock'));
+    if (/costo real promedio/.test(t19)) rev.getRange('A19').setValue(t19.replace('La ganancia usa el costo real promedio.', 'Cada venta guarda el costo del día en que se vendió (columna X): su ganancia ya no cambia.'));
+    if (/se recalcula con el costo promedio actual/.test(t21)) rev.getRange('A21').setValue('Nota: el costo promedio lo calcula el script del punto de venta (Inventario AJ:AK, Ventas X, Ajustes N). Si algo no cuadra: menú 🛒 Punto de venta → Recalcular costos.');
+  }
+  PropertiesService.getScriptProperties().setProperty('POS_COSTOS', '1');
+}
+
+// Menú: instala (si hace falta) y recalcula todo
+function posMenuCostos() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet(), ui = SpreadsheetApp.getUi();
+  var lock = LockService.getScriptLock(); lock.waitLock(30000);
+  try {
+    POS_TZ = ss.getSpreadsheetTimeZone() || POS_TZ;
+    var nuevo = PropertiesService.getScriptProperties().getProperty('POS_COSTOS') !== '1';
+    if (nuevo) posInstalarCostos_(ss);
+    var n = posRecalcularCostos_(ss);
+    ui.alert('Costos al día', (nuevo ? 'Se instaló el costo promedio de lo que hay en stock. ' : '') + (n ? 'Se actualizaron ' + n + ' filas.' : 'Todo estaba al día.'), ui.ButtonSet.OK);
+  } finally { lock.releaseLock(); }
+}
+
+// Al editar a mano Compras, Ventas, Ajustes o el stock/costo inicial del Inventario, el costo se recalcula solo
+function onEdit(e) {
+  try {
+    if (!e || !e.range) return;
+    var h = e.range.getSheet().getName(), c1 = e.range.getColumn(), c2 = e.range.getLastColumn();
+    var toca = function (a, b) { return c1 <= b && c2 >= a; };
+    var importa = h === 'Compras' || (h === POS.VENTAS && toca(1, V.CANT)) || (h === POS.AJ && toca(1, 3)) || (h === POS.INV && (toca(1, 1) || toca(15, 15) || toca(29, 30)));
+    if (!importa || e.range.getRow() < POS.PRIMERA) return;
+    var ss = e.source || SpreadsheetApp.getActiveSpreadsheet();
+    POS_TZ = ss.getSpreadsheetTimeZone() || POS_TZ;
+    posRecalcularCostos_(ss);
+  } catch (err) { /* nunca estorbar la edición */ }
 }

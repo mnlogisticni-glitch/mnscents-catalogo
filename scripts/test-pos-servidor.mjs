@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 let ok = 0, fallos = 0;
 const prueba = (n, fn) => { try { fn(); ok++; console.log('  ✓ ' + n); } catch (e) { fallos++; console.log('  ✗ ' + n + '\n    ' + (e.stack || e.message).split('\n').slice(0, 3).join('\n    ')); } };
 
-import { libroBase, ctx, gas, props } from './pos-hoja-simulada.mjs';
+import { libroBase, ctx, gas, props, Hoja } from './pos-hoja-simulada.mjs';
 const crudo = (L, req, ahora) => ctx.posAtender_(L, req, ahora);
 // como la app: escribe y después pide el estado
 const atender = (L, req, ahora) => {
@@ -238,6 +238,65 @@ prueba('Anular una venta también borra su tipo', () => {
   atender(L, { accion: 'venta', venta: ventaBase({ lineas: [{ ref: 'ARMAF MANDARIN SKY - 100ML (111)', cantidad: 1, precio: 1460, tipo: 'Detalle' }] }) }, AHORA);
   atender(L, { accion: 'anular', numero: 8 }, AHORA);
   assert.equal(L.hojas['Ventas'].celda(5, 23), '');
+});
+
+console.log('\nCosto promedio de lo que hay en stock');
+const J = x => JSON.parse(JSON.stringify(x));
+prueba('El caso del 9PM Elixir: 5 iniciales, vende 4, quita 1 y llegan 5 → C$1,144.50; las ventas viejas guardan C$1,093', () => {
+  const r = J(ctx.posCostosCalcular_([{ ref: 'E', inicial: 5, precio: 964, imp: 129 }],
+    [{ dia: 300, ref: 'E', cantidad: 5, precio: 954.5, imp: 190 }],
+    [{ dia: 100, ref: 'E', cantidad: 2, fila: 0 }, { dia: 150, ref: 'E', cantidad: 1, fila: 1 }, { dia: 151, ref: 'E', cantidad: 1, fila: 2 }, { dia: 301, ref: 'E', cantidad: 1, fila: 3 }],
+    [{ dia: 300, ref: 'E', cantidad: -1, fila: 0 }]));
+  assert.deepEqual(r.productos.E, { precio: 954.5, imp: 190, conocido: true, stock: 4 });
+  assert.deepEqual(r.ventas, { 0: 1093, 1: 1093, 2: 1093, 3: 1144.5 });
+  assert.deepEqual(r.ajustes, { 0: 1093 }, 'el faltante del mismo día sale antes de la compra (había con qué)');
+});
+prueba('Si todavía queda stock cuando llega la compra, se mezcla: (1 × 1,093 + 5 × 1,144.50) ÷ 6', () => {
+  const r = J(ctx.posCostosCalcular_([{ ref: 'E', inicial: 1, precio: 964, imp: 129 }], [{ dia: 10, ref: 'E', cantidad: 5, precio: 954.5, imp: 190 }], [{ dia: 11, ref: 'E', cantidad: 1, fila: 0 }], []));
+  assert.equal(Math.round((r.productos.E.precio + r.productos.E.imp) * 100) / 100, 1135.92); assert.equal(r.ventas[0], 1135.92);
+  assert.deepEqual([r.productos.E.precio, r.productos.E.imp], [956.0833, 179.8333]);
+});
+prueba('Mismo día sin stock: primero entra la compra y la venta usa ese costo', () => {
+  const r = J(ctx.posCostosCalcular_([{ ref: 'E', inicial: 0, precio: 900, imp: 100 }], [{ dia: 10, ref: 'E', cantidad: 3, precio: 1100, imp: 100 }], [{ dia: 10, ref: 'E', cantidad: 1, fila: 0 }], []));
+  assert.equal(r.ventas[0], 1200);
+});
+prueba('Sobrante entra al costo del momento; sin ningún costo conocido la venta no guarda costo', () => {
+  const r = J(ctx.posCostosCalcular_([{ ref: 'A', inicial: 2, precio: 500, imp: 0 }, { ref: 'B', inicial: 0, precio: 0, imp: 0 }], [],
+    [{ dia: 5, ref: 'B', cantidad: 1, fila: 0 }], [{ dia: 4, ref: 'A', cantidad: 1, fila: 0 }]));
+  assert.equal(r.ajustes[0], 500); assert.equal(r.productos.A.stock, 3); assert.equal(r.productos.B.conocido, false); assert.equal(r.ventas[0], undefined);
+});
+const conCompras = () => {
+  const L = libroBase(); const c = L.hojas['Compras'] = new Hoja('Compras', 1003, 16);
+  // compra recibida del 9PM: 4 a C$900 + C$100 de envío, el 20/10
+  [diaDe(2026, 10, 20), 1, 'DUBAI', 'AFNAN 9PM - 100ML (222)', 4, 900, '', 100, '', '', '', 'Recibido'].forEach((x, j) => c.poner(4, j + 1, x));
+  const inv = L.hojas['Inventario']; inv.poner(5, 15, 2); inv.poner(5, 29, 700); inv.poner(5, 30, 0);   // 9PM: 2 iniciales a C$700
+  inv.poner(5, 9, ''); inv.f['5,9'] = '=IF($A5="","",AC5)'; inv.f['5,10'] = '=IF($A5="","",AD5)';
+  return L;
+};
+const diaDe = (y, m, d) => Math.round((Date.UTC(y, m - 1, d) - Date.UTC(1899, 11, 30)) / 864e5);
+prueba('Instalar: columnas al final, I/J leen el costo del script, ganancia y ajustes usan el costo guardado; se puede repetir', () => {
+  const L = conCompras();
+  ctx.posInstalarCostos_(L); ctx.posInstalarCostos_(L);
+  const inv = L.hojas['Inventario'], ven = L.hojas['Ventas'], aj = L.hojas['Ajustes'];
+  assert.equal(inv.getMaxColumns(), 37); assert.match(inv.celda(3, 36), /Costo promedio: compra/);
+  assert.equal(inv.f['5,9'], '=IF(ISNUMBER($AJ5),$AJ5,IF($A5="","",AC5))', 'la fórmula vieja queda de respaldo y no se envuelve dos veces');
+  assert.equal(ven.getMaxColumns(), 24); assert.match(ven.celda(3, 24), /Costo al vender/); assert.equal(ven.celda(3, 23), 'Tipo de venta');
+  assert.equal(ven.f['10,14'], '=IF($F10="","",J10-(G10*IF(ISNUMBER($X10),$X10,IFERROR(INDEX(Inventario!$K$4:$K$303,MATCH($F10,Inventario!$W$4:$W$303,0)),0))))');
+  assert.match(aj.f['4,6'], /ISNUMBER\(N4:N503\)/);
+  assert.equal(props.POS_COSTOS, '1');
+});
+prueba('Recalcular: escribe el costo promedio en Inventario y el costo del día en cada venta; vender desde la app lo guarda', () => {
+  const L = conCompras(); ctx.posInstalarCostos_(L);
+  const ven = L.hojas['Ventas'], inv = L.hojas['Inventario'];
+  // venta vieja del 9PM antes de la compra (20/10) y la de la app (29/10) después
+  [diaDe(2026, 10, 1), 6, 'ANA', '', 'Estelí', 'AFNAN 9PM - 100ML (222)', 1, 1490, '', 1490, 'Efectivo', 'Pagado'].forEach((x, j) => ven.poner(5, j + 1, x));
+  const n = ctx.posRecalcularCostos_(L);
+  assert.ok(n >= 2);
+  assert.deepEqual([inv.celda(5, 36), inv.celda(5, 37)], [860, 80], 'quedaba 1 a C$700 + llegan 4 a C$900 + C$100 → (700 + 3,600) ÷ 5 y (0 + 400) ÷ 5');
+  assert.equal(ven.celda(5, 24), 700);
+  assert.equal(ctx.posRecalcularCostos_(L), 0, 'la segunda vez no reescribe nada');
+  atender(L, { accion: 'venta', venta: ventaBase({ lineas: [{ ref: 'AFNAN 9PM - 100ML (222)', cantidad: 1, precio: 1490, tipo: 'Detalle' }] }) }, AHORA);
+  assert.equal(ven.celda(6, 24), inv.celda(5, 36) + inv.celda(5, 37));
 });
 
 console.log('\nDirección de la app web');
