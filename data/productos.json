@@ -1,5 +1,5 @@
 {
- "actualizado": "2026-10-31T19:34:16.221Z",
+ "actualizado": "2026-11-02T03:33:39.764Z",
  "productos": [
   {
    "id": "H01",
@@ -127,7 +127,7 @@
    "catalogo": "caballeros",
    "nombre": "Club de Nuit Intense Man",
    "marca": "Armaf",
-   "presentacion": "",
+   "presentacion": "105 ML",
    "notas": [
     "Elegante",
     "Masculino",
@@ -451,7 +451,7 @@
    "catalogo": "caballeros",
    "nombre": "Club de Nuit Iconic",
    "marca": "Armaf",
-   "presentacion": "",
+   "presentacion": "105 ML",
    "notas": [
     "Fresco",
     "Refinado",
@@ -505,6 +505,35 @@
    "foto": "stallion53.imperial.png",
    "orden": 17,
    "sku": "6294021909648"
+  },
+  {
+   "id": "H18",
+   "catalogo": "caballeros",
+   "nombre": "9PM ELIXIR",
+   "marca": "Afnan",
+   "presentacion": "",
+   "notas": [
+    "Dulce",
+    "Especiado",
+    "calido"
+   ],
+   "descripcion": "",
+   "precios": {
+    "detalle": {
+     "cs": 1890,
+     "usd": 50
+    },
+    "mayor": {
+     "cs": 1240,
+     "usd": 33.65
+    }
+   },
+   "estado": "coming_soon",
+   "existencias": 0,
+   "etiqueta": null,
+   "foto": null,
+   "orden": 18,
+   "sku": "6290171075738"
   },
   {
    "id": "D01",
