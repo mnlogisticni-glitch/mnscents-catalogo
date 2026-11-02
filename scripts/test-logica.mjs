@@ -3,7 +3,7 @@
 import { readFile } from 'node:fs/promises';
 import assert from 'node:assert/strict';
 import { calcular, mensajeWhatsApp, enlaceWhatsApp, fmtCS, fmtUSD, esComprable } from '../js/precios.js';
-import { convertir } from './sync.mjs';
+import { nombreSeguro, convertir } from './sync.mjs';
 
 let ok = 0, fallos = 0;
 const prueba = (nombre, fn) => { try { fn(); ok++; console.log('  ✓ ' + nombre); } catch (e) { fallos++; console.log('  ✗ ' + nombre + '\n    ' + e.message); } };
@@ -113,6 +113,12 @@ prueba('Foto: solo acepta un nombre de archivo de imagen (sin carpetas ni códig
   assert.equal(rf.productos.find(p => p.id === 'X1').foto, null);
   assert.equal(rf.productos.find(p => p.id === 'X2').foto, null);
   assert.equal(rf.productos.find(p => p.id === 'X3').foto, 'buena-foto.webp');
+});
+prueba('Una foto con espacios o mayúsculas se convierte a un nombre seguro (sin barras ni comillas)', () => {
+  assert.equal(nombreSeguro('AFNAN 9 PM ELIXIR IMG.webp'), 'afnan-9-pm-elixir-img.webp');
+  assert.equal(nombreSeguro('Rosé Ñandú_2.WEBP'), 'rose-nandu-2.webp');
+  assert.equal(nombreSeguro('Mi foto - final .jpg'), 'mi-foto-final.jpg');
+  assert.doesNotMatch(nombreSeguro('../../etc/passwd'), /\//); assert.doesNotMatch(nombreSeguro('x.webp" onerror="a'), /["=\s]/);
   assert.equal(rf.avisos.filter(a => a.includes('no es un nombre de archivo válido')).length, 2);
 });
 const r5 = await convertir(cabE + 'X1,Damas,P,M,,,,1390,38,905,24.55,Disponible,,Sí,1,0\nX2,Damas,Q,M,,,,1390,38,905,24.55,Disponible,,Sí,2,2\n', { comprobarFotos: false });

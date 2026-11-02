@@ -31,12 +31,12 @@ jobs:
         run: node scripts/sync.mjs
       - name: Publicar si hubo cambios
         run: |
-          if git diff --quiet -- data/productos.json; then
+          if [ -z "$(git status --porcelain -- data/productos.json img/productos)" ]; then
             echo "Sin cambios en el catálogo."
           else
             git config user.name "Sincronizador MN Scents"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add data/productos.json
+            git add -A data/productos.json img/productos      # incluye fotos renombradas a un nombre seguro
             git commit -m "Catálogo actualizado desde Google Sheets"
             # Si alguien subió algo mientras corría, se pone encima y reintenta
             for intento in 1 2 3; do

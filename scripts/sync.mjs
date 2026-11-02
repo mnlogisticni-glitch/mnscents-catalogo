@@ -9,7 +9,7 @@
 // la web sigue mostrando la última versión correcta.
 // Sin dependencias: solo Node 18+.
 
-import { readFile, writeFile, access } from 'node:fs/promises';
+import { readFile, writeFile, access, readdir, rename } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
@@ -90,6 +90,11 @@ const MIN_PEDIDOS_TOP = 2;
 const COLUMNAS = ['id', 'catalogo', 'nombre', 'marca', 'presentacion', 'notas', 'descripcion',
   'precio_detalle_cs', 'precio_detalle_usd', 'precio_mayor_cs', 'precio_mayor_usd', 'estado', 'foto', 'mostrar', 'orden'];
 
+const FOTO_VALIDA = /^[A-Za-z0-9][A-Za-z0-9._-]*\.(webp|png|jpe?g|avif)$/i;
+// "Ñandú Rosé 2.WEBP" → "nandu-rose-2.webp": solo letras sin tilde, números, punto y guion (nunca "/" ni comillas)
+export const nombreSeguro = s => String(s).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+  .replace(/[\s_]+/g, '-').replace(/[^a-z0-9.-]/g, '').replace(/-+/g, '-').replace(/^[-.]+/, '').replace(/-+\./g, '.');
+
 export async function convertir(texto, { comprobarFotos = true } = {}) {
   const filas = parsearCSV(texto);
   if (filas.length < 2) throw new Error('La hoja está vacía o no tiene filas de productos.');
@@ -163,13 +168,25 @@ export async function convertir(texto, { comprobarFotos = true } = {}) {
     }
 
     let foto = g('foto') || null;
-    if (foto && !/^[A-Za-z0-9][A-Za-z0-9._-]*\.(webp|png|jpe?g|avif)$/i.test(foto)) {
-      avisos.push(`${pref}: la foto "${foto}" no es un nombre de archivo válido (ej.: mi-perfume.webp). Se mostrará sin foto.`);
-      foto = null;
+    // Un nombre con espacios, mayúsculas o tildes (como sale al subir la foto desde el teléfono)
+    // se convierte en uno seguro: "AFNAN 9 PM ELIXIR IMG.webp" → "afnan-9-pm-elixir-img.webp".
+    let original = null;
+    if (foto && !FOTO_VALIDA.test(foto)) {
+      const seguro = nombreSeguro(foto);
+      if (FOTO_VALIDA.test(seguro)) { original = foto; foto = seguro; }
+      else { avisos.push(`${pref}: la foto "${foto}" no es un nombre de archivo válido (ej.: mi-perfume.webp). Se mostrará sin foto.`); foto = null; }
     }
     if (foto && comprobarFotos) {
       try { await access(path.join(CARPETA_FOTOS, foto)); }
-      catch { avisos.push(`${pref}: no encontré la foto "${foto}" en img/productos. Se mostrará sin foto.`); foto = null; }
+      catch {
+        // si el archivo subido tiene el nombre "feo", se renombra al seguro (el sincronizador publica el cambio)
+        const archivos = await readdir(CARPETA_FOTOS).catch(() => []);
+        const igual = archivos.find(a => a !== foto && nombreSeguro(a) === foto);
+        if (igual) {
+          await rename(path.join(CARPETA_FOTOS, igual), path.join(CARPETA_FOTOS, foto));
+          avisos.push(`${pref}: renombré la foto "${igual}" a "${foto}" (sin espacios ni mayúsculas). Ya se muestra en la web.`);
+        } else { avisos.push(`${pref}: no encontré la foto "${original || foto}" en img/productos. Se mostrará sin foto.`); foto = null; }
+      }
     }
 
     // Pedidos de los últimos 30 días (columna opcional, viene de las Ventas del sistema).
