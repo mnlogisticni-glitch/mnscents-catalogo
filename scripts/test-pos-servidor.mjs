@@ -302,6 +302,19 @@ prueba('Recalcular: escribe el costo promedio en Inventario y el costo del día 
   assert.equal(ven.celda(6, 24), inv.celda(5, 36) + inv.celda(5, 37));
 });
 
+prueba('Editar a mano Compras o Ventas recalcula solo (onEdit); editar otras columnas no', () => {
+  const L = conCompras(); ctx.posInstalarCostos_(L); ctx.posRecalcularCostos_(L);
+  const inv = L.hojas['Inventario'], com = L.hojas['Compras'];
+  const evento = (hoja, fila, col) => ({ source: L, range: { getSheet: () => ({ getName: () => hoja }), getColumn: () => col, getLastColumn: () => col, getRow: () => fila } });
+  com.poner(4, 6, 1000);                                   // cambia el precio de la compra
+  ctx.onEdit(evento('Ventas', 4, 20));                     // columna Alerta: no recalcula
+  assert.equal(inv.celda(5, 36), 833.3333, 'sin cambios todavía: (2 × 700 + 4 × 900) ÷ 6');
+  ctx.onEdit(evento('Compras', 4, 6));
+  assert.equal(inv.celda(5, 36), 900, 'ahora sí: (2 × 700 + 4 × 1,000) ÷ 6');
+  delete props.POS_COSTOS; com.poner(4, 6, 500); ctx.onEdit(evento('Compras', 4, 6));
+  assert.equal(inv.celda(5, 36), 900, 'sin instalar no hace nada'); props.POS_COSTOS = '1';
+});
+
 console.log('\nDirección de la app web');
 prueba('Pide la dirección una vez, la valida, la guarda y la usa en el enlace', () => {
   const respuestas = [];
