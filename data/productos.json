@@ -1,5 +1,5 @@
 {
- "actualizado": "2026-11-02T03:33:39.764Z",
+ "actualizado": "2026-11-02T03:42:06.594Z",
  "productos": [
   {
    "id": "H01",
@@ -531,7 +531,7 @@
    "estado": "coming_soon",
    "existencias": 0,
    "etiqueta": null,
-   "foto": null,
+   "foto": "afnan-9-pm-elixir-img.webp",
    "orden": 18,
    "sku": "6290171075738"
   },
