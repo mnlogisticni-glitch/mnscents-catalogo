@@ -734,7 +734,7 @@ function posRecalcularCostos_(ss) {
   var vi = inv.getRange(POS.PRIMERA, 1, nInv, 30).getValues();
   var productos = [], filaDe = {};
   vi.forEach(function (f, k) {
-    var ref = String(f[I.REF - 1] || ''); if (!f[0] || !ref) return;
+    var ref = String(f[I.REF - 1] || ''); if (f[0] === '' || f[0] == null || !ref) return;   // un SKU 0 también cuenta
     filaDe[ref] = k;
     productos.push({ ref: ref, inicial: posNum_(f[14]), precio: posNum_(f[28]), imp: posNum_(f[29]) });   // O, AC, AD
   });

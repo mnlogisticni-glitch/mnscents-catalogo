@@ -295,6 +295,9 @@ prueba('Recalcular: escribe el costo promedio en Inventario y el costo del día 
   assert.deepEqual([inv.celda(5, 36), inv.celda(5, 37)], [860, 80], 'quedaba 1 a C$700 + llegan 4 a C$900 + C$100 → (700 + 3,600) ÷ 5 y (0 + 400) ÷ 5');
   assert.equal(ven.celda(5, 24), 700);
   assert.equal(ctx.posRecalcularCostos_(L), 0, 'la segunda vez no reescribe nada');
+  inv.poner(4, 1, 0); inv.poner(4, 15, 3); inv.poner(4, 29, 800);   // un perfume con SKU 0 también se calcula
+  ctx.posRecalcularCostos_(L);
+  assert.equal(inv.celda(4, 36), 800);
   atender(L, { accion: 'venta', venta: ventaBase({ lineas: [{ ref: 'AFNAN 9PM - 100ML (222)', cantidad: 1, precio: 1490, tipo: 'Detalle' }] }) }, AHORA);
   assert.equal(ven.celda(6, 24), inv.celda(5, 36) + inv.celda(5, 37));
 });
