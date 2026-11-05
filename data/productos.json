@@ -1,5 +1,5 @@
 {
- "actualizado": "2026-11-05T09:57:09.667Z",
+ "actualizado": "2026-11-05T23:00:50.724Z",
  "productos": [
   {
    "id": "H01",
@@ -169,8 +169,8 @@
      "usd": 24.55
     }
    },
-   "estado": "agotado",
-   "existencias": 0,
+   "estado": "disponible",
+   "existencias": 1,
    "etiqueta": null,
    "foto": "uomo-intense.webp",
    "orden": 6,
