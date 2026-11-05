@@ -1,5 +1,5 @@
 {
- "actualizado": "2026-11-02T03:50:37.380Z",
+ "actualizado": "2026-11-05T09:57:09.667Z",
  "productos": [
   {
    "id": "H01",
@@ -89,7 +89,6 @@
    "etiqueta": null,
    "foto": "afnan-9pm.webp",
    "orden": 3,
-   "top": 3,
    "sku": "6290171002338"
   },
   {
@@ -295,6 +294,7 @@
    "etiqueta": "top",
    "foto": "hawas-ice.webp",
    "orden": 10,
+   "top": 3,
    "sku": "614514331040"
   },
   {
