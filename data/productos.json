@@ -1,5 +1,5 @@
 {
- "actualizado": "2026-11-08T03:48:52.301Z",
+ "actualizado": "2026-11-08T04:48:45.743Z",
  "productos": [
   {
    "id": "H01",
@@ -499,7 +499,7 @@
      "usd": 21.2
     }
    },
-   "estado": "coming_soon",
+   "estado": "disponible",
    "existencias": 11,
    "etiqueta": null,
    "foto": "stallion53.imperial.png",
@@ -733,7 +733,7 @@
      "usd": 21.2
     }
    },
-   "estado": "coming_soon",
+   "estado": "disponible",
    "existencias": 5,
    "etiqueta": null,
    "foto": "stallion53-paradise.webp",
@@ -763,7 +763,7 @@
      "usd": 21.2
     }
    },
-   "estado": "coming_soon",
+   "estado": "disponible",
    "existencias": 5,
    "etiqueta": null,
    "foto": "stallion53-la-furia.webp",
