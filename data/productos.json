@@ -1,5 +1,5 @@
 {
- "actualizado": "2026-11-08T04:48:45.743Z",
+ "actualizado": "2026-11-08T17:30:32.220Z",
  "productos": [
   {
    "id": "H01",
@@ -55,7 +55,7 @@
      "usd": 28.9
     }
    },
-   "estado": "coming_soon",
+   "estado": "disponible",
    "existencias": 12,
    "etiqueta": null,
    "foto": "khamrah-qahwa.webp",
