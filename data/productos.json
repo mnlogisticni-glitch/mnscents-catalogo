@@ -1,5 +1,5 @@
 {
- "actualizado": "2026-11-05T23:00:50.724Z",
+ "actualizado": "2026-11-08T03:48:52.301Z",
  "productos": [
   {
    "id": "H01",
@@ -25,7 +25,7 @@
     }
    },
    "estado": "disponible",
-   "existencias": 10,
+   "existencias": 22,
    "etiqueta": "top",
    "foto": "mandarin-sky.webp",
    "orden": 1,
@@ -56,7 +56,7 @@
     }
    },
    "estado": "coming_soon",
-   "existencias": 0,
+   "existencias": 12,
    "etiqueta": null,
    "foto": "khamrah-qahwa.webp",
    "orden": 2,
@@ -500,7 +500,7 @@
     }
    },
    "estado": "coming_soon",
-   "existencias": 0,
+   "existencias": 11,
    "etiqueta": null,
    "foto": "stallion53.imperial.png",
    "orden": 17,
@@ -734,7 +734,7 @@
     }
    },
    "estado": "coming_soon",
-   "existencias": 0,
+   "existencias": 5,
    "etiqueta": null,
    "foto": "stallion53-paradise.webp",
    "orden": 7,
@@ -764,7 +764,7 @@
     }
    },
    "estado": "coming_soon",
-   "existencias": 0,
+   "existencias": 5,
    "etiqueta": null,
    "foto": "stallion53-la-furia.webp",
    "orden": 8,
