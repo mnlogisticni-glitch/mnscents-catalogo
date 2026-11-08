@@ -1,5 +1,5 @@
 {
- "actualizado": "2026-11-08T17:30:32.220Z",
+ "actualizado": "2026-11-08T21:32:04.874Z",
  "productos": [
   {
    "id": "H01",
@@ -734,7 +734,7 @@
     }
    },
    "estado": "disponible",
-   "existencias": 5,
+   "existencias": 4,
    "etiqueta": null,
    "foto": "stallion53-paradise.webp",
    "orden": 7,
