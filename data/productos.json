@@ -1,5 +1,5 @@
 {
- "actualizado": "2026-11-08T21:32:04.874Z",
+ "actualizado": "2026-11-09T09:58:10.677Z",
  "productos": [
   {
    "id": "H01",
@@ -148,7 +148,7 @@
    "etiqueta": null,
    "foto": "club-de-nuit-intense-man.webp",
    "orden": 5,
-   "top": 2,
+   "top": 3,
    "sku": "6085010044712"
   },
   {
@@ -294,7 +294,7 @@
    "etiqueta": "top",
    "foto": "hawas-ice.webp",
    "orden": 10,
-   "top": 3,
+   "top": 2,
    "sku": "614514331040"
   },
   {
