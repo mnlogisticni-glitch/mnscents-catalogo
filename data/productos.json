@@ -1,5 +1,5 @@
 {
- "actualizado": "2026-11-09T20:49:49.231Z",
+ "actualizado": "2026-11-09T23:36:38.216Z",
  "productos": [
   {
    "id": "H01",
@@ -85,7 +85,7 @@
     }
    },
    "estado": "disponible",
-   "existencias": 10,
+   "existencias": 9,
    "etiqueta": null,
    "foto": "afnan-9pm.webp",
    "orden": 3,
@@ -144,11 +144,11 @@
     }
    },
    "estado": "disponible",
-   "existencias": 5,
+   "existencias": 4,
    "etiqueta": null,
    "foto": "club-de-nuit-intense-man.webp",
    "orden": 5,
-   "top": 3,
+   "top": 2,
    "sku": "6085010044712"
   },
   {
@@ -200,7 +200,7 @@
     }
    },
    "estado": "disponible",
-   "existencias": 9,
+   "existencias": 7,
    "etiqueta": null,
    "foto": "nautica-voyage.webp",
    "orden": 7,
@@ -229,8 +229,8 @@
      "usd": 26.3
     }
    },
-   "estado": "disponible",
-   "existencias": 1,
+   "estado": "agotado",
+   "existencias": 0,
    "etiqueta": null,
    "foto": "badee-al-oud-for-glory.webp",
    "orden": 8,
@@ -260,7 +260,7 @@
     }
    },
    "estado": "disponible",
-   "existencias": 13,
+   "existencias": 11,
    "etiqueta": null,
    "foto": "9am-dive.webp",
    "orden": 9,
@@ -294,7 +294,7 @@
    "etiqueta": "top",
    "foto": "hawas-ice.webp",
    "orden": 10,
-   "top": 2,
+   "top": 3,
    "sku": "614514331040"
   },
   {
@@ -648,10 +648,11 @@
     }
    },
    "estado": "disponible",
-   "existencias": 4,
+   "existencias": 3,
    "etiqueta": null,
    "foto": "odyssey-candee.webp",
    "orden": 4,
+   "top": 2,
    "sku": "6294015188622"
   },
   {
@@ -682,7 +683,7 @@
    "etiqueta": null,
    "foto": "yara-tous.webp",
    "orden": 5,
-   "top": 2,
+   "top": 3,
    "sku": "0"
   },
   {
@@ -708,7 +709,6 @@
    "etiqueta": null,
    "foto": "set-yara-4-piezas.webp",
    "orden": 6,
-   "top": 3,
    "sku": "6290362344407"
   },
   {
