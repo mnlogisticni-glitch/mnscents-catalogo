@@ -1,5 +1,5 @@
 {
- "actualizado": "2026-11-09T09:58:10.677Z",
+ "actualizado": "2026-11-09T20:49:49.231Z",
  "productos": [
   {
    "id": "H01",
@@ -677,11 +677,12 @@
      "usd": 22.95
     }
    },
-   "estado": "disponible",
-   "existencias": 1,
+   "estado": "agotado",
+   "existencias": 0,
    "etiqueta": null,
    "foto": "yara-tous.webp",
    "orden": 5,
+   "top": 2,
    "sku": "0"
   },
   {
@@ -707,7 +708,7 @@
    "etiqueta": null,
    "foto": "set-yara-4-piezas.webp",
    "orden": 6,
-   "top": 2,
+   "top": 3,
    "sku": "6290362344407"
   },
   {
