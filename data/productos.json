@@ -1,5 +1,5 @@
 {
- "actualizado": "2026-11-09T23:36:38.216Z",
+ "actualizado": "2026-11-10T03:46:57.832Z",
  "productos": [
   {
    "id": "H01",
@@ -470,7 +470,7 @@
     }
    },
    "estado": "disponible",
-   "existencias": 4,
+   "existencias": 3,
    "etiqueta": null,
    "foto": "club-de-nuit-iconic.webp",
    "orden": 16,
