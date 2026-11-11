@@ -1,5 +1,5 @@
 {
- "actualizado": "2026-11-10T09:52:42.706Z",
+ "actualizado": "2026-11-11T22:47:35.810Z",
  "productos": [
   {
    "id": "H01",
@@ -56,7 +56,7 @@
     }
    },
    "estado": "disponible",
-   "existencias": 12,
+   "existencias": 11,
    "etiqueta": null,
    "foto": "khamrah-qahwa.webp",
    "orden": 2,
@@ -85,10 +85,11 @@
     }
    },
    "estado": "disponible",
-   "existencias": 9,
+   "existencias": 7,
    "etiqueta": null,
    "foto": "afnan-9pm.webp",
    "orden": 3,
+   "top": 2,
    "sku": "6290171002338"
   },
   {
@@ -115,7 +116,7 @@
     }
    },
    "estado": "disponible",
-   "existencias": 2,
+   "existencias": 1,
    "etiqueta": null,
    "foto": "amber-oud-gold-edition.webp",
    "orden": 4,
@@ -144,7 +145,7 @@
     }
    },
    "estado": "disponible",
-   "existencias": 4,
+   "existencias": 3,
    "etiqueta": null,
    "foto": "club-de-nuit-intense-man.webp",
    "orden": 5,
@@ -200,7 +201,7 @@
     }
    },
    "estado": "disponible",
-   "existencias": 7,
+   "existencias": 6,
    "etiqueta": null,
    "foto": "nautica-voyage.webp",
    "orden": 7,
@@ -260,7 +261,7 @@
     }
    },
    "estado": "disponible",
-   "existencias": 11,
+   "existencias": 9,
    "etiqueta": null,
    "foto": "9am-dive.webp",
    "orden": 9,
@@ -294,7 +295,6 @@
    "etiqueta": "top",
    "foto": "hawas-ice.webp",
    "orden": 10,
-   "top": 2,
    "sku": "614514331040"
   },
   {
@@ -380,7 +380,7 @@
     }
    },
    "estado": "disponible",
-   "existencias": 6,
+   "existencias": 5,
    "etiqueta": null,
    "foto": "mandarin-sky-elixir.webp",
    "orden": 13,
@@ -410,7 +410,7 @@
     }
    },
    "estado": "disponible",
-   "existencias": 4,
+   "existencias": 3,
    "etiqueta": null,
    "foto": "jean-lowe-vibe.webp",
    "orden": 14,
@@ -440,7 +440,7 @@
     }
    },
    "estado": "disponible",
-   "existencias": 4,
+   "existencias": 3,
    "etiqueta": null,
    "foto": "asad-bourbon.webp",
    "orden": 15,
@@ -500,7 +500,7 @@
     }
    },
    "estado": "disponible",
-   "existencias": 11,
+   "existencias": 10,
    "etiqueta": null,
    "foto": "stallion53.imperial.png",
    "orden": 17,
@@ -619,7 +619,7 @@
     }
    },
    "estado": "disponible",
-   "existencias": 5,
+   "existencias": 4,
    "etiqueta": null,
    "foto": "delilah-pour-femme.webp",
    "orden": 3,
@@ -648,7 +648,7 @@
     }
    },
    "estado": "disponible",
-   "existencias": 3,
+   "existencias": 2,
    "etiqueta": null,
    "foto": "odyssey-candee.webp",
    "orden": 4,
@@ -735,7 +735,7 @@
     }
    },
    "estado": "disponible",
-   "existencias": 4,
+   "existencias": 3,
    "etiqueta": null,
    "foto": "stallion53-paradise.webp",
    "orden": 7,
@@ -765,7 +765,7 @@
     }
    },
    "estado": "disponible",
-   "existencias": 5,
+   "existencias": 4,
    "etiqueta": null,
    "foto": "stallion53-la-furia.webp",
    "orden": 8,
