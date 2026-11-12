@@ -1,5 +1,5 @@
 {
- "actualizado": "2026-11-11T22:47:35.810Z",
+ "actualizado": "2026-11-12T09:55:23.846Z",
  "productos": [
   {
    "id": "H01",
@@ -29,7 +29,6 @@
    "etiqueta": "top",
    "foto": "mandarin-sky.webp",
    "orden": 1,
-   "top": 1,
    "sku": "6294015149371"
   },
   {
@@ -89,7 +88,7 @@
    "etiqueta": null,
    "foto": "afnan-9pm.webp",
    "orden": 3,
-   "top": 2,
+   "top": 1,
    "sku": "6290171002338"
   },
   {
@@ -149,7 +148,7 @@
    "etiqueta": null,
    "foto": "club-de-nuit-intense-man.webp",
    "orden": 5,
-   "top": 3,
+   "top": 2,
    "sku": "6085010044712"
   },
   {
@@ -295,6 +294,7 @@
    "etiqueta": "top",
    "foto": "hawas-ice.webp",
    "orden": 10,
+   "top": 3,
    "sku": "614514331040"
   },
   {
