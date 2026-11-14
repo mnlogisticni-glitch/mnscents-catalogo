@@ -1,5 +1,5 @@
 {
- "actualizado": "2026-11-12T09:55:23.846Z",
+ "actualizado": "2026-11-14T02:46:14.106Z",
  "productos": [
   {
    "id": "H01",
@@ -55,7 +55,7 @@
     }
    },
    "estado": "disponible",
-   "existencias": 11,
+   "existencias": 10,
    "etiqueta": null,
    "foto": "khamrah-qahwa.webp",
    "orden": 2,
@@ -84,7 +84,7 @@
     }
    },
    "estado": "disponible",
-   "existencias": 7,
+   "existencias": 6,
    "etiqueta": null,
    "foto": "afnan-9pm.webp",
    "orden": 3,
@@ -144,7 +144,7 @@
     }
    },
    "estado": "disponible",
-   "existencias": 3,
+   "existencias": 2,
    "etiqueta": null,
    "foto": "club-de-nuit-intense-man.webp",
    "orden": 5,
@@ -380,7 +380,7 @@
     }
    },
    "estado": "disponible",
-   "existencias": 5,
+   "existencias": 4,
    "etiqueta": null,
    "foto": "mandarin-sky-elixir.webp",
    "orden": 13,
