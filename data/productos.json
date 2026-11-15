@@ -1,5 +1,5 @@
 {
- "actualizado": "2026-11-14T02:46:14.106Z",
+ "actualizado": "2026-11-15T01:40:29.824Z",
  "productos": [
   {
    "id": "H01",
@@ -260,10 +260,11 @@
     }
    },
    "estado": "disponible",
-   "existencias": 9,
+   "existencias": 8,
    "etiqueta": null,
    "foto": "9am-dive.webp",
    "orden": 9,
+   "top": 3,
    "sku": "6290171072836"
   },
   {
@@ -294,7 +295,6 @@
    "etiqueta": "top",
    "foto": "hawas-ice.webp",
    "orden": 10,
-   "top": 3,
    "sku": "614514331040"
   },
   {
