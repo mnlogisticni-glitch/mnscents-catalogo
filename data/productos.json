@@ -1,5 +1,5 @@
 {
- "actualizado": "2026-11-19T03:04:00.342Z",
+ "actualizado": "2026-11-19T20:22:07.460Z",
  "productos": [
   {
    "id": "H01",
@@ -148,7 +148,7 @@
    "etiqueta": null,
    "foto": "club-de-nuit-intense-man.webp",
    "orden": 5,
-   "top": 2,
+   "top": 3,
    "sku": "6085010044712"
   },
   {
@@ -264,7 +264,7 @@
    "etiqueta": null,
    "foto": "9am-dive.webp",
    "orden": 9,
-   "top": 3,
+   "top": 2,
    "sku": "6290171072836"
   },
   {
@@ -563,7 +563,7 @@
    "etiqueta": "top",
    "foto": "9am-pour-femme.webp",
    "orden": 1,
-   "top": 1,
+   "top": 2,
    "sku": "6290171072591"
   },
   {
@@ -652,7 +652,7 @@
    "etiqueta": null,
    "foto": "odyssey-candee.webp",
    "orden": 4,
-   "top": 2,
+   "top": 1,
    "sku": "6294015188622"
   },
   {
@@ -683,7 +683,6 @@
    "etiqueta": null,
    "foto": "yara-tous.webp",
    "orden": 5,
-   "top": 3,
    "sku": "0"
   },
   {
@@ -739,6 +738,7 @@
    "etiqueta": null,
    "foto": "stallion53-paradise.webp",
    "orden": 7,
+   "top": 3,
    "sku": "6294021909679"
   },
   {
