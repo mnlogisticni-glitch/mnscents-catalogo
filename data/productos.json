@@ -1,5 +1,5 @@
 {
- "actualizado": "2026-11-18T03:31:53.806Z",
+ "actualizado": "2026-11-19T03:04:00.342Z",
  "productos": [
   {
    "id": "H01",
@@ -84,7 +84,7 @@
     }
    },
    "estado": "disponible",
-   "existencias": 6,
+   "existencias": 5,
    "etiqueta": null,
    "foto": "afnan-9pm.webp",
    "orden": 3,
@@ -500,7 +500,7 @@
     }
    },
    "estado": "disponible",
-   "existencias": 10,
+   "existencias": 9,
    "etiqueta": null,
    "foto": "stallion53.imperial.png",
    "orden": 17,
@@ -735,7 +735,7 @@
     }
    },
    "estado": "disponible",
-   "existencias": 3,
+   "existencias": 2,
    "etiqueta": null,
    "foto": "stallion53-paradise.webp",
    "orden": 7,
