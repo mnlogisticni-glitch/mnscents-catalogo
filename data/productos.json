@@ -1,5 +1,5 @@
 {
- "actualizado": "2026-11-19T20:22:07.460Z",
+ "actualizado": "2026-11-20T19:52:51.160Z",
  "productos": [
   {
    "id": "H01",
@@ -55,10 +55,11 @@
     }
    },
    "estado": "disponible",
-   "existencias": 9,
+   "existencias": 8,
    "etiqueta": null,
    "foto": "khamrah-qahwa.webp",
    "orden": 2,
+   "top": 3,
    "sku": "6290360593661"
   },
   {
@@ -148,7 +149,6 @@
    "etiqueta": null,
    "foto": "club-de-nuit-intense-man.webp",
    "orden": 5,
-   "top": 3,
    "sku": "6085010044712"
   },
   {
@@ -563,7 +563,6 @@
    "etiqueta": "top",
    "foto": "9am-pour-femme.webp",
    "orden": 1,
-   "top": 2,
    "sku": "6290171072591"
   },
   {
@@ -738,7 +737,7 @@
    "etiqueta": null,
    "foto": "stallion53-paradise.webp",
    "orden": 7,
-   "top": 3,
+   "top": 2,
    "sku": "6294021909679"
   },
   {
