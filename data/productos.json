@@ -1,5 +1,5 @@
 {
- "actualizado": "2026-11-21T17:16:33.561Z",
+ "actualizado": "2026-11-21T22:58:04.935Z",
  "productos": [
   {
    "id": "H01",
@@ -25,7 +25,7 @@
     }
    },
    "estado": "disponible",
-   "existencias": 22,
+   "existencias": 21,
    "etiqueta": "top",
    "foto": "mandarin-sky.webp",
    "orden": 1,
@@ -647,7 +647,7 @@
     }
    },
    "estado": "disponible",
-   "existencias": 2,
+   "existencias": 1,
    "etiqueta": null,
    "foto": "odyssey-candee.webp",
    "orden": 4,
