@@ -1,5 +1,5 @@
 {
- "actualizado": "2026-11-20T19:52:51.160Z",
+ "actualizado": "2026-11-21T01:17:21.979Z",
  "productos": [
   {
    "id": "H01",
@@ -200,7 +200,7 @@
     }
    },
    "estado": "disponible",
-   "existencias": 6,
+   "existencias": 5,
    "etiqueta": null,
    "foto": "nautica-voyage.webp",
    "orden": 7,
