@@ -1,5 +1,5 @@
 {
- "actualizado": "2026-11-21T22:58:04.935Z",
+ "actualizado": "2026-11-23T21:05:48.604Z",
  "productos": [
   {
    "id": "H01",
@@ -145,7 +145,7 @@
     }
    },
    "estado": "disponible",
-   "existencias": 2,
+   "existencias": 1,
    "etiqueta": null,
    "foto": "club-de-nuit-intense-man.webp",
    "orden": 5,
@@ -350,7 +350,7 @@
     }
    },
    "estado": "agotado",
-   "existencias": 1,
+   "existencias": 0,
    "etiqueta": null,
    "foto": "hawas-elixir.webp",
    "orden": 12,
