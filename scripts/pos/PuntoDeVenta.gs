@@ -1214,18 +1214,22 @@ function posWebConectar() {
   if (!m) { ui.alert('Ese enlace no sirve', 'Debe ser el enlace de una hoja de Google (https://docs.google.com/spreadsheets/d/…).', ui.ButtonSet.OK); return; }
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   if (m[1] === ss.getId()) { ui.alert('Ese es el enlace de esta misma hoja. Pega el de la hoja de la web.'); return; }
+  ui.alert('Hoja de la web conectada', posWebConectarCon_(ss, m[1]), ui.ButtonSet.OK);
+}
+// Conecta (o vuelve a conectar) la hoja de la web por su ID: instala, crea el disparador de 10 minutos y sincroniza.
+function posWebConectarCon_(ss, id) {
   var lock = LockService.getScriptLock(); lock.waitLock(30000);
   try {
-    var web = SpreadsheetApp.openById(m[1]).getSheets()[0];
+    var web = SpreadsheetApp.openById(id).getSheets()[0];
     posWebLeer_(web);                                  // revisa que tenga las columnas de la web
-    props.setProperty('WEB_ID', m[1]);
+    PropertiesService.getScriptProperties().setProperty('WEB_ID', id);
     var inst = posWebInstalar_(ss, web);
     ScriptApp.getProjectTriggers().forEach(function (t) { if (t.getHandlerFunction() === 'posWebCadaRato') ScriptApp.deleteTrigger(t); });
     ScriptApp.newTrigger('posWebCadaRato').timeBased().everyMinutes(10).create();
     var res = posWebSincronizar_(ss, web, {});
     posGuardarResumen_(res);
     if (res.cambios) posGithubPublicar_(res.agregados.map(function (a) { return a.id; }));
-    ui.alert('Hoja de la web conectada', posWebTextoResumen_(res) + (inst ? '\n\n' + inst : '') + '\n\nDesde ahora se revisa sola cada 10 minutos.', ui.ButtonSet.OK);
+    return posWebTextoResumen_(res) + (inst ? '\n\n' + inst : '') + '\n\nDesde ahora se revisa sola cada 10 minutos.';
   } finally { lock.releaseLock(); }
 }
 function posWebMenuSincronizar() {
