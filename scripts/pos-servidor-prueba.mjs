@@ -34,6 +34,18 @@ function libroDePrueba(conHistorial = false) {
   [0, 36.8, 'C$', 50000, 15000, 3, 6].forEach((x, i) => conf.poner(4 + i, 2, x));
   ['Estelí', 'Managua', 'León', 'Matagalpa', 'Jinotega'].forEach((x, i) => conf.poner(4 + i, 5, x));
   ['Publicidad', 'Envíos', 'Transporte', 'Empaques', 'Otros'].forEach((x, i) => conf.poner(4 + i, 10, x));
+  ['Oriental', 'Amaderada', 'Floral', 'Cítrica', 'Dulce/Gourmand'].forEach((x, i) => conf.poner(4 + i, 8, x));
+  conf.poner(11, 1, 'Ganancia mínima por perfume al mayor (C$)'); conf.poner(11, 2, 185);
+  const com = L.hojas['Compras'] = new Hoja('Compras', 1003, 16); com.fmt['4,1'] = 'd/m/yyyy';
+  [45900, 3, 'DUBAI', inv.celda(4, 23), 6, 800, '', 50, '', 65, '', 'Recibido'].forEach((x, j) => com.poner(4, j + 1, x));
+  const prov = L.hojas['Proveedores'] = new Hoja('Proveedores', 60, 5); ['DUBAI', 'ANGELITA BOUTIQUE', 'JOMAS SHOP'].forEach((x, i) => prov.poner(4 + i, 1, x));
+  // hoja de la web (otra hoja de Google): la cabecera real y los perfumes del catálogo de prueba con su SKU
+  const CAB = ['id', 'catalogo', 'nombre', 'marca', 'presentacion', 'notas', 'descripcion', 'precio_detalle_cs', 'precio_detalle_usd', 'precio_mayor_cs', 'precio_mayor_usd', 'estado', 'foto', 'mostrar', 'orden', 'existencias', 'etiqueta', 'sku_inventario', 'pedidos_30d'];
+  const web = L.hojas['__web'] = new Hoja('Web', 200, 19);
+  CAB.forEach((c, j) => web.poner(1, j + 1, c));
+  FIX.productos.forEach((p, i) => [p.id, p.catalogo === 'damas' ? 'Damas' : 'Caballeros', p.nombre, p.marca, p.presentacion || '', '', '', p.precios.detalle.cs, p.precios.detalle.usd, p.precios.mayor.cs, p.precios.mayor.usd, 'Disponible', p.foto || '', 'Sí', i + 1, '', '', `SKU-${p.id}`, '']
+    .forEach((x, j) => web.poner(2 + i, j + 1, x)));
+  web.f['2,16'] = '=ARRAYFORMULA(existencias)'; web.f['2,19'] = '=ARRAYFORMULA(pedidos)';
   L.hojas['Ajustes'] = new Hoja('Ajustes', 503, 13); L.hojas['Ajustes'].fmt['4,1'] = 'd/m/yyyy';
   L.hojas['Gastos'] = new Hoja('Gastos', 503, 11); L.hojas['Gastos'].fmt['4,1'] = 'd/m/yyyy';
   return L;
@@ -69,7 +81,11 @@ function historialDePrueba(ven, inv) {
 }
 
 let libro = libroDePrueba();
-props.POS_TOKEN = CLAVE;
+props.POS_TOKEN = CLAVE; props.WEB_ID = 'WEBID'; props.GITHUB_TOKEN = 'github_pat_prueba';
+// GitHub falso: guarda lo que se le pide (fotos y "publicar")
+export const github = [];
+ctx.SpreadsheetApp.openById = id => { if (id !== 'WEBID') throw new Error('No existe la hoja'); return { getSheets: () => [libro.hojas['__web']] }; };
+ctx.UrlFetchApp = { fetch: (url, o) => { github.push({ url, metodo: o.method, bytes: o.payload ? o.payload.length : 0 }); const c = o.method === 'get' ? 404 : o.method === 'put' ? 201 : 204; return { getResponseCode: () => c, getContentText: () => '{}' }; } };
 let lento = 0, caido = false;
 
 const volcar = n => { const h = libro.getSheetByName(n); return h ? h.v.slice(0, Math.max(h.getLastRow(), 3)) : null; };
@@ -78,7 +94,8 @@ http.createServer((req, res) => {
   const cab = { 'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json' };
   if (req.method === 'GET') {
     const u = new URL(req.url, 'http://x');
-    if (u.pathname === '/reset') { libro = libroDePrueba(u.searchParams.get('historial') === '1'); for (const k in props) if (k !== 'POS_TOKEN') delete props[k]; props.POS_TOKEN = CLAVE; lento = 0; caido = false; }
+    if (u.pathname === '/reset') { libro = libroDePrueba(u.searchParams.get('historial') === '1'); for (const k in props) if (k !== 'POS_TOKEN') delete props[k]; props.POS_TOKEN = CLAVE; if (u.searchParams.get('sinweb') !== '1') { props.WEB_ID = 'WEBID'; props.GITHUB_TOKEN = 'github_pat_prueba'; } github.length = 0; lento = 0; caido = false; }
+    if (u.pathname === '/github') { res.writeHead(200, cab); return res.end(JSON.stringify(github)); }
     if (u.pathname === '/caido') caido = u.searchParams.get('v') === '1';
     if (u.pathname === '/lento') lento = Number(u.searchParams.get('ms') || 0);
     if (u.pathname === '/hoja') { res.writeHead(200, cab); return res.end(JSON.stringify(volcar(u.searchParams.get('n')))); }

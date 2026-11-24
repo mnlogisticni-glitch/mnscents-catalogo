@@ -86,3 +86,58 @@ function posPruebaEnCopia() {
   Logger.log(texto);
   return texto;
 }
+
+/**
+ * Prueba de Entradas y de la conexión Inventario → web, sobre COPIAS de las dos hojas (nunca sobre las reales).
+ * Antes: en la copia, menú 🛒 Punto de venta → Conectar con la hoja de la web (pegando la COPIA de la hoja de la web).
+ */
+function posPruebaEntradas() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  if (!/PRUEBA/.test(ss.getName())) throw new Error('Esta hoja no se llama "… PRUEBA …": la prueba solo se corre en una copia.');
+  var web = posWebHoja_();
+  if (!/PRUEBA/.test(web.getParent().getName())) throw new Error('La hoja de la web conectada no es una copia de PRUEBA.');
+  var log = [], fallas = 0, ahora = new Date();
+  var ok = function (n, c, extra) { log.push((c ? '✓ ' : '✗ ') + n + (c ? '' : '  → ' + JSON.stringify(extra))); if (!c) fallas++; };
+  POS_TZ = ss.getSpreadsheetTimeZone();
+  var inv = ss.getSheetByName('Inventario'), com = ss.getSheetByName('Compras');
+
+  var e = posAtender_(ss, { accion: 'estado' }, ahora);
+  ok('Estado v' + e.version + ' con proveedores, familias, último pedido y ganancia mínima', e.version >= 5 && e.config.proveedores.length > 0 && e.config.familias.length > 0 && e.config.ultimoPedido && e.config.gananciaMinMayor > 0, e.config);
+  ok('Precio mayorista (AH) como valor, no fórmula', !/IMPORTRANGE/i.test(inv.getRange(4, 34).getFormula()) && posNum_(inv.getRange(4, 34).getValue()) > 0, inv.getRange(4, 34).getFormula());
+  log.push('   Pendientes de la web: ' + JSON.stringify(e.web.pendientes));
+
+  // Perfume nuevo (código de prueba que no existe)
+  var sku = '999000' + String(Date.now()).slice(-6);
+  var r = posAtender_(ss, { accion: 'entrada', id: 'pe-' + sku, entrada: { nuevo: true, sku: sku, marca: 'Prueba', nombre: 'Perfume de prueba', presentacion: '100ML', genero: 'Hombre', familia: e.config.familias[0],
+    nombreWeb: 'Perfume de prueba', marcaWeb: 'Prueba', notas: 'Dulce · Ámbar', descripcion: 'Fila de prueba.', cantidad: 6, costo: 1000, envio: 50, aduana: 0, otros: 65.35, precio: 1890, mayor: 1300, proveedor: e.config.proveedores[0], pedido: 99, llego: false } }, ahora).resultado;
+  var fi = r.fila;
+  ok('Inventario: fila nueva ' + fi, String(inv.getRange(fi, 3).getValue()) === 'PERFUME DE PRUEBA' && inv.getRange(fi, 12).getValue() === 1890 && inv.getRange(fi, 34).getValue() === 1300, inv.getRange(fi, 1, 1, 6).getValues()[0]);
+  ok('Inventario: la referencia (W) coincide con la de Compras', String(inv.getRange(fi, 23).getValue()) === r.ref, [inv.getRange(fi, 23).getValue(), r.ref]);
+  ok('Inventario: stock 0 y revisión sin alerta rara', inv.getRange(fi, 18).getValue() === 0, inv.getRange(fi, 18).getValue());
+  var fc = com.getRange(r.compra, 1, 1, 16).getValues()[0];
+  ok('Compras: fila ' + r.compra + ' En tránsito, costo llegado 1,115.35, revisión OK', fc[11] === 'En tránsito' && Math.abs(fc[14] - 1115.35) < 0.01 && fc[15] === 'OK', fc);
+  ok('Web: fila nueva en Coming soon', r.web && r.web.agregado && r.web.agregado.estado === 'Coming soon', r.web);
+  var w = posWebLeer_(web), fw = r.web && r.web.agregado ? w.filas[r.web.agregado.fila - 2] : [];
+  ok('Web: nombre, notas, precios y SKU', fw[w.col.nombre] === 'Perfume de prueba' && fw[w.col.notas] === 'Dulce · Ámbar' && fw[w.col.precio_detalle_cs] === 1890 && posSku_(fw[w.col.sku_inventario]) === sku, fw);
+  SpreadsheetApp.flush(); Utilities.sleep(4000);
+  var ex = web.getRange(r.web.agregado.fila, w.col.existencias + 1).getValue();
+  ok('Web: la fórmula de existencias sigue viva para la fila nueva (' + ex + ')', ex === 0 || ex === '0', ex);
+
+  // Llega: Recibido → stock 6 y la web pasa a Disponible
+  com.getRange(r.compra, 12).setValue('Recibido'); SpreadsheetApp.flush();
+  ok('Al marcar Recibido el stock sube a 6', inv.getRange(fi, 18).getValue() === 6, inv.getRange(fi, 18).getValue());
+  var res = posWebSincronizar_(ss, web, {});
+  ok('La web lo pasa a Disponible', res.disponibles.indexOf('Perfume de prueba') >= 0, res);
+
+  // Entrada de uno que ya tengo, con precio nuevo
+  var r2 = posAtender_(ss, { accion: 'entrada', id: 'pe2-' + sku, entrada: { nuevo: false, ref: r.ref, cantidad: 2, costo: 1200, envio: 0, aduana: 0, otros: 0, precio: 1950, mayor: 1300, proveedor: '', pedido: 99, llego: true } }, ahora).resultado;
+  SpreadsheetApp.flush();
+  ok('Ya lo tengo: stock 8 y precio 1,950 en el Inventario', inv.getRange(fi, 18).getValue() === 8 && inv.getRange(fi, 12).getValue() === 1950, [inv.getRange(fi, 18).getValue(), inv.getRange(fi, 12).getValue()]);
+  w = posWebLeer_(web); fw = w.filas[w.porSku[sku] - 2];
+  ok('Y el precio nuevo llegó a la web', fw[w.col.precio_detalle_cs] === 1950, fw);
+  ok('Costo promedio (6 a 1,115.35 + 2 a 1,200)', Math.abs(inv.getRange(fi, 11).getValue() - 1136.51) < 0.02, inv.getRange(fi, 11).getValue());
+
+  var texto = (fallas ? '❌ ' + fallas + ' FALLAS' : '✅ TODO BIEN') + '\n' + log.join('\n') + '\n(Borra las filas de prueba o tira las copias a la papelera.)';
+  Logger.log(texto);
+  return texto;
+}

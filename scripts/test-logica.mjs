@@ -3,7 +3,7 @@
 import { readFile } from 'node:fs/promises';
 import assert from 'node:assert/strict';
 import { calcular, mensajeWhatsApp, enlaceWhatsApp, fmtCS, fmtUSD, esComprable } from '../js/precios.js';
-import { nombreSeguro, convertir } from './sync.mjs';
+import { nombreSeguro, convertir, idsEsperados } from './sync.mjs';
 
 let ok = 0, fallos = 0;
 const prueba = (nombre, fn) => { try { fn(); ok++; console.log('  ✓ ' + nombre); } catch (e) { fallos++; console.log('  ✗ ' + nombre + '\n    ' + e.message); } };
@@ -154,6 +154,15 @@ prueba('Inventario: existencias que vienen de la fórmula se respetan y avisa si
   assert.equal(rInv.errores.length, 0, JSON.stringify(rInv.errores));
   assert.equal(rInv.productos.find(p => p.id === 'H01').existencias, 6);
   assert.ok(rInv.avisos.some(a => /\(B\)|H02|Fila 3/.test(a) && /SKU/.test(a)), JSON.stringify(rInv.avisos));
+});
+
+const rCs = await convertir(cabInv + 'H01,Caballeros,A,M,,,,1460,40,1080,29.5,Coming soon,,Sí,1,5,,111\nH02,Caballeros,B,M,,,,1460,40,1080,29.5,Coming soon,,Sí,2,0,,222\nH03,Caballeros,C,M,,,,1460,40,1080,29.5,Coming soon,,Sí,3,,,\n', { comprobarFotos: false });
+prueba('Coming soon con unidades en el Inventario se publica Disponible; sin unidades sigue Coming soon', () => {
+  assert.deepEqual(rCs.productos.map(p => p.estado), ['disponible', 'coming_soon', 'coming_soon']);
+});
+prueba('Publicar desde la hoja: solo acepta códigos simples para esperar', () => {
+  assert.deepEqual(idsEsperados('H17, D03,cambio,,$(rm -rf),../x'), ['H17', 'D03']);
+  assert.deepEqual(idsEsperados(''), []);
 });
 
 // ---------- Comparar ----------

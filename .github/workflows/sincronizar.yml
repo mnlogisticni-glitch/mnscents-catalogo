@@ -3,7 +3,12 @@ name: Sincronizar catálogo desde Google Sheets
 on:
   schedule:
     - cron: '7 * * * *'      # cada hora (minuto 7, hora UTC)
-  workflow_dispatch: {}      # botón "Run workflow" = Actualizar ahora
+  workflow_dispatch:         # botón "Run workflow" = Actualizar ahora; también lo usa la hoja del sistema al agregar perfumes
+    inputs:
+      esperar:
+        description: 'Lo llena la hoja del sistema (códigos de perfumes nuevos o "cambio"). Déjalo vacío.'
+        required: false
+        default: ''
 
 permissions:
   contents: write
@@ -15,12 +20,23 @@ concurrency:
 jobs:
   sincronizar:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 15
     steps:
       # Siempre la versión más reciente de main (también al usar "Re-run")
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
           ref: main
+      # Fotos que llegan desde el punto de venta (img/entrantes/): se les quita el fondo y pasan a img/productos
+      - name: Fotos nuevas
+        run: |
+          if ls img/entrantes/*.jpg img/entrantes/*.jpeg img/entrantes/*.png img/entrantes/*.webp >/dev/null 2>&1; then
+            python3 -m venv /tmp/fotos
+            /tmp/fotos/bin/pip install --quiet pillow
+            /tmp/fotos/bin/pip install --quiet "rembg[cpu]==2.0.67" || echo "No se pudo instalar el quitafondos: se publican con su fondo."
+            /tmp/fotos/bin/python scripts/fotos-entrantes.py
+          else
+            echo "Sin fotos nuevas."
+          fi
       - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
         with:
           node-version: 22
@@ -28,15 +44,17 @@ jobs:
         env:
           # Como secreto, GitHub la oculta en los registros públicos (***). La variable queda de respaldo.
           SHEET_CSV_URL: ${{ secrets.SHEET_CSV_URL || vars.SHEET_CSV_URL }}
+          # si lo pidió la hoja, espera a que Google publique el cambio (se pasa como variable, nunca dentro del comando)
+          ESPERAR: ${{ inputs.esperar }}
         run: node scripts/sync.mjs
       - name: Publicar si hubo cambios
         run: |
-          if [ -z "$(git status --porcelain -- data/productos.json img/productos)" ]; then
+          if [ -z "$(git status --porcelain -- data/productos.json img/productos img/entrantes)" ]; then
             echo "Sin cambios en el catálogo."
           else
             git config user.name "Sincronizador MN Scents"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add -A data/productos.json img/productos      # incluye fotos renombradas a un nombre seguro
+            git add -A data/productos.json img/productos img/entrantes   # fotos renombradas, fotos nuevas sin fondo
             git commit -m "Catálogo actualizado desde Google Sheets"
             # Si alguien subió algo mientras corría, se pone encima y reintenta
             for intento in 1 2 3; do

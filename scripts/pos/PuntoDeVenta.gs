@@ -1,4 +1,7 @@
-/** @OnlyCurrentDoc  (el script solo puede abrir ESTA hoja; no ve el resto de tu Drive) */
+/**
+ * Permisos: esta hoja, la hoja de la web (solo la que conectes desde el menú) y GitHub (subir fotos y
+ * publicar la web al momento, solo si conectas una clave de GitHub desde el menú). No ve el resto de tu Drive.
+ */
 /**
  * MN Scents — Punto de venta (conexión con la hoja MNScents_claude)
  *
@@ -22,7 +25,7 @@ var POS = {
   MOTIVOS: ['Mal conteo', 'Pérdida o robo', 'Dañado', 'Regalo o muestra', 'Uso personal'],
   TIPOS: ['Detalle', 'Detalle sin sello', 'Mayorista', 'Canje'],   // columna "Tipo de venta" (W) de Ventas; "sin sello" = precio especial, no suma a la tarjeta
   PREMIO: /stallion\s*53/i,                     // el perfume gratis de la tarjeta se elige de esta línea
-  VERSION: 4,
+  VERSION: 5,
 };
 
 // Columnas (número, base 1)
@@ -40,6 +43,11 @@ function onOpen() {
     .addItem('Vincular un teléfono o computadora', 'posVincular')
     .addSeparator()
     .addItem('Recalcular costos', 'posMenuCostos')
+    .addSeparator()
+    .addItem('Conectar con la hoja de la web', 'posWebConectar')
+    .addItem('Enviar perfumes nuevos y precios a la web ahora', 'posWebMenuSincronizar')
+    .addItem('Conectar GitHub (fotos y publicar al instante)', 'posGithubConectar')
+    .addSeparator()
     .addItem('Cambiar la dirección de la app web', 'posCambiarDireccion')
     .addItem('Cambiar la clave (desvincula todos)', 'posCambiarClave')
     .addToUi();
@@ -151,10 +159,11 @@ function posAtender_(ss, req, ahora) {
     else if (a === 'ajuste') r = posAjuste_(ss, req.ajuste, ahora);
     else if (a === 'caja') r = posCaja_(ss, req.caja, ahora);
     else if (a === 'sellos') r = posSellos_(ss, req.sellos, ahora);
+    else if (a === 'entrada') r = posEntrada_(ss, req.entrada, ahora);
     else throw new Error('Acción desconocida.');
     if (idOp) cache.put('pos:' + idOp, JSON.stringify(r || {}), 21600);
     // el costo del día queda guardado en la venta o el ajuste (si falla, la venta igual quedó)
-    if (a === 'venta' || a === 'anular' || a === 'ajuste') { try { posRecalcularCostos_(ss); } catch (e) { Logger.log('Costos: ' + e); } }
+    if (a === 'venta' || a === 'anular' || a === 'ajuste' || a === 'entrada') { try { posRecalcularCostos_(ss); } catch (e) { Logger.log('Costos: ' + e); } }
     // Se responde enseguida: la hoja recalcula sus fórmulas después y la app pide el estado aparte.
     return { ok: true, version: POS.VERSION, resultado: r };
   } finally { lock.releaseLock(); }
@@ -254,7 +263,11 @@ function posConfig_(ss) {
   var b = h.getRange(4, 2, 7, 1).getValues();
   var ciudades = h.getRange(4, 5, 17, 1).getValues().map(function (x) { return String(x[0]); }).filter(String);
   var gastos = h.getRange(4, 10, 8, 1).getValues().map(function (x) { return String(x[0]); }).filter(String);
-  return { metaVentas: posNum_(b[3][0]), metaGanancia: posNum_(b[4][0]), tipoCambio: posNum_(b[1][0]), stockMinimo: posNum_(b[5][0]) || 3, minimoMayor: posNum_(b[6][0]) || 6, ciudades: ciudades, gastos: gastos, bancos: POS.BANCOS, motivos: POS.MOTIVOS };
+  var familias = h.getRange(4, 8, 10, 1).getValues().map(function (x) { return String(x[0]); }).filter(String);
+  var b11 = h.getRange(11, 1, 1, 2).getValues()[0];
+  var minGanancia = /ganancia m[ií]nima/i.test(String(b11[0])) ? posNum_(b11[1]) : 0;
+  return { metaVentas: posNum_(b[3][0]), metaGanancia: posNum_(b[4][0]), tipoCambio: posNum_(b[1][0]), stockMinimo: posNum_(b[5][0]) || 3, minimoMayor: posNum_(b[6][0]) || 6, ciudades: ciudades, gastos: gastos, bancos: POS.BANCOS, motivos: POS.MOTIVOS,
+    familias: familias, gananciaMinMayor: minGanancia, proveedores: posProveedores_(ss), ultimoPedido: posUltimoPedido_(ss) };
 }
 
 function posHojaCaja_(ss) {
@@ -384,6 +397,7 @@ function posEstado_(ss, ahora) {
     hoy: posVentasDia_(filas, dia),
     historial: posHistorial_(filas, productos),
     fidelidad: posFidelidad_(ss),
+    web: posWebResumen_(),
   };
 }
 
@@ -870,4 +884,437 @@ function onEdit(e) {
     POS_TZ = ss.getSpreadsheetTimeZone() || POS_TZ;
     posRecalcularCostos_(ss);
   } catch (err) { /* nunca estorbar la edición */ }
+}
+
+// ======================================================================
+// Entradas de perfumes y catálogo de la web
+// ======================================================================
+// El Inventario manda: nombre, precios y stock salen de ahí. La hoja de la web ("Catálogo MN Scents
+// (fuente de la web)") recibe sola cada perfume nuevo y los cambios de precio. Lo que se escribe a mano
+// en la hoja de la web (notas, descripción, foto, orden, etiqueta, mostrar) nunca se pisa.
+var WEB = {
+  REPO: 'mnlogisticni-glitch/mnscents-catalogo',
+  FLUJO: 'sincronizar.yml',
+  PUBLICAR: 38,                                     // Inventario AL: "Publicar en la web" (Sí/No; vacío = Sí)
+  CAB_PUBLICAR: 'Publicar en la web (Sí / No)',
+  INICIAL_PROV: 31,                                 // Inventario AE (proveedor inicial)
+  STOCK_INICIAL: 15,                                // Inventario O
+  FORMULAS: ['existencias', 'pedidos_30d'],         // columnas con ARRAYFORMULA en la hoja de la web: nunca se escriben
+  NECESARIAS: ['id', 'catalogo', 'nombre', 'marca', 'presentacion', 'precio_detalle_cs', 'precio_detalle_usd', 'precio_mayor_cs', 'precio_mayor_usd', 'estado', 'foto', 'mostrar', 'orden', 'sku_inventario'],
+  C: { FECHA: 1, PEDIDO: 2, PROV: 3, PROD: 4, CANT: 5, PRECIO: 6, ENVIO: 8, ADUANA: 9, OTROS: 10, ESTADO: 12, RECIBIDO: 14 },
+  FIN_COMPRAS: 1003,
+};
+
+function posSku_(v) {
+  if (typeof v === 'number') return isFinite(v) ? String(Math.round(v)) : '';
+  return String(v == null ? '' : v).trim().replace(/\.0+$/, '');
+}
+function posClaveTexto_(s) { return String(s == null ? '' : s).normalize('NFD').replace(/[̀-ͯ]/g, '').trim().toLowerCase(); }
+function posSlug_(s) { return posClaveTexto_(s).replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''); }
+function posUsd_(cs, tc) { return tc > 0 ? Math.round(cs / tc * 20) / 20 : 0; }     // a 5 centavos, como en la web
+// "ARMAF CLUB DE NUIT" → "Armaf Club de Nuit"; "9PM" y "100ML" quedan igual
+function posBonito_(s) {
+  var chicas = { de: 1, del: 1, la: 1, las: 1, los: 1, el: 1, y: 1, for: 1, of: 1, the: 1, pour: 1, et: 1, en: 1 };
+  return posTexto_(s, 80).toLowerCase().split(' ').map(function (w, i) {
+    if (!w) return w;
+    if (/\d/.test(w) || /^(edp|edt|edc|ml|oz)$/.test(w)) return w.toUpperCase();
+    if (i > 0 && chicas[w]) return w;
+    return w.charAt(0).toUpperCase() + w.slice(1);
+  }).join(' ');
+}
+function posPresentacion_(s) {
+  var t = posTexto_(s, 60), m = /^(\d+(?:[.,]\d+)?)\s*ml$/i.exec(t);
+  return m ? m[1] + ' ml' : t;
+}
+function posCatalogo_(genero) {
+  var g = posClaveTexto_(genero);
+  return /^(hombre|caballero)/.test(g) ? 'Caballeros' : /^(mujer|dama)/.test(g) ? 'Damas' : '';
+}
+function posProveedores_(ss) {
+  var h = ss.getSheetByName('Proveedores');
+  if (!h) return [];
+  return h.getRange(4, 1, 50, 1).getValues().map(function (x) { return posTexto_(x[0], 60); }).filter(String);
+}
+function posUltimoPedido_(ss) {
+  var h = ss.getSheetByName('Compras');
+  if (!h) return null;
+  var v = h.getRange(POS.PRIMERA, 1, WEB.FIN_COMPRAS - POS.PRIMERA + 1, 2).getValues();
+  var num = 0, dia = null;
+  for (var i = 0; i < v.length; i++) { var n = posNum_(v[i][1]); if (n >= num && n > 0) { num = n; dia = posDia_(v[i][0]); } }
+  return num ? { numero: num, dia: dia } : null;
+}
+function posWebResumen_() {
+  var p = PropertiesService.getScriptProperties();
+  var u = null; try { u = JSON.parse(p.getProperty('WEB_ULTIMO') || 'null'); } catch (e) { u = null; }
+  return { conectada: !!p.getProperty('WEB_ID'), github: !!p.getProperty('GITHUB_TOKEN'), pendientes: (u && u.pendientes) || [], cuando: (u && u.cuando) || '' };
+}
+
+// ---------------- la hoja de la web ----------------
+function posWebHoja_() {
+  var id = PropertiesService.getScriptProperties().getProperty('WEB_ID');
+  if (!id) throw new Error('La hoja de la web no está conectada (menú 🛒 Punto de venta → Conectar con la hoja de la web).');
+  return SpreadsheetApp.openById(id).getSheets()[0];
+}
+function posWebLeer_(web) {
+  var ult = Math.max(web.getLastRow(), 1), nc = web.getMaxColumns();
+  var vals = web.getRange(1, 1, ult, nc).getValues();
+  var cab = vals[0].map(function (x) { return String(x).trim(); });
+  var col = {};
+  cab.forEach(function (c, i) { if (c && !(c in col)) col[c] = i; });
+  var faltan = WEB.NECESARIAS.filter(function (c) { return !(c in col); });
+  if (faltan.length) throw new Error('A la hoja de la web le faltan las columnas: ' + faltan.join(', ') + '. No cambies los títulos de la fila 1.');
+  var filas = vals.slice(1), porSku = {}, ultima = 1;
+  filas.forEach(function (f, i) {
+    var r = i + 2;
+    if (String(f[col.id]).trim() !== '' || String(f[col.nombre]).trim() !== '') ultima = r;
+    var s = posSku_(f[col.sku_inventario]);
+    if (s && !(s in porSku)) porSku[s] = r;
+  });
+  return { cab: cab, col: col, filas: filas, porSku: porSku, ultima: ultima };
+}
+// Escribe una fila de la web por tramos, saltando las columnas con fórmula
+function posWebEscribirFila_(web, w, r, datos) {
+  var n = w.cab.length, fila = [];
+  for (var j = 0; j < n; j++) fila.push(w.cab[j] in datos ? datos[w.cab[j]] : null);
+  var j0 = 0;
+  while (j0 < n) {
+    if (fila[j0] === null || WEB.FORMULAS.indexOf(w.cab[j0]) >= 0) { j0++; continue; }
+    var j1 = j0;
+    while (j1 + 1 < n && fila[j1 + 1] !== null && WEB.FORMULAS.indexOf(w.cab[j1 + 1]) < 0) j1++;
+    web.getRange(r, j0 + 1, 1, j1 - j0 + 1).setValues([fila.slice(j0, j1 + 1)]);
+    j0 = j1 + 1;
+  }
+}
+
+/**
+ * Pasa el Inventario a la hoja de la web.
+ * - Perfume del Inventario que no está en la web (por SKU) → fila nueva en "Coming soon" (o "Disponible" si ya hay stock).
+ * - Precio de venta (L) o mayorista (AH) distinto → actualiza C$ y US$ en la web.
+ * - "Coming soon" con unidades en el Inventario → "Disponible".
+ * opciones.extras[sku] = { nombre, marca, presentacion, notas, descripcion, foto } para perfumes nuevos de la app.
+ * opciones.fotos[sku] = nombre de foto nueva para un perfume que ya está en la web.
+ */
+function posWebSincronizar_(ss, web, opciones) {
+  opciones = opciones || {};
+  var extras = opciones.extras || {}, fotos = opciones.fotos || {};
+  var tc = posNum_(posHoja_(ss, POS.CONF).getRange(5, 2).getValue());
+  if (!(tc > 0)) throw new Error('Falta el tipo de cambio en Configuración (B5).');
+  var inv = posHoja_(ss, POS.INV);
+  var nc = Math.min(inv.getMaxColumns(), WEB.PUBLICAR);
+  var vals = inv.getRange(POS.PRIMERA, 1, POS.FIN_INV - POS.PRIMERA + 1, nc).getValues();
+  var w = posWebLeer_(web), col = w.col;
+  var res = { agregados: [], precios: [], disponibles: [], fotos: [], pendientes: [], cambios: 0 };
+
+  var cuenta = {};
+  vals.forEach(function (f) { var s = posSku_(f[I.SKU - 1]); if (s && String(f[I.NOMBRE - 1]).trim()) cuenta[s] = (cuenta[s] || 0) + 1; });
+  // próximos id (H01…, D01…) y orden por catálogo
+  var maxId = { Caballeros: 0, Damas: 0 }, maxOrden = { Caballeros: 0, Damas: 0 };
+  w.filas.forEach(function (f) {
+    var cat = posCatalogo_(f[col.catalogo]) || (/^dam/i.test(String(f[col.catalogo])) ? 'Damas' : '');
+    var m = /^([HD])(\d+)$/i.exec(String(f[col.id]).trim());
+    if (m) { var k = m[1].toUpperCase() === 'H' ? 'Caballeros' : 'Damas'; maxId[k] = Math.max(maxId[k], +m[2]); }
+    if (cat) maxOrden[cat] = Math.max(maxOrden[cat], posNum_(f[col.orden]));
+  });
+  var ids = {}; w.filas.forEach(function (f) { ids[String(f[col.id]).trim()] = 1; });
+  var dos = function (n) { return n < 10 ? '0' + n : String(n); };
+  var vistos = {};
+  var siguiente = w.ultima + 1;
+
+  vals.forEach(function (f, i) {
+    var sku = posSku_(f[I.SKU - 1]), nombreInv = posTexto_(f[I.NOMBRE - 1], 80);
+    if (!sku || !nombreInv) return;
+    if (vistos[sku]) return; vistos[sku] = 1;
+    var publicar = nc >= WEB.PUBLICAR ? posClaveTexto_(f[WEB.PUBLICAR - 1]) : '';
+    if (publicar === 'no') return;
+    var titulo = posBonito_(f[I.MARCA - 1]) + ' ' + posBonito_(nombreInv);
+    if (cuenta[sku] > 1) { res.pendientes.push({ nombre: titulo, sku: sku, motivo: 'El SKU ' + sku + ' está repetido en el Inventario: cada perfume necesita su propio código.' }); return; }
+    var precio = posNum_(f[I.PRECIO - 1]), mayor = posNum_(f[I.MAYOR - 1]), stock = posNum_(f[I.STOCK - 1]);
+    var r = w.porSku[sku];
+    if (r) {
+      var fw = w.filas[r - 2], cambio = {};
+      if (precio > 0 && Math.abs(posNum_(fw[col.precio_detalle_cs]) - precio) >= 0.5) { cambio.precio_detalle_cs = precio; cambio.precio_detalle_usd = posUsd_(precio, tc); }
+      if (mayor > 0 && Math.abs(posNum_(fw[col.precio_mayor_cs]) - mayor) >= 0.5) { cambio.precio_mayor_cs = mayor; cambio.precio_mayor_usd = posUsd_(mayor, tc); }
+      if (Object.keys(cambio).length) res.precios.push({ nombre: String(fw[col.nombre]), antes: [posNum_(fw[col.precio_detalle_cs]), posNum_(fw[col.precio_mayor_cs])], ahora: [precio || posNum_(fw[col.precio_detalle_cs]), mayor || posNum_(fw[col.precio_mayor_cs])] });
+      if (/^coming/i.test(String(fw[col.estado]).trim()) && stock > 0) { cambio.estado = 'Disponible'; res.disponibles.push(String(fw[col.nombre])); }
+      if (fotos[sku]) { cambio.foto = fotos[sku]; res.fotos.push(String(fw[col.nombre])); }
+      if (Object.keys(cambio).length) { posWebEscribirFila_(web, w, r, cambio); res.cambios++; }
+      return;
+    }
+    // perfume nuevo para la web
+    var x = extras[sku] || {};
+    var catalogo = posCatalogo_(f[I.GENERO - 1]);
+    var falta = !(precio > 0) ? 'falta el precio de venta (Inventario, columna L)'
+      : !(mayor > 0) ? 'falta el precio mayorista (Inventario, columna AH)'
+      : mayor > precio ? 'el precio mayorista es más alto que el de detalle'
+      : !catalogo ? 'en Género (columna F) elige Hombre o Mujer: la web solo tiene Caballeros y Damas' : '';
+    if (falta) { res.pendientes.push({ nombre: titulo, sku: sku, motivo: falta }); return; }
+    var letra = catalogo === 'Caballeros' ? 'H' : 'D';
+    var id; do { maxId[catalogo]++; id = letra + dos(maxId[catalogo]); } while (ids[id]);
+    ids[id] = 1;
+    maxOrden[catalogo]++;
+    var datos = {
+      id: id, catalogo: catalogo,
+      nombre: posTexto_(x.nombre, 80) || posBonito_(nombreInv),
+      marca: posTexto_(x.marca, 60) || posBonito_(f[I.MARCA - 1]),
+      presentacion: posTexto_(x.presentacion, 60) || posPresentacion_(f[I.PRES - 1]),
+      notas: posTexto_(x.notas, 200), descripcion: posTexto_(x.descripcion, 600),
+      precio_detalle_cs: precio, precio_detalle_usd: posUsd_(precio, tc), precio_mayor_cs: mayor, precio_mayor_usd: posUsd_(mayor, tc),
+      estado: stock > 0 ? 'Disponible' : 'Coming soon', foto: posTexto_(x.foto, 120), mostrar: 'Sí', orden: maxOrden[catalogo],
+      sku_inventario: /^\d{1,15}$/.test(sku) ? Number(sku) : sku,
+    };
+    if ('etiqueta' in col) datos.etiqueta = '';
+    posWebEscribirFila_(web, w, siguiente, datos);
+    w.porSku[sku] = siguiente;
+    res.agregados.push({ id: id, nombre: datos.nombre, sku: sku, estado: datos.estado, fila: siguiente });
+    siguiente++; res.cambios++;
+  });
+  return res;
+}
+
+// ---------------- GitHub: fotos y publicar al momento ----------------
+function posGithub_(metodo, ruta, cuerpo) {
+  var token = PropertiesService.getScriptProperties().getProperty('GITHUB_TOKEN');
+  if (!token) return null;
+  var o = { method: metodo, muteHttpExceptions: true, headers: { Authorization: 'Bearer ' + token, Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28' } };
+  if (cuerpo) { o.contentType = 'application/json'; o.payload = JSON.stringify(cuerpo); }
+  var r = UrlFetchApp.fetch('https://api.github.com' + ruta, o);
+  var d = null; try { d = JSON.parse(r.getContentText() || 'null'); } catch (e) { d = null; }
+  return { codigo: r.getResponseCode(), datos: d };
+}
+// Nombre libre para la foto (si ya existe uno igual, le agrega un sufijo)
+function posGithubNombreFoto_(base) {
+  var r = posGithub_('get', '/repos/' + WEB.REPO + '/contents/img/productos/' + base + '.webp');
+  if (r && r.codigo === 200) base = base + '-' + Date.now().toString(36).slice(-4);
+  return base;
+}
+// Sube la foto a img/entrantes/ (la sincronización de la web le quita el fondo y la pasa a img/productos)
+function posGithubFoto_(base, b64) {
+  var r = posGithub_('put', '/repos/' + WEB.REPO + '/contents/img/entrantes/' + base + '.jpg', { message: 'Foto nueva desde el punto de venta: ' + base, content: b64 });
+  if (!r) throw new Error('GitHub no está conectado.');
+  if (r.codigo !== 201 && r.codigo !== 200) throw new Error('GitHub respondió ' + r.codigo + (r.datos && r.datos.message ? ' (' + r.datos.message + ')' : '') + '.');
+  return base + '.webp';
+}
+// Pide a GitHub que actualice la web ya (si no, se actualiza sola cada hora)
+function posGithubPublicar_(esperar) {
+  var r = posGithub_('post', '/repos/' + WEB.REPO + '/actions/workflows/' + WEB.FLUJO + '/dispatches', { ref: 'main', inputs: { esperar: (esperar || []).join(',').slice(0, 900) || 'cambio' } });
+  return !!(r && r.codigo === 204);
+}
+function posGuardarResumen_(res, ahora) {
+  try {
+    PropertiesService.getScriptProperties().setProperty('WEB_ULTIMO', JSON.stringify({ pendientes: res.pendientes.slice(0, 20), cuando: Utilities.formatDate(ahora || new Date(), POS.ZONA, 'dd/MM HH:mm') }));
+  } catch (e) { /* no importa */ }
+}
+
+// ---------------- entrada desde la app ----------------
+/**
+ * entrada = { id, nuevo, ref (si no es nuevo), sku, marca, nombre, presentacion, genero ('Hombre'|'Mujer'), familia,
+ *             nombreWeb, marcaWeb, notas, descripcion,
+ *             cantidad, costo, envio, aduana, otros (C$ por unidad), precio, mayor (C$), proveedor, pedido, llego,
+ *             foto: { base64 } | null }
+ */
+function posEntrada_(ss, ent, ahora) {
+  if (!ent) throw new Error('Faltan los datos de la entrada.');
+  var r2 = function (n) { return Math.round(posNum_(n) * 100) / 100; };
+  var cant = Math.round(posNum_(ent.cantidad));
+  var costo = r2(ent.costo), envio = r2(ent.envio), aduana = r2(ent.aduana), otros = r2(ent.otros);
+  var precio = r2(ent.precio), mayor = r2(ent.mayor);
+  if (cant < 1 || cant > 999) throw new Error('La cantidad debe ser de 1 a 999.');
+  if (!(costo > 0)) throw new Error('Falta el precio que te costó cada unidad.');
+  if (envio < 0 || aduana < 0 || otros < 0) throw new Error('Los gastos no pueden ser negativos.');
+  if (!(precio > 0)) throw new Error('Falta el precio de venta al detalle.');
+  if (!(mayor > 0)) throw new Error('Falta el precio por mayor.');
+  if (mayor > precio) throw new Error('El precio por mayor no puede ser más alto que el de detalle.');
+  var inv = posHoja_(ss, POS.INV), com = posHoja_(ss, 'Compras');
+  if (inv.getMaxColumns() < WEB.PUBLICAR) inv.insertColumnsAfter(inv.getMaxColumns(), WEB.PUBLICAR - inv.getMaxColumns());
+  var n = POS.FIN_INV - POS.PRIMERA + 1;
+  var vals = inv.getRange(POS.PRIMERA, 1, n, I.MAYOR).getValues();
+  var fila, ref, sku, avisos = [];
+
+  if (ent.nuevo) {
+    sku = posTexto_(ent.sku, 30);
+    if (!sku) throw new Error('Falta el código (SKU o código de barras).');
+    if (!/^[0-9A-Za-z][0-9A-Za-z .-]*$/.test(sku)) throw new Error('El código solo puede tener números, letras, espacios, puntos o guiones.');
+    var marca = posTexto_(ent.marca, 40).toUpperCase(), nombre = posTexto_(ent.nombre, 60).toUpperCase(), pres = posTexto_(ent.presentacion, 30).toUpperCase();
+    var genero = posCatalogo_(ent.genero) === 'Caballeros' ? 'Hombre' : posCatalogo_(ent.genero) === 'Damas' ? 'Mujer' : '';
+    if (!marca || !nombre) throw new Error('Faltan la marca y el nombre del perfume.');
+    if (!genero) throw new Error('Elige si es de Caballeros o de Damas.');
+    for (var i = 0; i < n; i++) {
+      if (posSku_(vals[i][I.SKU - 1]) === posSku_(sku)) throw new Error('Ese código ya es de ' + posBonito_(vals[i][I.MARCA - 1]) + ' ' + posBonito_(vals[i][I.NOMBRE - 1]) + '. Para sumarle unidades usa "Perfume que ya tengo".');
+    }
+    fila = posUltima_(inv, I.SKU, POS.FIN_INV) + 1;
+    if (fila > POS.FIN_INV) throw new Error('El Inventario llegó a su última fila preparada (' + POS.FIN_INV + ').');
+    var skuCelda = /^\d{1,15}$/.test(sku) ? Number(sku) : sku;
+    inv.getRange(fila, 1, 1, 6).setValues([[skuCelda, marca, nombre, pres, posTexto_(ent.familia, 30), genero]]);
+    inv.getRange(fila, I.PRECIO).setValue(precio);
+    inv.getRange(fila, WEB.STOCK_INICIAL).setValue(0);
+    inv.getRange(fila, I.MAYOR).setValue(mayor);
+    inv.getRange(fila, WEB.PUBLICAR).setValue('Sí');
+    ref = marca + ' ' + nombre + ' - ' + pres + ' (' + sku + ')';
+  } else {
+    var refs = inv.getRange(POS.PRIMERA, I.REF, n, 1).getValues();
+    for (var k = 0; k < n; k++) {
+      var refK = String(refs[k][0]);
+      if (refK && refK === String(ent.ref)) { fila = POS.PRIMERA + k; ref = refK; break; }
+    }
+    if (!fila) throw new Error('Ese perfume ya no está en el Inventario.');
+    sku = posSku_(vals[fila - POS.PRIMERA][I.SKU - 1]);
+    if (Math.abs(posNum_(vals[fila - POS.PRIMERA][I.PRECIO - 1]) - precio) >= 0.005) inv.getRange(fila, I.PRECIO).setValue(precio);
+    if (Math.abs(posNum_(vals[fila - POS.PRIMERA][I.MAYOR - 1]) - mayor) >= 0.005) inv.getRange(fila, I.MAYOR).setValue(mayor);
+  }
+
+  // Compras
+  var fc = posUltima_(com, WEB.C.PROD, WEB.FIN_COMPRAS) + 1;
+  if (fc > WEB.FIN_COMPRAS) throw new Error('La hoja Compras llegó a su última fila preparada (' + WEB.FIN_COMPRAS + ').');
+  var hoy = Math.floor(posSerie_(posHoyNica_(ahora)));
+  var pedido = Math.round(posNum_(ent.pedido));
+  com.getRange(fc, 1, 1, 6).setValues([[hoy, pedido > 0 ? pedido : '', posTexto_(ent.proveedor, 60), ref, cant, costo]]);
+  com.getRange(fc, WEB.C.ENVIO, 1, 3).setValues([[envio || '', aduana || '', otros || '']]);
+  com.getRange(fc, WEB.C.ESTADO).setValue(ent.llego ? 'Recibido' : 'En tránsito');
+  if (ent.llego) com.getRange(fc, WEB.C.RECIBIDO).setValue(hoy);
+  com.getRange(fc, 1).setNumberFormat(com.getRange(POS.PRIMERA, 1).getNumberFormat());
+  if (ent.llego) com.getRange(fc, WEB.C.RECIBIDO).setNumberFormat(com.getRange(POS.PRIMERA, 1).getNumberFormat());
+
+  // Web: foto (GitHub) y fila (hoja de la web). Si algo falla, la entrada igual quedó guardada.
+  var resultado = { fila: fila, ref: ref, sku: sku, compra: fc, avisos: avisos, web: null, publicado: false };
+  var props = PropertiesService.getScriptProperties();
+  var foto = '';
+  if (ent.foto && ent.foto.base64) {
+    if (!props.getProperty('GITHUB_TOKEN')) avisos.push('La foto no se subió: falta conectar GitHub (menú 🛒 Punto de venta en la hoja).');
+    else {
+      try {
+        var b64 = String(ent.foto.base64).replace(/^data:[^,]*,/, '');
+        if (b64.length > 8e6) throw new Error('la foto es muy pesada');
+        var base = posGithubNombreFoto_(posSlug_(ent.nombreWeb || ent.nombre || (ent.nuevo ? '' : ref.replace(/\s*\(.*$/, ''))) || 'perfume');
+        foto = posGithubFoto_(base, b64);
+      } catch (e) { avisos.push('La foto no se subió (' + (e.message || e) + '). La entrada sí quedó guardada.'); }
+    }
+  }
+  if (props.getProperty('WEB_ID')) {
+    try {
+      var web = posWebHoja_();
+      var op = { extras: {}, fotos: {} };
+      if (ent.nuevo) op.extras[posSku_(sku)] = { nombre: ent.nombreWeb, marca: ent.marcaWeb, presentacion: ent.presentacionWeb, notas: ent.notas, descripcion: ent.descripcion, foto: foto };
+      else if (foto) op.fotos[posSku_(sku)] = foto;
+      var res = posWebSincronizar_(ss, web, op);
+      posGuardarResumen_(res, ahora);
+      var nuevo = res.agregados.filter(function (a) { return a.sku === posSku_(sku); })[0];
+      resultado.web = { agregado: nuevo || null, precios: res.precios.length, pendiente: res.pendientes.filter(function (p) { return p.sku === posSku_(sku); })[0] || null };
+      if (res.cambios || foto) resultado.publicado = posGithubPublicar_(res.agregados.map(function (a) { return a.id; }));
+    } catch (e) { avisos.push('No pude actualizar la hoja de la web (' + (e.message || e) + '). Se intentará sola en unos minutos.'); }
+  } else avisos.push('La hoja de la web no está conectada: el perfume no se agregó a la web.');
+  return resultado;
+}
+
+// ---------------- menús y disparador ----------------
+function posWebConectar() {
+  var ui = SpreadsheetApp.getUi(), props = PropertiesService.getScriptProperties();
+  var r = ui.prompt('Conectar con la hoja de la web', 'Pega el enlace de la hoja "Catálogo MN Scents (fuente de la web)" (el que ves en la barra del navegador cuando la abres).', ui.ButtonSet.OK_CANCEL);
+  if (r.getSelectedButton() !== ui.Button.OK) return;
+  var m = /\/d\/([A-Za-z0-9_-]{20,})/.exec(r.getResponseText()) || /^([A-Za-z0-9_-]{20,})$/.exec(String(r.getResponseText()).trim());
+  if (!m) { ui.alert('Ese enlace no sirve', 'Debe ser el enlace de una hoja de Google (https://docs.google.com/spreadsheets/d/…).', ui.ButtonSet.OK); return; }
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  if (m[1] === ss.getId()) { ui.alert('Ese es el enlace de esta misma hoja. Pega el de la hoja de la web.'); return; }
+  var lock = LockService.getScriptLock(); lock.waitLock(30000);
+  try {
+    var web = SpreadsheetApp.openById(m[1]).getSheets()[0];
+    posWebLeer_(web);                                  // revisa que tenga las columnas de la web
+    props.setProperty('WEB_ID', m[1]);
+    var inst = posWebInstalar_(ss, web);
+    ScriptApp.getProjectTriggers().forEach(function (t) { if (t.getHandlerFunction() === 'posWebCadaRato') ScriptApp.deleteTrigger(t); });
+    ScriptApp.newTrigger('posWebCadaRato').timeBased().everyMinutes(10).create();
+    var res = posWebSincronizar_(ss, web, {});
+    posGuardarResumen_(res);
+    if (res.cambios) posGithubPublicar_(res.agregados.map(function (a) { return a.id; }));
+    ui.alert('Hoja de la web conectada', posWebTextoResumen_(res) + (inst ? '\n\n' + inst : '') + '\n\nDesde ahora se revisa sola cada 10 minutos.', ui.ButtonSet.OK);
+  } finally { lock.releaseLock(); }
+}
+function posWebMenuSincronizar() {
+  var ui = SpreadsheetApp.getUi(), ss = SpreadsheetApp.getActiveSpreadsheet();
+  var lock = LockService.getScriptLock(); lock.waitLock(30000);
+  try {
+    var res = posWebSincronizar_(ss, posWebHoja_(), {});
+    posGuardarResumen_(res);
+    var pub = res.cambios ? posGithubPublicar_(res.agregados.map(function (a) { return a.id; })) : false;
+    ui.alert('Web', posWebTextoResumen_(res) + (res.cambios ? (pub ? '\n\nLa web se actualiza en unos minutos.' : '\n\nLa web se actualiza en menos de una hora.') : ''), ui.ButtonSet.OK);
+  } finally { lock.releaseLock(); }
+}
+// Disparador cada 10 minutos
+function posWebCadaRato() {
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(20000)) return;
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    POS_TZ = ss.getSpreadsheetTimeZone() || POS_TZ;
+    var res = posWebSincronizar_(ss, posWebHoja_(), {});
+    posGuardarResumen_(res);
+    if (res.cambios) posGithubPublicar_(res.agregados.map(function (a) { return a.id; }));
+  } finally { lock.releaseLock(); }
+}
+function posWebTextoResumen_(res) {
+  var t = [];
+  if (res.agregados.length) t.push('Perfumes nuevos en la web: ' + res.agregados.map(function (a) { return a.nombre + ' (' + a.estado + ')'; }).join(', ') + '.');
+  if (res.precios.length) t.push('Precios actualizados: ' + res.precios.map(function (p) { return p.nombre; }).join(', ') + '.');
+  if (res.disponibles.length) t.push('Pasaron a Disponible: ' + res.disponibles.join(', ') + '.');
+  if (res.pendientes.length) t.push('No se pudieron subir:\n' + res.pendientes.map(function (p) { return '• ' + p.nombre + ': ' + p.motivo; }).join('\n'));
+  return t.length ? t.join('\n\n') : 'La web ya estaba al día.';
+}
+function posGithubConectar() {
+  var ui = SpreadsheetApp.getUi(), props = PropertiesService.getScriptProperties();
+  var r = ui.prompt('Conectar GitHub', 'Pega la clave de GitHub (empieza con github_pat_). Se guarda solo dentro de este script, no en la hoja ni en la web.', ui.ButtonSet.OK_CANCEL);
+  if (r.getSelectedButton() !== ui.Button.OK) return;
+  var t = String(r.getResponseText() || '').trim();
+  if (!/^(github_pat_|ghp_)[A-Za-z0-9_]{20,}$/.test(t)) { ui.alert('Esa clave no parece de GitHub', 'Debe empezar con github_pat_.', ui.ButtonSet.OK); return; }
+  var antes = props.getProperty('GITHUB_TOKEN');
+  props.setProperty('GITHUB_TOKEN', t);
+  var prueba = posGithub_('get', '/repos/' + WEB.REPO + '/actions/workflows/' + WEB.FLUJO);
+  if (!prueba || prueba.codigo !== 200) {
+    if (antes) props.setProperty('GITHUB_TOKEN', antes); else props.deleteProperty('GITHUB_TOKEN');
+    ui.alert('No funcionó', 'GitHub respondió ' + (prueba ? prueba.codigo : '—') + '. Revisa que la clave tenga acceso al repositorio mnscents-catalogo con permisos de Contents y Actions (lectura y escritura).', ui.ButtonSet.OK);
+    return;
+  }
+  ui.alert('GitHub conectado', 'Listo: las fotos de la app se suben a la web y los cambios se publican en minutos.', ui.ButtonSet.OK);
+}
+
+// Instala una vez: columna AL "Publicar en la web", precio mayorista fijo en el Inventario y la ganancia mínima por mayor.
+function posWebInstalar_(ss, web) {
+  var inv = posHoja_(ss, POS.INV), hecho = [];
+  if (inv.getMaxColumns() < WEB.PUBLICAR) inv.insertColumnsAfter(inv.getMaxColumns(), WEB.PUBLICAR - inv.getMaxColumns());
+  var cab = inv.getRange(3, WEB.PUBLICAR);
+  if (String(cab.getValue()) !== WEB.CAB_PUBLICAR) { inv.getRange(3, 32).copyTo(cab, SpreadsheetApp.CopyPasteType.PASTE_FORMAT, false); cab.setValue(WEB.CAB_PUBLICAR); }
+  var n = POS.FIN_INV - POS.PRIMERA + 1;
+  var w = posWebLeer_(web);
+  // AL: los que ya están en la web = Sí; los demás = No (así no aparecen perfumes viejos sin querer)
+  var a = inv.getRange(POS.PRIMERA, 1, n, 1).getValues(), al = inv.getRange(POS.PRIMERA, WEB.PUBLICAR, n, 1).getValues();
+  var marcados = 0;
+  var nuevoAl = al.map(function (x, i) {
+    var s = posSku_(a[i][0]);
+    if (!s || String(x[0]).trim() !== '') return [x[0]];
+    marcados++;
+    return [w.porSku[s] ? 'Sí' : 'No'];
+  });
+  if (marcados) inv.getRange(POS.PRIMERA, WEB.PUBLICAR, n, 1).setValues(nuevoAl);
+  try {
+    var regla = SpreadsheetApp.newDataValidation().requireValueInList(['Sí', 'No'], true).setAllowInvalid(false).build();
+    inv.getRange(POS.PRIMERA, WEB.PUBLICAR, n, 1).setDataValidation(regla);
+  } catch (e) { /* sin validación no pasa nada */ }
+  // AH: deja de venir de la web (IMPORTRANGE) y pasa a ser un valor del Inventario
+  var ah = inv.getRange(POS.PRIMERA, I.MAYOR, n, 1);
+  var f0 = String(inv.getRange(POS.PRIMERA, I.MAYOR).getFormula() || '');
+  if (/IMPORTRANGE/i.test(f0)) {
+    var valores = ah.getValues().map(function (x, i) { return [posSku_(a[i][0]) && posNum_(x[0]) > 0 ? posNum_(x[0]) : '']; });
+    ah.clearContent();
+    ah.setValues(valores);
+    inv.getRange(3, I.MAYOR).setNote('Precio mayorista: escríbelo aquí (o desde la app). La hoja de la web lo copia sola.');
+    hecho.push('El precio mayorista (columna AH) ahora se escribe en el Inventario y la web lo copia.');
+  }
+  var t2 = String(inv.getRange('A2').getValue());
+  if (t2 && t2.indexOf('Publicar en la web') < 0) inv.getRange('A2').setValue(t2 + '  WEB: un perfume con precio de venta (L), precio mayorista (AH) y Género Hombre o Mujer se agrega solo a la web en "Coming soon" y pasa a Disponible cuando hay stock. Columna AL "Publicar en la web": No = no lo agrega.');
+  // Configuración: ganancia mínima por perfume al mayor (para el aviso de la app)
+  var conf = posHoja_(ss, POS.CONF);
+  if (String(conf.getRange(11, 1).getValue()).trim() === '' && String(conf.getRange(11, 2).getValue()).trim() === '') {
+    conf.getRange(11, 1, 1, 2).setValues([['Ganancia mínima por perfume al mayor (C$)', 185]]);
+    hecho.push('En Configuración (fila 11) quedó la ganancia mínima por perfume al mayor: C$185. La app te avisa si un precio queda por debajo.');
+  }
+  PropertiesService.getScriptProperties().setProperty('POS_WEB', '1');
+  return hecho.join('\n');
 }

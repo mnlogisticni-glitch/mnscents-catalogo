@@ -156,7 +156,8 @@ export async function convertir(texto, { comprobarFotos = true } = {}) {
     // Conectado al Inventario: un perfume disponible sin SKU no tendría límite de unidades
     if ('sku_inventario' in col && !g('sku_inventario') && est === 'disponible')
       avisos.push(`${pref}: no tiene SKU en "sku_inventario", así que la web no limita sus unidades. Copia su SKU de la hoja Inventario.`);
-    const estadoFinal = existencias === 0 && est === 'disponible' ? 'agotado' : est;
+    // Disponible sin unidades → Agotado; Coming soon que ya llegó (hay unidades en el Inventario) → Disponible
+    const estadoFinal = existencias === 0 && est === 'disponible' ? 'agotado' : est === 'coming_soon' && existencias > 0 ? 'disponible' : est;
 
     // Etiqueta (columna opcional): Nuevo o Más vendido
     let etiqueta = null;
@@ -225,8 +226,25 @@ export async function convertir(texto, { comprobarFotos = true } = {}) {
 }
 
 // ---------- Programa ----------
+// Cuando la hoja del sistema pide publicar (ESPERAR="H17,D03" o "cambio"), Google tarda unos minutos en
+// actualizar el CSV publicado: se vuelve a leer cada 40 s hasta ver el cambio (máximo ~5 min).
+export const idsEsperados = v => String(v || '').split(',').map(x => x.trim()).filter(x => /^[A-Za-z0-9_-]{1,40}$/.test(x) && x !== 'cambio');
 async function main() {
-  const { errores, avisos, productos } = await convertir(await obtenerCSV());
+  const pedido = !process.argv[2] && String(process.env.ESPERAR || '').trim() !== '';
+  const esperar = idsEsperados(process.env.ESPERAR);
+  let anterior = null;
+  try { anterior = JSON.parse(await readFile(SALIDA, 'utf8')); } catch {}
+  let r;
+  for (let intento = 1; ; intento++) {
+    r = await convertir(await obtenerCSV());
+    const ids = new Set(r.productos.map(p => p.id));
+    const faltan = esperar.filter(x => !ids.has(x));
+    const igual = anterior && JSON.stringify(anterior.productos) === JSON.stringify(r.productos);
+    if (!pedido || r.errores.length || (!faltan.length && !igual) || intento >= 8) break;
+    console.log(`Google todavía no publica el cambio${faltan.length ? ` (${faltan.join(', ')})` : ''}; vuelvo a leer en 40 s…`);
+    await new Promise(ok => setTimeout(ok, 40000));
+  }
+  const { errores, avisos, productos } = r;
   avisos.forEach(a => console.warn('⚠️  ' + a));
   if (errores.length) {
     console.error('\n❌ No se publicó nada. Corrige estos errores en la hoja:\n');
@@ -235,8 +253,6 @@ async function main() {
   }
   if (!productos.length) { console.error('❌ La hoja no tiene productos visibles. No se publicó nada.'); process.exit(1); }
 
-  let anterior = null;
-  try { anterior = JSON.parse(await readFile(SALIDA, 'utf8')); } catch {}
   if (anterior && JSON.stringify(anterior.productos) === JSON.stringify(productos)) {
     console.log(`✓ Sin cambios (${productos.length} productos).`); return;
   }

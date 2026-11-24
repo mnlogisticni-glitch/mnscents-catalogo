@@ -337,5 +337,133 @@ prueba('Pide la dirección una vez, la valida, la guarda y la usa en el enlace',
   assert.match(ui.dialogo.html, /Dirección de la hoja: https:\/\/script\.google\.com\/macros\/s\/AKfy_buena-123\/exec/);
 });
 
+
+console.log('\nEntradas y hoja de la web');
+const CAB_WEB = ['id', 'catalogo', 'nombre', 'marca', 'presentacion', 'notas', 'descripcion', 'precio_detalle_cs', 'precio_detalle_usd', 'precio_mayor_cs', 'precio_mayor_usd', 'estado', 'foto', 'mostrar', 'orden', 'existencias', 'etiqueta', 'sku_inventario', 'pedidos_30d'];
+const llamadas = [];
+const conWeb = ({ github = true, conectada = true } = {}) => {
+  const L = conCompras();
+  const prov = L.hojas['Proveedores'] = new Hoja('Proveedores', 60, 5); prov.poner(4, 1, 'DUBAI'); prov.poner(5, 1, 'JOMAS SHOP');
+  const web = new Hoja('Catálogo web', 100, 19);
+  CAB_WEB.forEach((c, j) => web.poner(1, j + 1, c));
+  [['H01', 'Caballeros', 'Mandarin Sky', 'Armaf', '', 'Cítrico', '', 1460, 40, 985, 27, 'Disponible', 'mandarin-sky.webp', 'Sí', 1, 10, '', '111', 3],
+   ['H02', 'Caballeros', '9PM', 'Afnan', '', 'Dulce', '', 1490, 40.6, 975, 26.45, 'Coming soon', '9pm.webp', 'Sí', 2, 2, '', '222', 1]]
+    .forEach((f, i) => f.forEach((x, j) => web.poner(2 + i, j + 1, x)));
+  web.f['2,16'] = '=ARRAYFORMULA(existencias)'; web.f['2,19'] = '=ARRAYFORMULA(pedidos)';
+  // el 333 (Yara, Mujer, sin stock) no está en la web
+  L.web = web;
+  ctx.SpreadsheetApp.openById = id => { assert.equal(id, 'WEBID'); return { getSheets: () => [web] }; };
+  ctx.UrlFetchApp = { fetch: (url, o) => { llamadas.push({ url, metodo: o.method, cuerpo: o.payload ? JSON.parse(o.payload) : null });
+    const codigo = o.method === 'get' ? 404 : o.method === 'put' ? 201 : 204;
+    return { getResponseCode: () => codigo, getContentText: () => '{}' }; } };
+  llamadas.length = 0;
+  if (conectada) props.WEB_ID = 'WEBID'; else delete props.WEB_ID;
+  if (github) props.GITHUB_TOKEN = 'github_pat_prueba'; else delete props.GITHUB_TOKEN;
+  delete props.WEB_ULTIMO;
+  return L;
+};
+const filaWeb = (web, r) => Object.fromEntries(CAB_WEB.map((c, j) => [c, web.celda(r, j + 1)]));
+
+prueba('Perfume del Inventario que falta en la web se agrega solo (id, orden, US$, Coming soon) sin tocar las columnas con fórmula', () => {
+  const L = conWeb(); const web = L.web;
+  const res = J(ctx.posWebSincronizar_(L, web, {}));
+  assert.equal(res.agregados.length, 1);
+  const f = filaWeb(web, 4);
+  assert.deepEqual([f.id, f.catalogo, f.nombre, f.marca, f.presentacion, f.precio_detalle_cs, f.precio_detalle_usd, f.precio_mayor_cs, f.precio_mayor_usd, f.estado, f.mostrar, f.orden, f.sku_inventario],
+    ['D01', 'Damas', 'Yara', 'Lattafa', '100 ml', 1390, 37.75, 905, 24.6, 'Coming soon', 'Sí', 1, 333]);
+  assert.equal(web.celda(4, 16), '', 'existencias la pone la fórmula'); assert.equal(web.celda(4, 19), '', 'pedidos la pone la fórmula');
+  assert.equal(web.f['2,16'], '=ARRAYFORMULA(existencias)');
+  const otra = J(ctx.posWebSincronizar_(L, web, {}));
+  assert.equal(otra.agregados.length, 0, 'no se duplica');
+});
+prueba('Cambio de precio en el Inventario pasa a la web (C$ y US$); Coming soon con stock pasa a Disponible', () => {
+  const L = conWeb(); const web = L.web, inv = L.hojas['Inventario'];
+  inv.poner(4, 12, 1500); inv.poner(4, 34, 1000);
+  const res = J(ctx.posWebSincronizar_(L, web, {}));
+  const f = filaWeb(web, 2);
+  assert.deepEqual([f.precio_detalle_cs, f.precio_detalle_usd, f.precio_mayor_cs, f.precio_mayor_usd], [1500, 40.75, 1000, 27.15]);
+  assert.equal(filaWeb(web, 3).estado, 'Disponible', '9PM tiene 2 en stock');
+  assert.deepEqual(res.disponibles, ['9PM']); assert.equal(res.precios.length, 1);
+  assert.equal(filaWeb(web, 2).notas, 'Cítrico', 'lo escrito a mano no se toca');
+});
+prueba('No sube perfumes incompletos, repetidos o marcados "No"; avisa el motivo', () => {
+  const L = conWeb(); const web = L.web, inv = L.hojas['Inventario'];
+  [['444', 'ARMAF', 'SIN MAYOR', '100ML', '', 'Hombre', 1490, ''], ['555', 'ARMAF', 'UNISEX', '100ML', '', 'Unisex', 1490, 900],
+   ['666', 'ARMAF', 'REPETIDO A', '100ML', '', 'Hombre', 1490, 900], ['666', 'ARMAF', 'REPETIDO B', '100ML', '', 'Hombre', 1490, 900],
+   ['777', 'ARMAF', 'VIEJO', '100ML', '', 'Hombre', 1490, 900]].forEach((p, i) => {
+    const r = 7 + i; p.slice(0, 6).forEach((x, j) => inv.poner(r, j + 1, x)); inv.poner(r, 12, p[6]); inv.poner(r, 34, p[7]);
+  });
+  inv.insertColumnsAfter(35, 3); inv.poner(11, 38, 'No');
+  const res = J(ctx.posWebSincronizar_(L, web, {}));
+  assert.deepEqual(res.agregados.map(a => a.sku), ['333']);
+  const m = Object.fromEntries(res.pendientes.map(p => [p.sku, p.motivo]));
+  assert.match(m['444'], /precio mayorista/); assert.match(m['555'], /Hombre o Mujer/); assert.match(m['666'], /repetido/);
+  assert.equal(m['777'], undefined, '"No" ni se menciona');
+});
+prueba('Instalar: AH deja de leer la web (queda el valor), AL marca Sí a los que ya están y No a los demás, ganancia mínima en Configuración', () => {
+  const L = conWeb(); const inv = L.hojas['Inventario'];
+  inv.f['4,34'] = '=ARRAYFORMULA(IMPORTRANGE("x","J2:J"))';
+  ctx.posWebInstalar_(L, L.web);
+  assert.equal(inv.celda(4, 34), 985); assert.equal(inv.f['4,34'], undefined);
+  assert.deepEqual([inv.celda(4, 38), inv.celda(5, 38), inv.celda(6, 38), inv.celda(7, 38)], ['Sí', 'Sí', 'No', '']);
+  assert.equal(inv.celda(3, 38), 'Publicar en la web (Sí / No)');
+  assert.deepEqual([L.hojas['Configuración'].celda(11, 1), L.hojas['Configuración'].celda(11, 2)], ['Ganancia mínima por perfume al mayor (C$)', 185]);
+  const e = atender(L, { accion: 'estado' }, AHORA);
+  assert.equal(e.config.gananciaMinMayor, 185); assert.deepEqual(e.config.proveedores, ['DUBAI', 'JOMAS SHOP']);
+  assert.deepEqual(J(e.config.ultimoPedido), { numero: 1, dia: diaDe(2026, 10, 20) });
+  ctx.posWebInstalar_(L, L.web);
+  assert.equal(inv.celda(6, 38), 'No', 'repetir no cambia nada');
+});
+const entradaNueva = (extra = {}) => ({ id: 'e-1', nuevo: true, sku: '6290171075288', marca: 'Afnan', nombre: '9pm Rebel', presentacion: '100ml', genero: 'Hombre', familia: 'Dulce/Gourmand',
+  nombreWeb: '9PM Rebel', marcaWeb: 'Afnan', notas: 'Dulce · Frutal', descripcion: 'Nuevo de Afnan.',
+  cantidad: 6, costo: 1012, envio: 50, aduana: 0, otros: 65.35, precio: 1890, mayor: 1300, proveedor: 'DUBAI', pedido: 9, llego: false, foto: { base64: 'AAAA' }, ...extra });
+prueba('Perfume nuevo desde la app: Inventario, Compras, web con notas y foto, y publica en GitHub', () => {
+  const L = conWeb(); const inv = L.hojas['Inventario'], com = L.hojas['Compras'], web = L.web;
+  const r = crudo(L, { accion: 'entrada', id: 'e-1', entrada: entradaNueva() }, AHORA).resultado;
+  assert.deepEqual([inv.celda(7, 1), inv.celda(7, 2), inv.celda(7, 3), inv.celda(7, 4), inv.celda(7, 5), inv.celda(7, 6), inv.celda(7, 12), inv.celda(7, 15), inv.celda(7, 34), inv.celda(7, 38)],
+    [6290171075288, 'AFNAN', '9PM REBEL', '100ML', 'Dulce/Gourmand', 'Hombre', 1890, 0, 1300, 'Sí']);
+  assert.equal(r.ref, 'AFNAN 9PM REBEL - 100ML (6290171075288)');
+  assert.deepEqual([com.celda(5, 1), com.celda(5, 2), com.celda(5, 3), com.celda(5, 4), com.celda(5, 5), com.celda(5, 6), com.celda(5, 8), com.celda(5, 9), com.celda(5, 10), com.celda(5, 12), com.celda(5, 14)],
+    [DIA, 9, 'DUBAI', r.ref, 6, 1012, 50, '', 65.35, 'En tránsito', '']);
+  const f = filaWeb(web, 5);   // la fila 4 es Yara (estaba pendiente en el Inventario)
+  assert.deepEqual([f.id, f.nombre, f.marca, f.notas, f.descripcion, f.foto, f.estado, f.orden, f.precio_detalle_usd], ['H03', '9PM Rebel', 'Afnan', 'Dulce · Frutal', 'Nuevo de Afnan.', '9pm-rebel.webp', 'Coming soon', 3, 51.35]);
+  const put = llamadas.find(l => l.metodo === 'put'), post = llamadas.find(l => l.metodo === 'post');
+  assert.match(put.url, /contents\/img\/entrantes\/9pm-rebel\.jpg$/); assert.equal(put.cuerpo.content, 'AAAA');
+  assert.match(post.url, /actions\/workflows\/sincronizar\.yml\/dispatches$/); assert.deepEqual(J(post.cuerpo), { ref: 'main', inputs: { esperar: 'D01,H03' } });
+  assert.equal(r.publicado, true); assert.equal(r.web.agregado.id, 'H03'); assert.deepEqual(J(r.avisos), []);
+  // reintento sin señal: no se repite
+  crudo(L, { accion: 'entrada', id: 'e-1', entrada: entradaNueva() }, AHORA);
+  assert.equal(com.celda(6, 4), ''); assert.equal(inv.celda(8, 1), '');
+});
+prueba('Entrada de un perfume que ya tengo: cambia precios si los cambiaste y registra la compra recibida', () => {
+  const L = conWeb(); const inv = L.hojas['Inventario'], com = L.hojas['Compras'];
+  const r = crudo(L, { accion: 'entrada', id: 'e-2', entrada: { id: 'e-2', nuevo: false, ref: 'AFNAN 9PM - 100ML (222)', cantidad: 3, costo: 950, envio: 0, aduana: 0, otros: 0, precio: 1550, mayor: 975, proveedor: 'DUBAI', pedido: 10, llego: true, foto: null } }, AHORA).resultado;
+  assert.deepEqual([inv.celda(5, 12), inv.celda(5, 34)], [1550, 975]);
+  assert.deepEqual([com.celda(5, 4), com.celda(5, 5), com.celda(5, 12), com.celda(5, 14)], ['AFNAN 9PM - 100ML (222)', 3, 'Recibido', DIA]);
+  assert.equal(filaWeb(L.web, 3).precio_detalle_cs, 1550);
+  assert.equal(r.sku, '222');
+});
+prueba('Entrada: valida código repetido, mayorista más alto, género y costo', () => {
+  const L = conWeb();
+  assert.throws(() => crudo(L, { accion: 'entrada', id: 'x1', entrada: entradaNueva({ sku: '111' }) }, AHORA), /ya es de Armaf Mandarin Sky/);
+  assert.throws(() => crudo(L, { accion: 'entrada', id: 'x2', entrada: entradaNueva({ mayor: 2000 }) }, AHORA), /mayor no puede ser más alto/);
+  assert.throws(() => crudo(L, { accion: 'entrada', id: 'x3', entrada: entradaNueva({ genero: '' }) }, AHORA), /Caballeros o de Damas/);
+  assert.throws(() => crudo(L, { accion: 'entrada', id: 'x4', entrada: entradaNueva({ costo: 0 }) }, AHORA), /te costó/);
+});
+prueba('Sin GitHub ni hoja de la web conectadas, la entrada igual se guarda y avisa', () => {
+  const L = conWeb({ github: false, conectada: false });
+  const r = crudo(L, { accion: 'entrada', id: 'e-3', entrada: entradaNueva({ id: 'e-3' }) }, AHORA).resultado;
+  assert.equal(L.hojas['Inventario'].celda(7, 3), '9PM REBEL'); assert.equal(L.hojas['Compras'].celda(5, 6), 1012);
+  assert.equal(r.avisos.length, 2); assert.match(r.avisos[0], /GitHub/); assert.match(r.avisos[1], /no está conectada/);
+  assert.equal(llamadas.length, 0);
+  const e = atender(L, { accion: 'estado' }, AHORA); assert.deepEqual(J(e.web), { conectada: false, github: false, pendientes: [], cuando: '' });
+});
+prueba('Si la foto ya existe en la web, usa otro nombre', () => {
+  const L = conWeb();
+  ctx.UrlFetchApp.fetch = (url, o) => { llamadas.push({ url, metodo: o.method, cuerpo: o.payload ? JSON.parse(o.payload) : null }); return { getResponseCode: () => o.method === 'get' ? 200 : o.method === 'put' ? 201 : 204, getContentText: () => '{}' }; };
+  crudo(L, { accion: 'entrada', id: 'e-4', entrada: entradaNueva({ id: 'e-4' }) }, AHORA);
+  assert.match(filaWeb(L.web, 5).foto, /^9pm-rebel-[a-z0-9]{1,4}\.webp$/);
+});
+
 console.log(`\n${ok} pruebas correctas, ${fallos} fallidas.`);
 process.exit(fallos ? 1 : 0);

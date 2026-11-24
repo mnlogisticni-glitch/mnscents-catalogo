@@ -2,6 +2,7 @@
 import { BANCOS, fmtCS, fmtUSD, redondear, titulo, nivelStock, coincide, calcularVenta, vuelto, billetesSugeridos, stockVisible, armarVenta, telWa, recibo, leerVinculo, nuevoId, norm } from './logica.js';
 import { agruparVentas, ventasPendientes, tarjetaCliente, ajustesDe, rachaCliente, esPremio, TARJETA, reposicion, porReponer, listaCompra, PERIODOS, periodo, reporte, metaDelMes, hoyNica, fechaCorta, fechaDeDia, MESES } from './negocio.js';
 import { dibujarRecibo, aBlob, compartirRecibo, descargar } from './recibo-imagen.js';
+import { calcularEntrada, pedidoSugerido, skuValido, normSku, armarEntrada } from './entradas.js';
 import { conexion, guardarConexion, olvidarConexion, estadoGuardado, guardarEstado, cola, encolar, procesarCola, llamar, errores, borrarErrores, ErrorRed } from './api.js';
 
 const $ = (s, r = document) => r.querySelector(s);
@@ -22,6 +23,8 @@ const S = {
   periodo: leerLS('mnpos-periodo-v1', 'mes'), pedido: new Map(), recibo: null,
   sello: null,                       // null = automático (sin sello si hay precio especial); true/false = lo decidiste en esta venta
   ajSellos: { delta: 1, motivo: null, nota: '' },
+  ent: { modo: 'nuevo', ref: null, moneda: 'CS', foto: null, fotoUrl: null, q: '', sucio: false, id: null, guardando: false },
+  web: new Map(),                    // sku → { nombre, foto } de la web (data/productos.json)
 };
 const guardarCarrito = () => { guardarLS('mnpos-carrito-v1', S.carrito); guardarLS('mnpos-cliente-v1', S.cliente); };
 
@@ -115,6 +118,7 @@ async function cargarFotos() {
     const r = await fetch('../data/productos.json', { cache: 'no-cache' });
     const d = await r.json();
     S.fotos = new Map(d.productos.filter(p => p.sku && p.foto).map(p => [String(p.sku), `../img/productos/${p.foto}`]));
+    S.web = new Map(d.productos.filter(p => p.sku).map(p => [normSku(p.sku), { nombre: p.nombre, estado: p.estado }]));
   } catch { /* sin fotos: se muestran iniciales */ }
 }
 function foto(p, tam = 160) {
@@ -163,16 +167,17 @@ async function sincronizar({ silencioso = false } = {}) {
 addEventListener('online', () => sincronizar());
 
 // ---------------------------------------------------------------- pantallas
-const VISTAS = ['vender', 'stock', 'caja', 'reportes'];
+const VISTAS = ['vender', 'stock', 'caja', 'reportes', 'entradas'];
 function ponerVista(v) {
   if (!VISTAS.includes(v)) v = 'vender';
   S.vista = v;
   for (const id of VISTAS) $(`#v-${id}`).hidden = id !== v;
   for (const a of $$('.nav-pos a')) a.dataset.vista === v ? a.setAttribute('aria-current', 'page') : a.removeAttribute('aria-current');
   document.body.dataset.vista = v;
-  document.title = { vender: 'Vender', stock: 'Stock', caja: 'Caja', reportes: 'Reportes' }[v] + ' · MN Scents';
+  document.title = { vender: 'Vender', stock: 'Stock', caja: 'Caja', reportes: 'Reportes', entradas: 'Entradas' }[v] + ' · MN Scents';
   pintarBarraCobro();
   if (v === 'reportes' && S.estado) pintarReportes();
+  if (v === 'entradas' && S.estado && !S.ent.sucio) pintarEntradas();
   scrollTo({ top: 0, behavior: 'instant' });
 }
 addEventListener('hashchange', () => { const h = location.hash.slice(1); if (leerVinculo(h)) return arrancar(); if (VISTAS.includes(h) && S.estado) ponerVista(h); });
@@ -190,6 +195,7 @@ function pintarTodo() {
   if (!VISTAS.some(v => !$(`#v-${v}`).hidden)) ponerVista(S.vista);
   pintarChips(); pintarVender(); pintarCarrito(); pintarStock(); pintarCaja(); pintarNav(); pintarRed();
   if (S.vista === 'reportes') pintarReportes();
+  if (!S.ent.sucio) pintarEntradas(); else pintarWebEstado();
 }
 
 function pintarNav() {
@@ -786,6 +792,227 @@ function pintarReportes() {
     <p class="rp-pie">Todo sale de tu hoja Ventas (también lo que anotas a mano). Las ventas sin "Tipo de venta" se clasifican por su precio.</p>`;
 }
 
+// ---------------------------------------------------------------- ENTRADAS (perfume nuevo o más unidades)
+const MONEDAS = [['CS', 'C$'], ['USD', 'US$']];
+function pintarWebEstado() {
+  const el = $('.en-web'); if (!el || !S.estado) return;
+  const w = S.estado.web;
+  if (!w) { el.innerHTML = `<div class="tarjeta en-nota alerta-suave">${ico('aviso')}<p>Para usar Entradas, actualiza el script de tu hoja (versión 5).</p></div>`; return; }
+  const notas = [];
+  if (!w.conectada) notas.push('La hoja de la web aún no está conectada: lo que guardes queda en tu hoja, pero no aparece en la web.');
+  if (!w.github) notas.push('Para subir fotos falta conectar GitHub (menú 🛒 Punto de venta de tu hoja).');
+  el.innerHTML = (notas.length ? `<div class="tarjeta en-nota alerta-suave">${ico('aviso')}<div>${notas.map(n => `<p>${esc(n)}</p>`).join('')}</div></div>` : '')
+    + (w.pendientes?.length ? `<details class="tarjeta en-pend"><summary>${ico('aviso')}<span><b>${plural(w.pendientes.length, 'perfume no llegó', 'perfumes no llegaron')} a la web</b><small>Toca para ver qué les falta</small></span></summary>
+      <ul>${w.pendientes.map(p => `<li><b>${esc(p.nombre)}</b><span>${esc(p.motivo)}</span></li>`).join('')}</ul></details>` : '');
+}
+const marcasConocidas = () => [...new Set(S.estado.productos.map(p => titulo(p.marca)).filter(Boolean))].sort();
+const campo = (nombre, etiqueta, { tipo = 'text', valor = '', ayuda = '', attrs = '', pie = '' } = {}) =>
+  `<label class="campo"><span>${etiqueta}</span><input name="e_${nombre}" type="${tipo}" value="${esc(valor)}" ${attrs}>${ayuda ? `<small>${ayuda}</small>` : ''}${pie}</label>`;
+const dinero = (nombre, etiqueta, valor = '', ayuda = '') => campo(nombre, etiqueta, { valor, ayuda, attrs: 'inputmode="decimal" autocomplete="off" placeholder="0"', pie: `<small class="en-cu" data-cu="${nombre}"></small>` });
+
+function htmlFoto() {
+  const e = S.ent;
+  return `<label class="en-foto${e.fotoUrl ? ' con' : ''}">
+    <input type="file" name="e_foto" accept="image/*" class="sr">
+    ${e.fotoUrl ? `<img src="${e.fotoUrl}" alt="Foto elegida">` : `<span class="en-foto-vacia">${ico('imagen')}<b>${e.modo === 'nuevo' ? 'Foto para la web' : 'Cambiar la foto de la web'}</b><small>Toca para tomarla o elegirla. Le quitamos el fondo.</small></span>`}
+  </label>${e.fotoUrl ? `<button type="button" class="btn-texto chico" data-accion="en-quitar-foto">${ico('basura')}Quitar foto</button>` : ''}`;
+}
+
+function pintarEntradas() {
+  const raiz = $('.entradas'); if (!raiz || !S.estado) return;
+  const e = S.ent, conf = S.estado.config, nuevo = e.modo === 'nuevo';
+  const p = !nuevo && e.ref ? S.porRef.get(e.ref) : null;
+  if (!nuevo && e.ref && !p) e.ref = null;
+  const pedido = pedidoSugerido(conf.ultimoPedido, hoy());
+  let perfume;
+  if (nuevo) {
+    perfume = `${htmlFoto()}
+      <div class="campo"><span>Código de barras (SKU)</span><div class="fila-campo"><input name="e_sku" type="text" inputmode="numeric" autocomplete="off" spellcheck="false" placeholder="6290171075288">${'BarcodeDetector' in window ? `<button type="button" class="btn sec" data-accion="en-escanear">${ico('buscar')}Escanear</button>` : ''}</div><small class="en-sku-aviso"></small></div>
+      <div class="dos">${campo('marca', 'Marca', { attrs: 'list="en-marcas" autocomplete="off" placeholder="Afnan"' })}${campo('nombre', 'Nombre', { attrs: 'autocomplete="off" placeholder="9PM Rebel"' })}</div>
+      <datalist id="en-marcas">${marcasConocidas().map(m => `<option value="${esc(m)}">`).join('')}</datalist>
+      <div class="dos">${campo('presentacion', 'Presentación', { attrs: 'autocomplete="off" placeholder="100ML"' })}
+        <label class="campo"><span>Familia olfativa <i>(opcional)</i></span><select name="e_familia"><option value="">—</option>${(conf.familias || []).map(f => `<option>${esc(f)}</option>`).join('')}</select></label></div>
+      <fieldset class="campo en-genero"><legend>Para</legend><div class="chips">${['Caballeros', 'Damas'].map(g => `<label class="chip-radio"><input type="radio" name="e_genero" value="${g}"><span>${g}</span></label>`).join('')}</div></fieldset>
+      ${campo('notas', 'Notas para la web <i>(opcional)</i>', { attrs: 'autocomplete="off" placeholder="Dulce · Frutal · Ámbar"', ayuda: 'Con notas sale en el cuestionario y el mapa de aromas de la web.' })}
+      <label class="campo"><span>Descripción <i>(opcional)</i></span><textarea name="e_descripcion" rows="2" placeholder="Una frase corta para la web"></textarea></label>`;
+  } else if (!p) {
+    const lista = S.estado.productos.filter(x => coincide(x, e.q)).sort((a, b) => titulo(a.nombre).localeCompare(titulo(b.nombre))).slice(0, 8);
+    perfume = `<label class="buscar en-buscar">${ico('buscar')}<span class="sr">Buscar perfume</span><input type="search" data-campo="en-q" value="${esc(e.q)}" placeholder="Buscar perfume, marca o código" autocomplete="off"></label>
+      <ul class="en-lista">${lista.map(x => `<li><button type="button" class="st-fila nivel-${nivelStock(stockDe(x), minimo())}" data-accion="en-elegir" data-ref="${esc(x.ref)}"><span class="st-foto">${foto(x, 96)}</span><span class="st-texto"><b>${esc(titulo(x.nombre))}</b><small>${esc(titulo(x.marca))} · ${esc(x.pres)} · quedan ${stockDe(x)}</small></span>${ico('flecha')}</button></li>`).join('') || '<li class="vacio">No hay perfumes con ese nombre. Si es nuevo, usa "Perfume nuevo".</li>'}</ul>`;
+  } else {
+    const w = S.web.get(normSku(p.sku));
+    perfume = `<div class="en-elegido"><span class="st-foto">${foto(p, 96)}</span><span class="st-texto"><b>${esc(titulo(p.nombre))}</b><small>${esc(titulo(p.marca))} · ${esc(p.pres)} · quedan ${stockDe(p)} · costo ${fmtCS(p.costo)}</small><small>${w ? `En la web: ${esc(w.nombre)}` : 'Todavía no está en la web'}</small></span>
+      <button type="button" class="btn-texto chico" data-accion="en-cambiar">Cambiar</button></div>${htmlFoto()}`;
+  }
+  raiz.innerHTML = `<div class="en-cabeza"><h2>Entrada de perfumes</h2><p>Se guarda en Compras, Inventario y la web a la vez.</p></div>
+    <div class="en-web"></div>
+    <div class="segmento" role="group" aria-label="Tipo de entrada">
+      <button type="button" data-accion="en-modo" data-v="nuevo" aria-pressed="${nuevo}">${ico('mas')}Perfume nuevo</button>
+      <button type="button" data-accion="en-modo" data-v="existe" aria-pressed="${!nuevo}">${ico('frasco')}Ya lo tengo</button>
+    </div>
+    <form data-form="entrada" class="en-form" novalidate autocomplete="off">
+      <div class="en-col">
+        <section class="tarjeta en-sec"><h3><span class="en-num">1</span>El perfume</h3>${perfume}</section>
+        <section class="tarjeta en-sec"><h3><span class="en-num">2</span>Lo que te costó</h3>
+          <div class="en-moneda"><span>Costos en</span><div class="chips">${MONEDAS.map(([k, t]) => `<button type="button" class="chip" data-accion="en-moneda" data-v="${k}" aria-pressed="${e.moneda === k}">${t}</button>`).join('')}</div>${e.moneda === 'USD' ? `<small>a C$${conf.tipoCambio} por dólar</small>` : ''}</div>
+          <div class="dos">${campo('cantidad', 'Cantidad', { tipo: 'text', valor: '', attrs: 'inputmode="numeric" placeholder="6"' })}${dinero('costo', 'Precio por unidad')}</div>
+          <p class="en-sub">Gastos de <b>todas</b> estas unidades (se reparten solos):</p>
+          <div class="tres">${dinero('envio', 'Envío Miami → tienda')}${dinero('aduana', 'Aduana')}${dinero('otros', 'Otros gastos')}</div>
+          <div class="dos"><label class="campo"><span>Proveedor</span><select name="e_proveedor"><option value="">—</option>${(conf.proveedores || []).map(x => `<option>${esc(x)}</option>`).join('')}</select></label>
+            ${campo('pedido', 'Número de pedido', { valor: pedido, attrs: 'inputmode="numeric"', ayuda: 'Mismo número = misma caja' })}</div>
+          <label class="interruptor"><input type="checkbox" name="e_llego"><span></span><i class="sw-txt">Ya llegó a la tienda (si no, queda "En tránsito")</i></label>
+        </section>
+        <section class="tarjeta en-sec"><h3><span class="en-num">3</span>Precios de venta</h3>
+          <div class="dos">${campo('precio', 'Al detalle (C$)', { valor: p ? p.precio : '', attrs: 'inputmode="decimal" placeholder="0"', pie: '<small class="en-usd" data-usd="precio"></small>' })}
+            ${campo('mayor', 'Por mayor (C$)', { valor: p ? p.mayor || '' : '', attrs: 'inputmode="decimal" placeholder="0"', pie: '<small class="en-usd" data-usd="mayor"></small>' })}</div>
+          ${p ? '<small class="en-sub">Si los cambias, también cambian en el Inventario y en la web.</small>' : ''}
+        </section>
+      </div>
+      <aside class="en-lado">
+        <section class="tarjeta en-resultado" aria-live="polite"></section>
+        <p class="error" hidden role="alert"></p>
+        <button class="btn pri en-guardar" type="submit">${ico('check')}Guardar entrada</button>
+      </aside>
+    </form>`;
+  pintarWebEstado();
+  pintarCalculoEnt();
+}
+
+function formEnt() { return $('.en-form'); }
+function datosEnt() {
+  const f = formEnt(); if (!f) return null;
+  const v = n => f.elements['e_' + n]?.value ?? '';
+  return { sku: v('sku'), marca: v('marca'), nombre: v('nombre'), presentacion: v('presentacion'), familia: v('familia'), genero: f.querySelector('input[name="e_genero"]:checked')?.value || '',
+    notas: v('notas'), descripcion: v('descripcion'), cantidad: v('cantidad'), costo: v('costo'), envio: v('envio'), aduana: v('aduana'), otros: v('otros'),
+    proveedor: v('proveedor'), pedido: v('pedido'), llego: !!f.elements.e_llego?.checked, precio: v('precio'), mayor: v('mayor') };
+}
+function rellenarEnt(d, { sinPrecios = false } = {}) {
+  const f = formEnt(); if (!f || !d) return;
+  for (const [k, v] of Object.entries(d)) {
+    if (sinPrecios && (k === 'precio' || k === 'mayor')) continue;
+    if (k === 'genero') { const r = v && f.querySelector(`input[name="e_genero"][value="${v}"]`); if (r) r.checked = true; continue; }
+    if (k === 'llego') { if (f.elements.e_llego) f.elements.e_llego.checked = v; continue; }
+    const el = f.elements['e_' + k]; if (el && el.type !== 'file' && v !== '') el.value = v;
+  }
+  pintarCalculoEnt();
+}
+function calculoEnt() {
+  const d = datosEnt(); if (!d) return null;
+  const conf = S.estado.config, p = S.ent.modo === 'existe' && S.ent.ref ? S.porRef.get(S.ent.ref) : null;
+  return calcularEntrada({ ...d, moneda: S.ent.moneda, tc: conf.tipoCambio, stock: p ? Math.max(0, p.stock) : 0, costoActual: p ? p.costo : 0, minGananciaMayor: conf.gananciaMinMayor });
+}
+function pintarCalculoEnt() {
+  const f = formEnt(); if (!f) return;
+  const c = calculoEnt(), d = datosEnt();
+  for (const k of ['costo', 'envio', 'aduana', 'otros']) {
+    const el = $(`[data-cu="${k}"]`, f); if (!el) continue;
+    const bruto = Number(String(d[k]).replace(/[^\d.]/g, '')) || 0;
+    el.textContent = !bruto ? '' : k === 'costo' ? (S.ent.moneda === 'USD' ? `= ${fmtCS(c.unidad.costo)} c/u` : '') : c.cantidad > 1 || S.ent.moneda === 'USD' ? `= ${fmtCS(c.unidad[k])} por unidad` : '';
+  }
+  for (const k of ['precio', 'mayor']) { const el = $(`[data-usd="${k}"]`, f); if (el) el.textContent = c[k === 'precio' ? 'detalle' : 'mayor'].precio > 0 ? `En la web: US$${c[k === 'precio' ? 'detalle' : 'mayor'].usd.toFixed(2)}` : ''; }
+  const fila = (t, x, extra = '') => `<div class="en-fila${x.ganancia < 0 ? ' pierde' : ''}"><span>${t}${extra}</span><b>${x.precio > 0 && c.costoReal > 0 ? `${x.ganancia < 0 ? '−' : '+'}${fmtCS(Math.abs(x.ganancia))}` : '—'}</b><small>${x.precio > 0 && c.costoReal > 0 ? pct(x.margen) : ''}</small></div>`;
+  $('.en-resultado', f).innerHTML = `<h3>Lo que ganas por perfume</h3>
+    <div class="en-costo"><span>Costo real por unidad</span><b>${c.costoReal > 0 ? fmtCS(c.costoReal) : '—'}</b>
+      ${c.costoReal > 0 ? `<small>${[['Precio', c.unidad.costo], ['envío', c.unidad.envio], ['aduana', c.unidad.aduana], ['otros', c.unidad.otros]].filter(([, n]) => n > 0).map(([t, n]) => `${t} ${fmtCS(n)}`).join(' + ')}</small>` : ''}</div>
+    ${fila('Al detalle', c.detalle)}${fila('Al mayor', c.mayor)}
+    ${c.cantidad > 0 && c.costoReal > 0 ? `<div class="en-lote"><p>Las ${c.cantidad} unidades te cuestan <b>${fmtCS(c.lote.invertido)}</b>.</p>
+      ${c.detalle.precio > 0 ? `<p>Si las vendes al detalle ganas <b>${fmtCS(c.lote.detalle)}</b>${c.mayor.precio > 0 ? `; al mayor, <b>${fmtCS(c.lote.mayor)}</b>` : ''}.</p>` : ''}</div>` : ''}
+    ${c.promedio ? `<p class="en-prom">Con las ${stockDe(S.porRef.get(S.ent.ref))} que ya tienes, el costo promedio queda en <b>${fmtCS(c.promedio)}</b> (antes ${fmtCS(S.porRef.get(S.ent.ref).costo)}).</p>` : ''}
+    ${c.avisos.map(a => `<p class="en-aviso ${a.tipo}">${ico('aviso')}${esc(a.texto)}</p>`).join('')}`;
+  $('.en-guardar', f).setAttribute('aria-disabled', String(!c.listo || S.ent.guardando || (S.ent.modo === 'existe' && !S.ent.ref)));
+  // código que ya existe
+  const av = $('.en-sku-aviso', f);
+  if (av) {
+    const sku = normSku(d.sku), ya = sku && S.estado.productos.find(x => normSku(x.sku) === sku);
+    av.innerHTML = ya ? `Ese código ya es de <b>${esc(titulo(ya.marca))} ${esc(titulo(ya.nombre))}</b>. <button type="button" class="btn-texto chico" data-accion="en-elegir" data-ref="${esc(ya.ref)}">Sumarle unidades</button>` : '';
+  }
+}
+
+async function achicarFoto(file, max = 1200) {
+  let img;
+  try { img = await createImageBitmap(file, { imageOrientation: 'from-image' }); }
+  catch {
+    img = await new Promise((ok, mal) => { const i = new Image(); i.onload = () => ok(i); i.onerror = mal; i.src = URL.createObjectURL(file); });
+  }
+  const w = img.width, h = img.height, k = Math.min(1, max / Math.max(w, h));
+  const c = document.createElement('canvas'); c.width = Math.round(w * k); c.height = Math.round(h * k);
+  const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height); g.drawImage(img, 0, 0, c.width, c.height);
+  return c.toDataURL('image/jpeg', 0.88);
+}
+
+let escaneo = null;
+async function abrirEscaner() {
+  const d = $('#h-escaner'), msg = $('.esc-msg', d), v = $('video', d);
+  msg.textContent = 'Apunta al código de barras de la caja.';
+  abrir(d);
+  try {
+    const formatos = (await BarcodeDetector.getSupportedFormats()).filter(f => ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128', 'code_39', 'itf'].includes(f));
+    const det = new BarcodeDetector({ formats: formatos.length ? formatos : undefined });
+    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false });
+    escaneo = stream; v.srcObject = stream; await v.play();
+    while (d.open && escaneo === stream) {
+      const r = await det.detect(v).catch(() => []);
+      if (r.length) { const f = formEnt(); if (f?.elements.e_sku) { f.elements.e_sku.value = r[0].rawValue; vibrar(40); pintarCalculoEnt(); } break; }
+      await new Promise(ok => setTimeout(ok, 220));
+    }
+    cerrar(d);
+  } catch { msg.textContent = 'No se pudo abrir la cámara. Escribe el código a mano.'; }
+}
+function pararEscaner() { if (escaneo) { for (const t of escaneo.getTracks()) t.stop(); escaneo = null; } }
+$('#h-escaner')?.addEventListener('close', pararEscaner);
+
+async function guardarEntrada(f, err) {
+  const e = S.ent, d = datosEnt(), c = calculoEnt();
+  const nuevo = e.modo === 'nuevo';
+  const p = nuevo ? null : S.porRef.get(e.ref);
+  if (!nuevo && !p) return err('Elige el perfume.');
+  if (nuevo) {
+    if (!skuValido(d.sku)) return err('Escribe o escanea el código de barras (solo números, letras o guiones).');
+    if (S.estado.productos.some(x => normSku(x.sku) === normSku(d.sku))) return err('Ese código ya existe. Usa "Perfume que ya tengo" para sumarle unidades.');
+    if (!d.marca.trim() || !d.nombre.trim()) return err('Escribe la marca y el nombre.');
+    if (!d.genero) return err('Elige si es de Caballeros o de Damas.');
+  }
+  if (c.faltan.length) return err(`Falta ${c.faltan.join(', ')}.`);
+  const malo = c.avisos.find(a => a.tipo === 'error'); if (malo) return err(malo.texto);
+  err('');
+  e.id = e.id || nuevoId();
+  const w = p ? S.web.get(normSku(p.sku)) : null;
+  const entrada = armarEntrada({ id: e.id, nuevo, producto: p, form: { ...d, nombreWeb: nuevo ? d.nombre : (w?.nombre || titulo(p.nombre)) }, calculo: c });
+  if (e.foto) entrada.foto = { base64: e.foto.replace(/^data:[^,]*,/, '') };
+  e.guardando = true;
+  const b = $('.en-guardar', f); b.setAttribute('aria-disabled', 'true'); b.innerHTML = `<span class="luna-carga chica" aria-hidden="true"></span>Guardando${e.foto ? ' y subiendo la foto' : ''}…`;
+  try {
+    const r = await llamar({ accion: 'entrada', id: e.id, entrada }, { espera: 120000 });
+    const res = r.resultado || {};
+    const nombre = nuevo ? `${d.marca.trim()} ${d.nombre.trim()}` : titulo(p.nombre);
+    mostrarEntradaLista(res, { nombre, cantidad: c.cantidad, llego: entrada.llego, nuevo, foto: !!e.foto });
+    S.ent = { modo: e.modo, ref: null, moneda: e.moneda, foto: null, fotoUrl: null, q: '', sucio: false, id: null, guardando: false };
+    pintarEntradas();
+    sincronizar({ silencioso: true });
+  } catch (x) {
+    e.guardando = false;
+    b.innerHTML = `${ico('check')}Guardar entrada`; pintarCalculoEnt();
+    if (x instanceof ErrorRed) err(`No se guardó: ${x.message}. Revisa tu internet y vuelve a tocar Guardar (no se duplica).`);
+    else if (x.message === 'no-autorizado') { olvidarConexion(); mostrarVincular('Este dispositivo ya no está vinculado. Vincúlalo otra vez.'); }
+    else { e.id = null; err(/Acción desconocida/.test(x.message) ? 'Tu hoja tiene el script viejo: hay que actualizarlo para usar Entradas.' : x.message); }
+  }
+}
+
+function mostrarEntradaLista(res, x) {
+  const d = $('#h-entrada');
+  const web = res.web, lineas = [];
+  lineas.push(`${x.cantidad} × ${esc(x.nombre)} en Compras (${x.llego ? 'Recibido: ya suma al stock' : 'En tránsito'}).`);
+  if (x.nuevo) lineas.push('Agregado al Inventario.');
+  if (web?.agregado) lineas.push(`Agregado a la web como <b>${esc(web.agregado.estado)}</b>${res.publicado ? '. Aparece en unos minutos' : '. Aparece en menos de una hora'}${x.foto && !res.avisos?.some(a => /foto/i.test(a)) ? ', con la foto sin fondo' : ''}.`);
+  else if (web?.pendiente) lineas.push(`No se agregó a la web: ${esc(web.pendiente.motivo)}.`);
+  else if (web && x.foto && !res.avisos?.some(a => /foto/i.test(a))) lineas.push(`Foto nueva enviada a la web${res.publicado ? ': se ve en unos minutos' : ''}.`);
+  if (web?.precios) lineas.push('Precios de la web actualizados.');
+  $('.listo', d).innerHTML = `<span class="ls-check">${ico('check')}</span><h2>Entrada guardada</h2>
+    <ul class="en-listo">${lineas.map(l => `<li>${ico('check')}<span>${l}</span></li>`).join('')}${(res.avisos || []).map(a => `<li class="av">${ico('aviso')}<span>${esc(a)}</span></li>`).join('')}</ul>
+    <div class="acciones"><button class="btn pri" type="button" data-accion="en-listo">Listo</button></div>`;
+  abrir(d);
+}
+
 // ---------------------------------------------------------------- eventos
 document.addEventListener('click', async e => {
   const b = e.target.closest('[data-accion]');
@@ -848,6 +1075,13 @@ document.addEventListener('click', async e => {
       await operar({ id: nuevoId(), accion: 'anular', numero: n }, `Venta #${n} anulada.`);
       break;
     }
+    case 'en-modo': if (S.ent.modo !== b.dataset.v) { const d = datosEnt(); S.ent = { ...S.ent, modo: b.dataset.v, ref: null, foto: null, fotoUrl: null, q: '', id: null }; pintarEntradas(); rellenarEnt(d, { sinPrecios: true }); } break;
+    case 'en-elegir': { const d = datosEnt(); S.ent = { ...S.ent, modo: 'existe', ref, q: '', sucio: true, id: null, foto: null, fotoUrl: null }; pintarEntradas(); rellenarEnt(d, { sinPrecios: true }); $('.en-form [name="e_cantidad"]')?.focus(); break; }
+    case 'en-cambiar': { const d = datosEnt(); S.ent.ref = null; S.ent.id = null; pintarEntradas(); rellenarEnt(d, { sinPrecios: true }); $('[data-campo="en-q"]')?.focus(); break; }
+    case 'en-moneda': { const d = datosEnt(); S.ent.moneda = b.dataset.v; S.ent.sucio = true; pintarEntradas(); rellenarEnt(d); break; }
+    case 'en-quitar-foto': { const d = datosEnt(); S.ent.foto = null; S.ent.fotoUrl = null; pintarEntradas(); rellenarEnt(d); break; }
+    case 'en-escanear': abrirEscaner(); break;
+    case 'en-listo': cerrar($('#h-entrada')); break;
     case 'sincronizar': sincronizar(); break;
     case 'refrescar': sincronizar(); break;
     case 'borrar-errores': borrarErrores(); pintarCaja(); break;
@@ -871,6 +1105,12 @@ document.addEventListener('change', e => {
   if (t.matches('[data-accion="sello"]')) { S.sello = t.checked; pintarCarrito(); }
   if (t.matches('[data-accion="orden-stock"]')) { S.ordenStock = t.value; pintarStock(); }
   if (t.matches('input[name="esGasto"]')) { const c = $('.categorias', t.form); c.hidden = !t.checked; }
+  if (t.matches('.en-form input[name="e_foto"]') && t.files?.[0]) {
+    const d = datosEnt(), archivo = t.files[0];
+    achicarFoto(archivo).then(url => { S.ent.foto = url; S.ent.fotoUrl = url; S.ent.sucio = true; pintarEntradas(); rellenarEnt(d); })
+      .catch(() => aviso('No se pudo leer esa foto. Prueba con otra.', 'error'));
+  }
+  if (t.closest('.en-form')) { S.ent.sucio = true; pintarCalculoEnt(); }
 });
 
 let tBusq;
@@ -890,6 +1130,8 @@ document.addEventListener('input', e => {
     $('[data-accion="confirmar-venta"]').setAttribute('aria-disabled', String(v === null));
   }
   if (t.dataset.campo === 'aj-nota') S.ajuste.nota = t.value;
+  if (t.dataset.campo === 'en-q') { S.ent.q = t.value; const d = datosEnt(); pintarEntradas(); rellenarEnt(d); const q = $('[data-campo="en-q"]'); q.focus(); q.setSelectionRange(q.value.length, q.value.length); }
+  else if (t.closest('.en-form')) { S.ent.sucio = true; pintarCalculoEnt(); }
   if (t.name === 'nota' && t.closest('.sellos-form')) S.ajSellos.nota = t.value;
   if (t.form?.dataset.tipo === 'cierre' && t.name === 'monto') {
     const r = S.estado.caja.resumen; const n = leerMonto(t.value);
@@ -936,6 +1178,7 @@ document.addEventListener('submit', async e => {
       pintarCarrito();
       break;
     }
+    case 'entrada': await guardarEntrada(f, err); break;
     case 'apertura': {
       const m = leerMonto(f.monto.value);
       await operar({ id: nuevoId(), accion: 'caja', caja: { tipo: 'apertura', monto: m } }, `Caja abierta con ${fmtCS(m)}.`);
