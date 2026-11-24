@@ -156,8 +156,8 @@ export async function convertir(texto, { comprobarFotos = true } = {}) {
     // Conectado al Inventario: un perfume disponible sin SKU no tendría límite de unidades
     if ('sku_inventario' in col && !g('sku_inventario') && est === 'disponible')
       avisos.push(`${pref}: no tiene SKU en "sku_inventario", así que la web no limita sus unidades. Copia su SKU de la hoja Inventario.`);
-    // Disponible sin unidades → Agotado; Coming soon que ya llegó (hay unidades en el Inventario) → Disponible
-    const estadoFinal = existencias === 0 && est === 'disponible' ? 'agotado' : est === 'coming_soon' && existencias > 0 ? 'disponible' : est;
+    // Disponible sin unidades → Agotado; Coming soon o Agotado con unidades en el Inventario → Disponible
+    const estadoFinal = existencias === 0 && est === 'disponible' ? 'agotado' : (est === 'coming_soon' || est === 'agotado') && existencias > 0 ? 'disponible' : est;
 
     // Etiqueta (columna opcional): Nuevo o Más vendido
     let etiqueta = null;

@@ -990,7 +990,7 @@ function posWebEscribirFila_(web, w, r, datos) {
  * Pasa el Inventario a la hoja de la web.
  * - Perfume del Inventario que no está en la web (por SKU) → fila nueva en "Coming soon" (o "Disponible" si ya hay stock).
  * - Precio de venta (L) o mayorista (AH) distinto → actualiza C$ y US$ en la web.
- * - "Coming soon" con unidades en el Inventario → "Disponible".
+ * - "Coming soon" o "Agotado" con unidades en el Inventario → "Disponible".
  * opciones.extras[sku] = { nombre, marca, presentacion, notas, descripcion, foto } para perfumes nuevos de la app.
  * opciones.fotos[sku] = nombre de foto nueva para un perfume que ya está en la web.
  */
@@ -1035,7 +1035,7 @@ function posWebSincronizar_(ss, web, opciones) {
       if (precio > 0 && Math.abs(posNum_(fw[col.precio_detalle_cs]) - precio) >= 0.5) { cambio.precio_detalle_cs = precio; cambio.precio_detalle_usd = posUsd_(precio, tc); }
       if (mayor > 0 && Math.abs(posNum_(fw[col.precio_mayor_cs]) - mayor) >= 0.5) { cambio.precio_mayor_cs = mayor; cambio.precio_mayor_usd = posUsd_(mayor, tc); }
       if (Object.keys(cambio).length) res.precios.push({ nombre: String(fw[col.nombre]), antes: [posNum_(fw[col.precio_detalle_cs]), posNum_(fw[col.precio_mayor_cs])], ahora: [precio || posNum_(fw[col.precio_detalle_cs]), mayor || posNum_(fw[col.precio_mayor_cs])] });
-      if (/^coming/i.test(String(fw[col.estado]).trim()) && stock > 0) { cambio.estado = 'Disponible'; res.disponibles.push(String(fw[col.nombre])); }
+      if (/^(coming|agotad)/i.test(String(fw[col.estado]).trim()) && stock > 0) { cambio.estado = 'Disponible'; res.disponibles.push(String(fw[col.nombre])); }
       if (fotos[sku]) { cambio.foto = fotos[sku]; res.fotos.push(String(fw[col.nombre])); }
       if (Object.keys(cambio).length) { posWebEscribirFila_(web, w, r, cambio); res.cambios++; }
       return;
@@ -1318,7 +1318,7 @@ function posWebInstalar_(ss, web) {
     hecho.push('El precio mayorista (columna AH) ahora se escribe en el Inventario y la web lo copia.');
   }
   var t2 = String(inv.getRange('A2').getValue());
-  if (t2 && t2.indexOf('Publicar en la web') < 0) inv.getRange('A2').setValue(t2 + '  WEB: un perfume con precio de venta (L), precio mayorista (AH) y Género Hombre o Mujer se agrega solo a la web en "Coming soon" y pasa a Disponible cuando hay stock. Columna AL "Publicar en la web": No = no lo agrega.');
+  if (t2 && t2.indexOf('Publicar en la web') < 0) inv.getRange('A2').setValue(t2 + '  WEB: un perfume con precio de venta (L), precio mayorista (AH) y Género Hombre o Mujer se agrega solo a la web en "Coming soon" y pasa a Disponible cuando hay stock (también si decía Agotado). Columna AL "Publicar en la web": No = no lo agrega.');
   // Configuración: ganancia mínima por perfume al mayor (para el aviso de la app)
   var conf = posHoja_(ss, POS.CONF);
   if (String(conf.getRange(11, 1).getValue()).trim() === '' && String(conf.getRange(11, 2).getValue()).trim() === '') {

@@ -383,6 +383,8 @@ prueba('Cambio de precio en el Inventario pasa a la web (C$ y US$); Coming soon 
   const f = filaWeb(web, 2);
   assert.deepEqual([f.precio_detalle_cs, f.precio_detalle_usd, f.precio_mayor_cs, f.precio_mayor_usd], [1500, 40.75, 1000, 27.15]);
   assert.equal(filaWeb(web, 3).estado, 'Disponible', '9PM tiene 2 en stock');
+  web.poner(2, 12, 'Agotado'); ctx.posWebSincronizar_(L, web, {});
+  assert.equal(filaWeb(web, 2).estado, 'Disponible', 'Agotado con stock (10) también pasa a Disponible');
   assert.deepEqual(res.disponibles, ['9PM']); assert.equal(res.precios.length, 1);
   assert.equal(filaWeb(web, 2).notas, 'Cítrico', 'lo escrito a mano no se toca');
 });
