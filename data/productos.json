@@ -1,5 +1,5 @@
 {
- "actualizado": "2026-11-24T17:23:47.885Z",
+ "actualizado": "2026-11-24T23:36:05.739Z",
  "productos": [
   {
    "id": "H01",
@@ -165,8 +165,8 @@
      "usd": 38
     },
     "mayor": {
-     "cs": 905,
-     "usd": 24.55
+     "cs": 930,
+     "usd": 25.25
     }
    },
    "estado": "agotado",
@@ -200,7 +200,7 @@
     }
    },
    "estado": "disponible",
-   "existencias": 5,
+   "existencias": 4,
    "etiqueta": null,
    "foto": "nautica-voyage.webp",
    "orden": 7,
@@ -536,6 +536,35 @@
    "sku": "6290171075738"
   },
   {
+   "id": "H19",
+   "catalogo": "caballeros",
+   "nombre": "Odyssey aqua",
+   "marca": "Armaf",
+   "presentacion": "",
+   "notas": [
+    "Citrico",
+    "Aromatico",
+    "Fresco"
+   ],
+   "descripcion": "",
+   "precios": {
+    "detalle": {
+     "cs": 1490,
+     "usd": 40.6
+    },
+    "mayor": {
+     "cs": 1250,
+     "usd": 33.55
+    }
+   },
+   "estado": "agotado",
+   "existencias": 0,
+   "etiqueta": null,
+   "foto": "odyssey-aqua-webp.webp",
+   "orden": 19,
+   "sku": "6294015166132"
+  },
+  {
    "id": "D01",
    "catalogo": "damas",
    "nombre": "9AM Pour Femme",
@@ -669,8 +698,8 @@
    "descripcion": "",
    "precios": {
     "detalle": {
-     "cs": 1390,
-     "usd": 38
+     "cs": 1490,
+     "usd": 40.5
     },
     "mayor": {
      "cs": 845,
