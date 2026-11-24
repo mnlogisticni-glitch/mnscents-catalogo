@@ -1305,7 +1305,13 @@ function posWebInstalar_(ss, web) {
   var ah = inv.getRange(POS.PRIMERA, I.MAYOR, n, 1);
   var f0 = String(inv.getRange(POS.PRIMERA, I.MAYOR).getFormula() || '');
   if (/IMPORTRANGE/i.test(f0)) {
-    var valores = ah.getValues().map(function (x, i) { return [posSku_(a[i][0]) && posNum_(x[0]) > 0 ? posNum_(x[0]) : '']; });
+    // el valor sale de la misma hoja de la web (lo que traía la fórmula), así no depende de que la fórmula esté cargada
+    var actuales = ah.getValues();
+    var valores = a.map(function (x, i) {
+      var s = posSku_(x[0]); if (!s) return [''];
+      var r = w.porSku[s], deWeb = r ? posNum_(w.filas[r - 2][w.col.precio_mayor_cs]) : 0;
+      return [deWeb > 0 ? deWeb : posNum_(actuales[i][0]) > 0 ? posNum_(actuales[i][0]) : ''];
+    });
     ah.clearContent();
     ah.setValues(valores);
     inv.getRange(3, I.MAYOR).setNote('Precio mayorista: escríbelo aquí (o desde la app). La hoja de la web lo copia sola.');

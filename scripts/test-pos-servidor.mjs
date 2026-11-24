@@ -403,8 +403,9 @@ prueba('No sube perfumes incompletos, repetidos o marcados "No"; avisa el motivo
 prueba('Instalar: AH deja de leer la web (queda el valor), AL marca Sí a los que ya están y No a los demás, ganancia mínima en Configuración', () => {
   const L = conWeb(); const inv = L.hojas['Inventario'];
   inv.f['4,34'] = '=ARRAYFORMULA(IMPORTRANGE("x","J2:J"))';
+  inv.poner(4, 34, '#REF!'); inv.poner(5, 34, 'Cargando…');      // la fórmula todavía no carga: igual se toma de la web
   ctx.posWebInstalar_(L, L.web);
-  assert.equal(inv.celda(4, 34), 985); assert.equal(inv.f['4,34'], undefined);
+  assert.deepEqual([inv.celda(4, 34), inv.celda(5, 34), inv.celda(6, 34)], [985, 975, 905]); assert.equal(inv.f['4,34'], undefined);
   assert.deepEqual([inv.celda(4, 38), inv.celda(5, 38), inv.celda(6, 38), inv.celda(7, 38)], ['Sí', 'Sí', 'No', '']);
   assert.equal(inv.celda(3, 38), 'Publicar en la web (Sí / No)');
   assert.deepEqual([L.hojas['Configuración'].celda(11, 1), L.hojas['Configuración'].celda(11, 2)], ['Ganancia mínima por perfume al mayor (C$)', 185]);
