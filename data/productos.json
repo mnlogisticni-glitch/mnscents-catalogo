@@ -1,5 +1,5 @@
 {
- "actualizado": "2026-11-24T23:36:05.739Z",
+ "actualizado": "2026-11-24T23:42:38.239Z",
  "productos": [
   {
    "id": "H01",
@@ -549,18 +549,18 @@
    "descripcion": "",
    "precios": {
     "detalle": {
-     "cs": 1490,
-     "usd": 40.6
+     "cs": 1590,
+     "usd": 43.2
     },
     "mayor": {
      "cs": 1250,
      "usd": 33.55
     }
    },
-   "estado": "agotado",
+   "estado": "coming_soon",
    "existencias": 0,
    "etiqueta": null,
-   "foto": "odyssey-aqua-webp.webp",
+   "foto": "odyssey-aqua.webp",
    "orden": 19,
    "sku": "6294015166132"
   },
