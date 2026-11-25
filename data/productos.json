@@ -1,5 +1,5 @@
 {
- "actualizado": "2026-11-25T20:38:26.174Z",
+ "actualizado": "2026-11-25T20:39:43.531Z",
  "productos": [
   {
    "id": "H01",
@@ -157,7 +157,11 @@
    "nombre": "Uomo Intense",
    "marca": "Stallion 53",
    "presentacion": "Incluye spray de viaje de 20 ml",
-   "notas": [],
+   "notas": [
+    "LAVANDA",
+    "AMADERADO",
+    "ELEGANTE"
+   ],
    "descripcion": "Alternativa del Valentino Uomo Intense",
    "precios": {
     "detalle": {
@@ -165,8 +169,8 @@
      "usd": 38
     },
     "mayor": {
-     "cs": 930,
-     "usd": 25.25
+     "cs": 960,
+     "usd": 26.1
     }
    },
    "estado": "agotado",
