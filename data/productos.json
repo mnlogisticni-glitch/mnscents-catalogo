@@ -1,5 +1,5 @@
 {
- "actualizado": "2026-11-25T20:53:58.066Z",
+ "actualizado": "2026-11-25T21:13:50.778Z",
  "productos": [
   {
    "id": "H01",
@@ -593,7 +593,7 @@
    "estado": "coming_soon",
    "existencias": 0,
    "etiqueta": null,
-   "foto": null,
+   "foto": "9pm-rebel.webp",
    "orden": 20,
    "sku": "6290171075288"
   },
