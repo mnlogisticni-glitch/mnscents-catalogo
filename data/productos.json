@@ -1,5 +1,5 @@
 {
- "actualizado": "2026-11-25T20:40:45.183Z",
+ "actualizado": "2026-11-25T20:42:15.781Z",
  "productos": [
   {
    "id": "H01",
@@ -140,8 +140,8 @@
      "usd": 40.6
     },
     "mayor": {
-     "cs": 1150,
-     "usd": 31.25
+     "cs": 1165,
+     "usd": 31.65
     }
    },
    "estado": "disponible",
@@ -157,7 +157,11 @@
    "nombre": "Uomo Intense",
    "marca": "Stallion 53",
    "presentacion": "Incluye spray de viaje de 20 ml",
-   "notas": [],
+   "notas": [
+    "LAVANDA",
+    "AMADERADO",
+    "ELEGANTE"
+   ],
    "descripcion": "Alternativa del Valentino Uomo Intense",
    "precios": {
     "detalle": {
@@ -165,8 +169,8 @@
      "usd": 38
     },
     "mayor": {
-     "cs": 930,
-     "usd": 25.25
+     "cs": 960,
+     "usd": 26.1
     }
    },
    "estado": "agotado",
@@ -225,8 +229,8 @@
      "usd": 38
     },
     "mayor": {
-     "cs": 970,
-     "usd": 26.3
+     "cs": 1005,
+     "usd": 27.3
     }
    },
    "estado": "agotado",
@@ -311,12 +315,12 @@
    "descripcion": "La mejor alternativa del Jean Paul Paradise Garden",
    "precios": {
     "detalle": {
-     "cs": 2010,
-     "usd": 55
+     "cs": 1990,
+     "usd": 54.1
     },
     "mayor": {
-     "cs": 1485,
-     "usd": 40.5
+     "cs": 1430,
+     "usd": 38.85
     }
    },
    "estado": "agotado",
@@ -553,8 +557,8 @@
      "usd": 43.2
     },
     "mayor": {
-     "cs": 1250,
-     "usd": 33.55
+     "cs": 1280,
+     "usd": 34.8
     }
    },
    "estado": "coming_soon",
