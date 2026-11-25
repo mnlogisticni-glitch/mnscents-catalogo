@@ -469,6 +469,14 @@ prueba('Si la foto ya existe en la web, usa otro nombre', () => {
 });
 
 
+prueba('Si una foto con ese nombre ya se subió y todavía no se procesa, usa otro nombre (no choca con GitHub)', () => {
+  const L = conWeb();
+  ctx.UrlFetchApp.fetch = (url, o) => { llamadas.push({ url, metodo: o.method }); const c = o.method === 'get' ? (/entrantes\/9pm-rebel\.jpg$/.test(url) ? 200 : 404) : o.method === 'put' ? 201 : 204; return { getResponseCode: () => c, getContentText: () => '{}' }; };
+  crudo(L, { accion: 'entrada', id: 'e-5', entrada: entradaNueva({ id: 'e-5' }) }, AHORA);
+  const put = llamadas.find(l => l.metodo === 'put');
+  assert.match(put.url, /entrantes\/9pm-rebel-[a-z0-9]{1,4}\.jpg$/);
+});
+
 console.log('\nEditar un perfume (sin compra)');
 prueba('Editar: precios, foto y notas de uno que ya está en la web; no crea compra', () => {
   const L = conWeb(); const inv = L.hojas['Inventario'], com = L.hojas['Compras'];

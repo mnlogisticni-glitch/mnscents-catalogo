@@ -29,7 +29,8 @@ jobs:
       # Fotos que llegan desde el punto de venta (img/entrantes/): se les quita el fondo y pasan a img/productos
       - name: Fotos nuevas
         run: |
-          if ls img/entrantes/*.jpg img/entrantes/*.jpeg img/entrantes/*.png img/entrantes/*.webp >/dev/null 2>&1; then
+          # ojo: "ls a b c" falla si falta CUALQUIERA de los tipos; find cuenta solo los que hay
+          if [ -n "$(find img/entrantes -maxdepth 1 -type f \( -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' -o -iname '*.webp' \) -print -quit)" ]; then
             python3 -m venv /tmp/fotos
             /tmp/fotos/bin/pip install --quiet pillow
             /tmp/fotos/bin/pip install --quiet "rembg[cpu]==2.0.67" || echo "No se pudo instalar el quitafondos: se publican con su fondo."

@@ -25,7 +25,7 @@ var POS = {
   MOTIVOS: ['Mal conteo', 'Pérdida o robo', 'Dañado', 'Regalo o muestra', 'Uso personal'],
   TIPOS: ['Detalle', 'Detalle sin sello', 'Mayorista', 'Canje'],   // columna "Tipo de venta" (W) de Ventas; "sin sello" = precio especial, no suma a la tarjeta
   PREMIO: /stallion\s*53/i,                     // el perfume gratis de la tarjeta se elige de esta línea
-  VERSION: 6,
+  VERSION: 7,
 };
 
 // Columnas (número, base 1)
@@ -1096,8 +1096,9 @@ function posGithub_(metodo, ruta, cuerpo) {
 }
 // Nombre libre para la foto (si ya existe uno igual, le agrega un sufijo)
 function posGithubNombreFoto_(base) {
-  var r = posGithub_('get', '/repos/' + WEB.REPO + '/contents/img/productos/' + base + '.webp');
-  if (r && r.codigo === 200) base = base + '-' + Date.now().toString(36).slice(-4);
+  var existe = function (ruta) { var r = posGithub_('get', '/repos/' + WEB.REPO + '/contents/' + ruta); return !!(r && r.codigo === 200); };
+  // ya publicada, o subida y todavía sin procesar (img/entrantes): otro nombre, para no chocar ni quedar en caché
+  if (existe('img/productos/' + base + '.webp') || existe('img/entrantes/' + base + '.jpg')) base = base + '-' + Date.now().toString(36).slice(-4);
   return base;
 }
 // Sube la foto a img/entrantes/ (la sincronización de la web le quita el fondo y la pasa a img/productos)
