@@ -1,5 +1,5 @@
 {
- "actualizado": "2026-11-24T23:42:38.239Z",
+ "actualizado": "2026-11-25T20:31:32.867Z",
  "productos": [
   {
    "id": "H01",
@@ -520,7 +520,7 @@
    "descripcion": "",
    "precios": {
     "detalle": {
-     "cs": 1890,
+     "cs": 1840,
      "usd": 50
     },
     "mayor": {
@@ -529,7 +529,7 @@
     }
    },
    "estado": "disponible",
-   "existencias": 5,
+   "existencias": 4,
    "etiqueta": null,
    "foto": "afnan-9-pm-elixir-img.webp",
    "orden": 18,
@@ -563,6 +563,35 @@
    "foto": "odyssey-aqua.webp",
    "orden": 19,
    "sku": "6294015166132"
+  },
+  {
+   "id": "H20",
+   "catalogo": "caballeros",
+   "nombre": "9PM Rebel",
+   "marca": "Afnan",
+   "presentacion": "100 ml",
+   "notas": [
+    "DULCE",
+    "PIÑA",
+    "ATRACTIVO"
+   ],
+   "descripcion": "",
+   "precios": {
+    "detalle": {
+     "cs": 1850,
+     "usd": 50.25
+    },
+    "mayor": {
+     "cs": 1255,
+     "usd": 34.1
+    }
+   },
+   "estado": "coming_soon",
+   "existencias": 0,
+   "etiqueta": null,
+   "foto": null,
+   "orden": 20,
+   "sku": "6290171075288"
   },
   {
    "id": "D01",
