@@ -675,3 +675,6 @@ dialog.hoja::backdrop { background: rgb(8 3 16 / 0.62); animation: velo 300ms va
 /* al enfocar un campo o un botón, que no quede debajo de la barra de abajo ni de la cabecera */
 html { scroll-padding-top: 76px; scroll-padding-bottom: calc(var(--alto-nav) + var(--seguro-abajo) + 16px); }
 @media (min-width: 1000px) { html { scroll-padding-bottom: 16px; } }
+.segmento.tres-op { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.segmento.tres-op button { font-size: 13.5px; gap: 5px; }
+.en-sec .interruptor + .en-genero { margin-top: 14px; }

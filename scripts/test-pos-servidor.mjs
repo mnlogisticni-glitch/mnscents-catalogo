@@ -468,5 +468,48 @@ prueba('Si la foto ya existe en la web, usa otro nombre', () => {
   assert.match(filaWeb(L.web, 5).foto, /^9pm-rebel-[a-z0-9]{1,4}\.webp$/);
 });
 
+
+console.log('\nEditar un perfume (sin compra)');
+prueba('Editar: precios, foto y notas de uno que ya está en la web; no crea compra', () => {
+  const L = conWeb(); const inv = L.hojas['Inventario'], com = L.hojas['Compras'];
+  const r = crudo(L, { accion: 'editar', id: 'ed-1', editar: { ref: 'AFNAN 9PM - 100ML (222)', precio: 1550, mayor: 1000, notas: 'Dulce · Ámbar', descripcion: 'Clásico.', foto: { base64: 'AAAA' } } }, AHORA).resultado;
+  assert.deepEqual([inv.celda(5, 12), inv.celda(5, 34)], [1550, 1000]);
+  assert.equal(com.celda(5, 4), '', 'no se registra compra');
+  const f = filaWeb(L.web, 3);
+  assert.deepEqual([f.precio_detalle_cs, f.precio_mayor_cs, f.notas, f.descripcion, f.foto], [1550, 1000, 'Dulce · Ámbar', 'Clásico.', 'afnan-9pm.webp']);
+  assert.deepEqual(J(r.hechos), ['precio al detalle', 'precio por mayor', 'foto nueva']);
+  assert.ok(llamadas.some(l => l.metodo === 'put' && /entrantes\/afnan-9pm\.jpg$/.test(l.url)));
+  assert.equal(r.publicado, true);
+});
+prueba('Editar uno viejo que no estaba en la web (Publicar = No): lo publica con precio mayorista, género y Agotado', () => {
+  const L = conWeb(); const inv = L.hojas['Inventario'];
+  inv.insertColumnsAfter(35, 3); inv.poner(6, 38, 'No'); inv.poner(6, 34, ''); inv.poner(6, 6, 'Unisex');
+  let res = J(ctx.posWebSincronizar_(L, L.web, {})); assert.equal(res.agregados.length, 0, 'con No no se publica');
+  const r = crudo(L, { accion: 'editar', id: 'ed-2', editar: { ref: 'LATTAFA YARA - 100ML (333)', precio: 1390, mayor: 950, genero: 'Mujer', publicar: true, estadoWeb: 'Agotado', notas: 'Dulce' } }, AHORA).resultado;
+  assert.deepEqual([inv.celda(6, 34), inv.celda(6, 6), inv.celda(6, 38)], [950, 'Mujer', 'Sí']);
+  assert.equal(r.web.agregado.estado, 'Agotado');
+  const f = filaWeb(L.web, 4);
+  assert.deepEqual([f.id, f.catalogo, f.precio_mayor_cs, f.notas, f.estado], ['D01', 'Damas', 950, 'Dulce', 'Agotado']);
+});
+prueba('Editar: dejar de mostrar en la web lo esconde (mostrar = No) y no lo vuelve a tocar', () => {
+  const L = conWeb(); const inv = L.hojas['Inventario'];
+  crudo(L, { accion: 'editar', id: 'ed-3', editar: { ref: 'ARMAF MANDARIN SKY - 100ML (111)', publicar: false } }, AHORA);
+  assert.equal(inv.celda(4, 38), 'No'); assert.equal(filaWeb(L.web, 2).mostrar, 'No');
+  inv.poner(4, 12, 1700); ctx.posWebSincronizar_(L, L.web, {});
+  assert.equal(filaWeb(L.web, 2).precio_detalle_cs, 1460, 'oculto: no se toca');
+  crudo(L, { accion: 'editar', id: 'ed-4', editar: { ref: 'ARMAF MANDARIN SKY - 100ML (111)', publicar: true } }, AHORA);
+  assert.deepEqual([filaWeb(L.web, 2).mostrar, filaWeb(L.web, 2).precio_detalle_cs], ['Sí', 1700]);
+});
+prueba('Editar: valida mayorista más alto y perfume inexistente', () => {
+  const L = conWeb();
+  assert.throws(() => crudo(L, { accion: 'editar', id: 'ed-5', editar: { ref: 'AFNAN 9PM - 100ML (222)', precio: 900, mayor: 1000 } }, AHORA), /mayor no puede/);
+  assert.throws(() => crudo(L, { accion: 'editar', id: 'ed-6', editar: { ref: 'NO EXISTE' } }, AHORA), /ya no está/);
+});
+prueba('Estado: cada perfume dice si se publica en la web', () => {
+  const L = conWeb(); const inv = L.hojas['Inventario']; inv.insertColumnsAfter(35, 3); inv.poner(5, 38, 'No');
+  const e = atender(L, { accion: 'estado' }, AHORA);
+  assert.deepEqual(J(e.productos.map(p => p.publicar)), [true, false, true]);
+});
+
 console.log(`\n${ok} pruebas correctas, ${fallos} fallidas.`);
 process.exit(fallos ? 1 : 0);

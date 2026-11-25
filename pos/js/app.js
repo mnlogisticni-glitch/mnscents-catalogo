@@ -2,7 +2,7 @@
 import { BANCOS, fmtCS, fmtUSD, redondear, titulo, nivelStock, coincide, calcularVenta, vuelto, billetesSugeridos, stockVisible, armarVenta, telWa, recibo, leerVinculo, nuevoId, norm } from './logica.js';
 import { agruparVentas, ventasPendientes, tarjetaCliente, ajustesDe, rachaCliente, esPremio, TARJETA, reposicion, porReponer, listaCompra, PERIODOS, periodo, reporte, metaDelMes, hoyNica, fechaCorta, fechaDeDia, MESES } from './negocio.js';
 import { dibujarRecibo, aBlob, compartirRecibo, descargar } from './recibo-imagen.js';
-import { calcularEntrada, pedidoSugerido, skuValido, normSku, armarEntrada } from './entradas.js';
+import { calcularEntrada, pedidoSugerido, skuValido, normSku, armarEntrada, usd05 } from './entradas.js';
 import { conexion, guardarConexion, olvidarConexion, estadoGuardado, guardarEstado, cola, encolar, procesarCola, llamar, errores, borrarErrores, ErrorRed } from './api.js';
 
 const $ = (s, r = document) => r.querySelector(s);
@@ -118,7 +118,7 @@ async function cargarFotos() {
     const r = await fetch('../data/productos.json', { cache: 'no-cache' });
     const d = await r.json();
     S.fotos = new Map(d.productos.filter(p => p.sku && p.foto).map(p => [String(p.sku), `../img/productos/${p.foto}`]));
-    S.web = new Map(d.productos.filter(p => p.sku).map(p => [normSku(p.sku), { nombre: p.nombre, estado: p.estado }]));
+    S.web = new Map(d.productos.filter(p => p.sku).map(p => [normSku(p.sku), { nombre: p.nombre, estado: p.estado, notas: p.notas || [], descripcion: p.descripcion || '' }]));
   } catch { /* sin fotos: se muestran iniciales */ }
 }
 function foto(p, tam = 160) {
@@ -820,9 +820,21 @@ function htmlFoto() {
 
 function pintarEntradas() {
   const raiz = $('.entradas'); if (!raiz || !S.estado) return;
-  const e = S.ent, conf = S.estado.config, nuevo = e.modo === 'nuevo';
+  const e = S.ent, conf = S.estado.config, nuevo = e.modo === 'nuevo', editar = e.modo === 'editar';
   const p = !nuevo && e.ref ? S.porRef.get(e.ref) : null;
   if (!nuevo && e.ref && !p) e.ref = null;
+  const segmento = `<div class="segmento tres-op" role="group" aria-label="Qué quieres hacer">
+      <button type="button" data-accion="en-modo" data-v="nuevo" aria-pressed="${nuevo}">${ico('mas')}Nuevo</button>
+      <button type="button" data-accion="en-modo" data-v="existe" aria-pressed="${e.modo === 'existe'}">${ico('frasco')}Ya lo tengo</button>
+      <button type="button" data-accion="en-modo" data-v="editar" aria-pressed="${editar}">${ico('lapiz')}Editar</button>
+    </div>`;
+  const cabeza = editar
+    ? '<div class="en-cabeza"><h2>Editar un perfume</h2><p>Cambia precios, foto o lo que sale en la web, sin registrar compra.</p></div>'
+    : '<div class="en-cabeza"><h2>Entrada de perfumes</h2><p>Se guarda en Compras, Inventario y la web a la vez.</p></div>';
+  if (editar && p) {
+    raiz.innerHTML = cabeza + '<div class="en-web"></div>' + segmento + htmlEditar(p);
+    pintarWebEstado(); pintarCalculoEnt(); return;
+  }
   const pedido = pedidoSugerido(conf.ultimoPedido, hoy());
   let perfume;
   if (nuevo) {
@@ -838,18 +850,18 @@ function pintarEntradas() {
   } else if (!p) {
     const lista = S.estado.productos.filter(x => coincide(x, e.q)).sort((a, b) => titulo(a.nombre).localeCompare(titulo(b.nombre))).slice(0, 8);
     perfume = `<label class="buscar en-buscar">${ico('buscar')}<span class="sr">Buscar perfume</span><input type="search" data-campo="en-q" value="${esc(e.q)}" placeholder="Buscar perfume, marca o código" autocomplete="off"></label>
-      <ul class="en-lista">${lista.map(x => `<li><button type="button" class="st-fila nivel-${nivelStock(stockDe(x), minimo())}" data-accion="en-elegir" data-ref="${esc(x.ref)}"><span class="st-foto">${foto(x, 96)}</span><span class="st-texto"><b>${esc(titulo(x.nombre))}</b><small>${esc(titulo(x.marca))} · ${esc(x.pres)} · quedan ${stockDe(x)}</small></span>${ico('flecha')}</button></li>`).join('') || '<li class="vacio">No hay perfumes con ese nombre. Si es nuevo, usa "Perfume nuevo".</li>'}</ul>`;
+      <ul class="en-lista">${lista.map(x => `<li><button type="button" class="st-fila nivel-${nivelStock(stockDe(x), minimo())}" data-accion="en-elegir" data-ref="${esc(x.ref)}"><span class="st-foto">${foto(x, 96)}</span><span class="st-texto"><b>${esc(titulo(x.nombre))}</b><small>${esc(titulo(x.marca))} · ${esc(x.pres)} · quedan ${stockDe(x)}</small></span>${ico('flecha')}</button></li>`).join('') || '<li class="vacio">No hay perfumes con ese nombre. Si es nuevo, usa "Nuevo".</li>'}</ul>`;
   } else {
     const w = S.web.get(normSku(p.sku));
     perfume = `<div class="en-elegido"><span class="st-foto">${foto(p, 96)}</span><span class="st-texto"><b>${esc(titulo(p.nombre))}</b><small>${esc(titulo(p.marca))} · ${esc(p.pres)} · quedan ${stockDe(p)} · costo ${fmtCS(p.costo)}</small><small>${w ? `En la web: ${esc(w.nombre)}` : 'Todavía no está en la web'}</small></span>
       <button type="button" class="btn-texto chico" data-accion="en-cambiar">Cambiar</button></div>${htmlFoto()}`;
   }
-  raiz.innerHTML = `<div class="en-cabeza"><h2>Entrada de perfumes</h2><p>Se guarda en Compras, Inventario y la web a la vez.</p></div>
-    <div class="en-web"></div>
-    <div class="segmento" role="group" aria-label="Tipo de entrada">
-      <button type="button" data-accion="en-modo" data-v="nuevo" aria-pressed="${nuevo}">${ico('mas')}Perfume nuevo</button>
-      <button type="button" data-accion="en-modo" data-v="existe" aria-pressed="${!nuevo}">${ico('frasco')}Ya lo tengo</button>
-    </div>
+  if (editar) {     // todavía sin perfume elegido: solo la lista
+    raiz.innerHTML = cabeza + '<div class="en-web"></div>' + segmento + `<div class="en-form"><div class="en-col"><section class="tarjeta en-sec"><h3><span class="en-num">1</span>¿Qué perfume?</h3>${perfume}</section></div></div>`;
+    pintarWebEstado(); return;
+  }
+  raiz.innerHTML = cabeza + `<div class="en-web"></div>
+    ${segmento}
     <form data-form="entrada" class="en-form" novalidate autocomplete="off">
       <div class="en-col">
         <section class="tarjeta en-sec"><h3><span class="en-num">1</span>El perfume</h3>${perfume}</section>
@@ -878,7 +890,118 @@ function pintarEntradas() {
   pintarCalculoEnt();
 }
 
-function formEnt() { return $('.en-form'); }
+const notasDeWeb = w => (w?.notas || []).join(' · ');
+function htmlEditar(p) {
+  const w = S.web.get(normSku(p.sku)), conf = S.estado.config;
+  const g = /^h/i.test(p.genero) ? 'Caballeros' : /^m/i.test(p.genero) ? 'Damas' : '';
+  const sinStock = stockDe(p) <= 0;
+  return `<form data-form="editar" class="en-form" novalidate autocomplete="off">
+    <div class="en-col">
+      <section class="tarjeta en-sec"><h3><span class="en-num">1</span>El perfume</h3>
+        <div class="en-elegido"><span class="st-foto">${foto(p, 96)}</span><span class="st-texto"><b>${esc(titulo(p.nombre))}</b><small>${esc(titulo(p.marca))} · ${esc(p.pres)} · quedan ${stockDe(p)}${p.costo > 0 ? ` · costo ${fmtCS(p.costo)}` : ''}</small><small>${w ? `En la web: ${esc(w.nombre)}` : 'Todavía no está en la web'}</small></span>
+          <button type="button" class="btn-texto chico" data-accion="en-cambiar">Cambiar</button></div>${htmlFoto()}</section>
+      <section class="tarjeta en-sec"><h3><span class="en-num">2</span>Precios de venta</h3>
+        <div class="dos">${campo('precio', 'Al detalle (C$)', { valor: p.precio || '', attrs: 'inputmode="decimal" placeholder="0"', pie: '<small class="en-usd" data-usd="precio"></small>' })}
+          ${campo('mayor', 'Por mayor (C$)', { valor: p.mayor || '', attrs: 'inputmode="decimal" placeholder="0"', pie: '<small class="en-usd" data-usd="mayor"></small>' })}</div>
+        <small class="en-sub">Cambian en el Inventario, en esta app y en la web.</small>
+      </section>
+      <section class="tarjeta en-sec"><h3><span class="en-num">3</span>En la web</h3>
+        <label class="interruptor"><input type="checkbox" name="e_publicar" ${p.publicar !== false ? 'checked' : ''}><span></span><i class="sw-txt">Mostrar en la web</i></label>
+        <fieldset class="campo en-genero"><legend>Para</legend><div class="chips">${['Caballeros', 'Damas'].map(x => `<label class="chip-radio"><input type="radio" name="e_genero" value="${x}" ${g === x ? 'checked' : ''}><span>${x}</span></label>`).join('')}</div></fieldset>
+        ${!w && sinStock ? `<fieldset class="campo en-genero"><legend>Mientras no tengas unidades sale como</legend><div class="chips">${['Agotado', 'Coming soon'].map((x, i) => `<label class="chip-radio"><input type="radio" name="e_estadoweb" value="${x}" ${i === 0 ? 'checked' : ''}><span>${x}</span></label>`).join('')}</div></fieldset>` : ''}
+        ${campo('notas', 'Notas', { valor: notasDeWeb(w), attrs: 'autocomplete="off" placeholder="Dulce · Frutal · Ámbar"', ayuda: 'Con notas sale en el cuestionario y el mapa de aromas.' })}
+        <label class="campo"><span>Descripción <i>(opcional)</i></span><textarea name="e_descripcion" rows="2" placeholder="Una frase corta para la web">${esc(w?.descripcion || '')}</textarea></label>
+        <small class="en-sub">${w ? 'Ya está en la web: lo que cambies aquí se actualiza allá.' : 'Todavía no está en la web: al guardar con "Mostrar en la web" se agrega.'}</small>
+      </section>
+    </div>
+    <aside class="en-lado">
+      <section class="tarjeta en-resultado" aria-live="polite"></section>
+      <p class="error" hidden role="alert"></p>
+      <button class="btn pri en-guardar" type="submit">${ico('check')}Guardar cambios</button>
+    </aside>
+  </form>`;
+}
+function datosEdit() {
+  const f = formEnt(); if (!f) return null;
+  const v = n => f.elements['e_' + n]?.value ?? '';
+  return { precio: v('precio'), mayor: v('mayor'), notas: v('notas'), descripcion: v('descripcion'), publicar: !!f.elements.e_publicar?.checked,
+    genero: f.querySelector('input[name="e_genero"]:checked')?.value || '', estadoWeb: f.querySelector('input[name="e_estadoweb"]:checked')?.value || '' };
+}
+function calculoEdit() {
+  const p = S.porRef.get(S.ent.ref), d = datosEdit(), conf = S.estado.config;
+  return calcularEntrada({ cantidad: 1, moneda: 'CS', tc: conf.tipoCambio, costo: p?.costo || 0, precio: d.precio, mayor: d.mayor, minGananciaMayor: conf.gananciaMinMayor });
+}
+function pintarCalculoEdit() {
+  const f = formEnt(), p = S.porRef.get(S.ent.ref); if (!f || !p || !$('.en-resultado', f)) return;
+  const c = calculoEdit(), tc = S.estado.config.tipoCambio, hay = p.costo > 0;
+  for (const k of ['precio', 'mayor']) { const el = $(`[data-usd="${k}"]`, f), x = c[k === 'precio' ? 'detalle' : 'mayor']; if (el) el.textContent = x.precio > 0 ? `En la web: US$${usd05(x.precio, tc).toFixed(2)}` : ''; }
+  const fila = (t, x) => `<div class="en-fila${x.ganancia < 0 ? ' pierde' : ''}"><span>${t}</span><b>${x.precio > 0 && hay ? `${x.ganancia < 0 ? '−' : '+'}${fmtCS(Math.abs(x.ganancia))}` : '—'}</b><small>${x.precio > 0 && hay ? pct(x.margen) : ''}</small></div>`;
+  const avisos = c.avisos.filter(a => hay || !/pierdes|mínimo/.test(a.texto));
+  $('.en-resultado', f).innerHTML = `<h3>Lo que ganas por perfume</h3>
+    <div class="en-costo"><span>Costo actual por unidad</span><b>${hay ? fmtCS(p.costo) : '—'}</b>${hay ? '' : '<small>Todavía no tiene costo: se calcula con su primera compra.</small>'}</div>
+    ${fila('Al detalle', c.detalle)}${fila('Al mayor', c.mayor)}
+    ${avisos.map(a => `<p class="en-aviso ${a.tipo}">${ico('aviso')}${esc(a.texto)}</p>`).join('')}`;
+  $('.en-guardar', f).setAttribute('aria-disabled', String(S.ent.guardando || !(c.detalle.precio > 0) || avisos.some(a => a.tipo === 'error')));
+}
+function capturar() {
+  const f = formEnt(); if (!f || !f.elements) return null;
+  return [...f.elements].filter(el => el.name && el.type !== 'file').map(el => [el.name, el.type === 'checkbox' || el.type === 'radio' ? el.checked : el.value, el.type === 'radio' ? el.value : null]);
+}
+function restaurar(lista) {
+  const f = formEnt(); if (!f || !lista) return;
+  for (const [n, v, rv] of lista) {
+    const el = rv != null ? f.querySelector(`[name="${n}"][value="${CSS.escape(rv)}"]`) : f.elements[n];
+    if (!el || el.type === 'file') continue;
+    if (el.type === 'checkbox' || el.type === 'radio') el.checked = v; else el.value = v;
+  }
+  pintarCalculoEnt();
+}
+async function guardarEdicion(f, err) {
+  const e = S.ent, p = S.porRef.get(e.ref);
+  if (!p) return err('Elige el perfume.');
+  const d = datosEdit(), c = calculoEdit();
+  if (!(c.detalle.precio > 0)) return err('Escribe el precio al detalle.');
+  const malo = c.avisos.find(a => a.tipo === 'error' && (p.costo > 0 || !/pierdes/.test(a.texto))); if (malo) return err(malo.texto);
+  if (d.publicar && !(c.mayor.precio > 0)) return err('Para mostrarlo en la web falta el precio por mayor.');
+  if (d.publicar && !d.genero) return err('Elige si es de Caballeros o de Damas.');
+  err('');
+  const w = S.web.get(normSku(p.sku));
+  const editar = { ref: p.ref, precio: c.detalle.precio, mayor: c.mayor.precio || '', publicar: d.publicar,
+    genero: d.genero === 'Damas' ? 'Mujer' : d.genero === 'Caballeros' ? 'Hombre' : '', nombreWeb: w?.nombre || `${titulo(p.marca)} ${titulo(p.nombre)}` };
+  if (d.notas.trim() !== notasDeWeb(w)) editar.notas = d.notas.trim();
+  if (d.descripcion.trim() !== (w?.descripcion || '')) editar.descripcion = d.descripcion.trim();
+  if (d.estadoWeb) editar.estadoWeb = d.estadoWeb;
+  if (e.foto) editar.foto = { base64: e.foto.replace(/^data:[^,]*,/, '') };
+  e.id = e.id || nuevoId(); e.guardando = true;
+  const b = $('.en-guardar', f); b.setAttribute('aria-disabled', 'true'); b.innerHTML = `<span class="luna-carga chica" aria-hidden="true"></span>Guardando${e.foto ? ' y subiendo la foto' : ''}…`;
+  try {
+    const r = await llamar({ accion: 'editar', id: e.id, editar }, { espera: 120000 });
+    mostrarEdicionLista(r.resultado || {}, titulo(p.nombre), !!e.foto);
+    S.ent = { modo: 'editar', ref: null, moneda: e.moneda, foto: null, fotoUrl: null, q: '', sucio: false, id: null, guardando: false };
+    pintarEntradas();
+    sincronizar({ silencioso: true });
+  } catch (x) {
+    e.guardando = false; b.innerHTML = `${ico('check')}Guardar cambios`; pintarCalculoEnt();
+    if (x instanceof ErrorRed) err(`No se guardó: ${x.message}. Revisa tu internet y vuelve a tocar Guardar.`);
+    else if (x.message === 'no-autorizado') { olvidarConexion(); mostrarVincular('Este dispositivo ya no está vinculado. Vincúlalo otra vez.'); }
+    else { e.id = null; err(/Acción desconocida/.test(x.message) ? 'Tu hoja tiene el script viejo: hay que actualizarlo para poder editar.' : x.message); }
+  }
+}
+function mostrarEdicionLista(res, nombre, conFoto) {
+  const d = $('#h-entrada'), web = res.web, lineas = [];
+  const hechos = (res.hechos || []).filter(h => h !== 'foto nueva');
+  lineas.push(hechos.length ? `${esc(nombre)}: ${esc(hechos.join(', '))}.` : `${esc(nombre)}: guardado.`);
+  const fotoMal = (res.avisos || []).some(a => /foto/i.test(a));
+  if (web?.agregado) lineas.push(`Agregado a la web como <b>${esc(web.agregado.estado)}</b>${res.publicado ? '. Aparece en unos minutos' : '. Aparece en menos de una hora'}.`);
+  else if (web?.pendiente) lineas.push(`No se pudo poner en la web: ${esc(web.pendiente.motivo)}.`);
+  else if (web) lineas.push(`La web se actualiza ${res.publicado ? 'en unos minutos' : 'en menos de una hora'}.`);
+  if (conFoto && !fotoMal) lineas.push('Foto nueva enviada: sale sin fondo.');
+  $('.listo', d).innerHTML = `<span class="ls-check">${ico('check')}</span><h2>Cambios guardados</h2>
+    <ul class="en-listo">${lineas.map(l => `<li>${ico('check')}<span>${l}</span></li>`).join('')}${(res.avisos || []).map(a => `<li class="av">${ico('aviso')}<span>${esc(a)}</span></li>`).join('')}</ul>
+    <div class="acciones"><button class="btn pri" type="button" data-accion="en-listo">Listo</button></div>`;
+  abrir(d);
+}
+function formEnt() { return $('form.en-form'); }
 function datosEnt() {
   const f = formEnt(); if (!f) return null;
   const v = n => f.elements['e_' + n]?.value ?? '';
@@ -902,7 +1025,8 @@ function calculoEnt() {
   return calcularEntrada({ ...d, moneda: S.ent.moneda, tc: conf.tipoCambio, stock: p ? Math.max(0, p.stock) : 0, costoActual: p ? p.costo : 0, minGananciaMayor: conf.gananciaMinMayor });
 }
 function pintarCalculoEnt() {
-  const f = formEnt(); if (!f) return;
+  if (S.ent.modo === 'editar') return pintarCalculoEdit();
+  const f = formEnt(); if (!f || !$('.en-resultado', f)) return;
   const c = calculoEnt(), d = datosEnt();
   for (const k of ['costo', 'envio', 'aduana', 'otros']) {
     const el = $(`[data-cu="${k}"]`, f); if (!el) continue;
@@ -1075,11 +1199,18 @@ document.addEventListener('click', async e => {
       await operar({ id: nuevoId(), accion: 'anular', numero: n }, `Venta #${n} anulada.`);
       break;
     }
-    case 'en-modo': if (S.ent.modo !== b.dataset.v) { const d = datosEnt(); S.ent = { ...S.ent, modo: b.dataset.v, ref: null, foto: null, fotoUrl: null, q: '', id: null }; pintarEntradas(); rellenarEnt(d, { sinPrecios: true }); } break;
-    case 'en-elegir': { const d = datosEnt(); S.ent = { ...S.ent, modo: 'existe', ref, q: '', sucio: true, id: null, foto: null, fotoUrl: null }; pintarEntradas(); rellenarEnt(d, { sinPrecios: true }); $('.en-form [name="e_cantidad"]')?.focus(); break; }
-    case 'en-cambiar': { const d = datosEnt(); S.ent.ref = null; S.ent.id = null; pintarEntradas(); rellenarEnt(d, { sinPrecios: true }); $('[data-campo="en-q"]')?.focus(); break; }
+    case 'en-modo': if (S.ent.modo !== b.dataset.v) {
+      const conEditar = S.ent.modo === 'editar' || b.dataset.v === 'editar', d = conEditar ? null : datosEnt();
+      S.ent = { ...S.ent, modo: b.dataset.v, ref: null, foto: null, fotoUrl: null, q: '', id: null, sucio: conEditar ? false : S.ent.sucio };
+      pintarEntradas(); if (d) rellenarEnt(d, { sinPrecios: true }); } break;
+    case 'en-elegir': {
+      if (S.ent.modo === 'editar') { S.ent = { ...S.ent, ref, q: '', sucio: true, id: null, foto: null, fotoUrl: null }; pintarEntradas(); break; }
+      const d = datosEnt(); S.ent = { ...S.ent, modo: 'existe', ref, q: '', sucio: true, id: null, foto: null, fotoUrl: null }; pintarEntradas(); rellenarEnt(d, { sinPrecios: true }); $('.en-form [name="e_cantidad"]')?.focus(); break; }
+    case 'en-cambiar': {
+      if (S.ent.modo === 'editar') { S.ent = { ...S.ent, ref: null, id: null, foto: null, fotoUrl: null, sucio: false }; pintarEntradas(); $('[data-campo="en-q"]')?.focus(); break; }
+      const d = datosEnt(); S.ent.ref = null; S.ent.id = null; pintarEntradas(); rellenarEnt(d, { sinPrecios: true }); $('[data-campo="en-q"]')?.focus(); break; }
     case 'en-moneda': { const d = datosEnt(); S.ent.moneda = b.dataset.v; S.ent.sucio = true; pintarEntradas(); rellenarEnt(d); break; }
-    case 'en-quitar-foto': { const d = datosEnt(); S.ent.foto = null; S.ent.fotoUrl = null; pintarEntradas(); rellenarEnt(d); break; }
+    case 'en-quitar-foto': { const d = capturar(); S.ent.foto = null; S.ent.fotoUrl = null; pintarEntradas(); restaurar(d); break; }
     case 'en-escanear': abrirEscaner(); break;
     case 'en-listo': cerrar($('#h-entrada')); break;
     case 'sincronizar': sincronizar(); break;
@@ -1106,8 +1237,8 @@ document.addEventListener('change', e => {
   if (t.matches('[data-accion="orden-stock"]')) { S.ordenStock = t.value; pintarStock(); }
   if (t.matches('input[name="esGasto"]')) { const c = $('.categorias', t.form); c.hidden = !t.checked; }
   if (t.matches('.en-form input[name="e_foto"]') && t.files?.[0]) {
-    const d = datosEnt(), archivo = t.files[0];
-    achicarFoto(archivo).then(url => { S.ent.foto = url; S.ent.fotoUrl = url; S.ent.sucio = true; pintarEntradas(); rellenarEnt(d); })
+    const d = capturar(), archivo = t.files[0];
+    achicarFoto(archivo).then(url => { S.ent.foto = url; S.ent.fotoUrl = url; S.ent.sucio = true; pintarEntradas(); restaurar(d); })
       .catch(() => aviso('No se pudo leer esa foto. Prueba con otra.', 'error'));
   }
   if (t.closest('.en-form')) { S.ent.sucio = true; pintarCalculoEnt(); }
@@ -1179,6 +1310,7 @@ document.addEventListener('submit', async e => {
       break;
     }
     case 'entrada': await guardarEntrada(f, err); break;
+    case 'editar': await guardarEdicion(f, err); break;
     case 'apertura': {
       const m = leerMonto(f.monto.value);
       await operar({ id: nuevoId(), accion: 'caja', caja: { tipo: 'apertura', monto: m } }, `Caja abierta con ${fmtCS(m)}.`);

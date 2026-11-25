@@ -25,7 +25,7 @@ var POS = {
   MOTIVOS: ['Mal conteo', 'Pérdida o robo', 'Dañado', 'Regalo o muestra', 'Uso personal'],
   TIPOS: ['Detalle', 'Detalle sin sello', 'Mayorista', 'Canje'],   // columna "Tipo de venta" (W) de Ventas; "sin sello" = precio especial, no suma a la tarjeta
   PREMIO: /stallion\s*53/i,                     // el perfume gratis de la tarjeta se elige de esta línea
-  VERSION: 5,
+  VERSION: 6,
 };
 
 // Columnas (número, base 1)
@@ -160,10 +160,11 @@ function posAtender_(ss, req, ahora) {
     else if (a === 'caja') r = posCaja_(ss, req.caja, ahora);
     else if (a === 'sellos') r = posSellos_(ss, req.sellos, ahora);
     else if (a === 'entrada') r = posEntrada_(ss, req.entrada, ahora);
+    else if (a === 'editar') r = posEditar_(ss, req.editar, ahora);
     else throw new Error('Acción desconocida.');
     if (idOp) cache.put('pos:' + idOp, JSON.stringify(r || {}), 21600);
     // el costo del día queda guardado en la venta o el ajuste (si falla, la venta igual quedó)
-    if (a === 'venta' || a === 'anular' || a === 'ajuste' || a === 'entrada') { try { posRecalcularCostos_(ss); } catch (e) { Logger.log('Costos: ' + e); } }
+    if (a === 'venta' || a === 'anular' || a === 'ajuste' || a === 'entrada' || a === 'editar') { try { posRecalcularCostos_(ss); } catch (e) { Logger.log('Costos: ' + e); } }
     // Se responde enseguida: la hoja recalcula sus fórmulas después y la app pide el estado aparte.
     return { ok: true, version: POS.VERSION, resultado: r };
   } finally { lock.releaseLock(); }
@@ -220,6 +221,7 @@ function posProductos_(ss) {
   var h = posHoja_(ss, POS.INV);
   var n = POS.FIN_INV - POS.PRIMERA + 1;
   var vals = h.getRange(POS.PRIMERA, 1, n, I.PEDIDOS30).getValues();
+  var pub = h.getMaxColumns() >= WEB.PUBLICAR ? h.getRange(POS.PRIMERA, WEB.PUBLICAR, n, 1).getValues() : null;
   var out = [];
   for (var i = 0; i < vals.length; i++) {
     var f = vals[i];
@@ -230,6 +232,7 @@ function posProductos_(ss) {
       familia: String(f[I.FAMILIA - 1] || ''), genero: String(f[I.GENERO - 1] || ''),
       precio: posNum_(f[I.PRECIO - 1]), mayor: posNum_(f[I.MAYOR - 1]), costo: Math.round(posNum_(f[I.COSTO - 1]) * 100) / 100,
       stock: posNum_(f[I.STOCK - 1]), estado: String(f[I.ESTADO - 1] || ''), pedidos30: posNum_(f[I.PEDIDOS30 - 1]),
+      publicar: pub ? posClaveTexto_(pub[i][0]) !== 'no' : true,
     });
   }
   return out;
@@ -992,11 +995,11 @@ function posWebEscribirFila_(web, w, r, datos) {
  * - Precio de venta (L) o mayorista (AH) distinto → actualiza C$ y US$ en la web.
  * - "Coming soon" o "Agotado" con unidades en el Inventario → "Disponible".
  * opciones.extras[sku] = { nombre, marca, presentacion, notas, descripcion, foto } para perfumes nuevos de la app.
- * opciones.fotos[sku] = nombre de foto nueva para un perfume que ya está en la web.
+ * opciones.cambios[sku] = { foto, notas, descripcion, mostrar } para un perfume que ya está en la web (lo pidió el dueño desde la app).
  */
 function posWebSincronizar_(ss, web, opciones) {
   opciones = opciones || {};
-  var extras = opciones.extras || {}, fotos = opciones.fotos || {};
+  var extras = opciones.extras || {}, cambios = opciones.cambios || {};
   var tc = posNum_(posHoja_(ss, POS.CONF).getRange(5, 2).getValue());
   if (!(tc > 0)) throw new Error('Falta el tipo de cambio en Configuración (B5).');
   var inv = posHoja_(ss, POS.INV);
@@ -1025,7 +1028,11 @@ function posWebSincronizar_(ss, web, opciones) {
     if (!sku || !nombreInv) return;
     if (vistos[sku]) return; vistos[sku] = 1;
     var publicar = nc >= WEB.PUBLICAR ? posClaveTexto_(f[WEB.PUBLICAR - 1]) : '';
-    if (publicar === 'no') return;
+    if (publicar === 'no') {
+      var oc = cambios[sku], ro = w.porSku[sku];
+      if (oc && oc.mostrar === 'No' && ro && posClaveTexto_(w.filas[ro - 2][col.mostrar]) !== 'no') { posWebEscribirFila_(web, w, ro, { mostrar: 'No' }); res.cambios++; }
+      return;
+    }
     var titulo = posBonito_(f[I.MARCA - 1]) + ' ' + posBonito_(nombreInv);
     if (cuenta[sku] > 1) { res.pendientes.push({ nombre: titulo, sku: sku, motivo: 'El SKU ' + sku + ' está repetido en el Inventario: cada perfume necesita su propio código.' }); return; }
     var precio = posNum_(f[I.PRECIO - 1]), mayor = posNum_(f[I.MAYOR - 1]), stock = posNum_(f[I.STOCK - 1]);
@@ -1036,7 +1043,13 @@ function posWebSincronizar_(ss, web, opciones) {
       if (mayor > 0 && Math.abs(posNum_(fw[col.precio_mayor_cs]) - mayor) >= 0.5) { cambio.precio_mayor_cs = mayor; cambio.precio_mayor_usd = posUsd_(mayor, tc); }
       if (Object.keys(cambio).length) res.precios.push({ nombre: String(fw[col.nombre]), antes: [posNum_(fw[col.precio_detalle_cs]), posNum_(fw[col.precio_mayor_cs])], ahora: [precio || posNum_(fw[col.precio_detalle_cs]), mayor || posNum_(fw[col.precio_mayor_cs])] });
       if (/^(coming|agotad)/i.test(String(fw[col.estado]).trim()) && stock > 0) { cambio.estado = 'Disponible'; res.disponibles.push(String(fw[col.nombre])); }
-      if (fotos[sku]) { cambio.foto = fotos[sku]; res.fotos.push(String(fw[col.nombre])); }
+      var pedido = cambios[sku];
+      if (pedido) {
+        if (pedido.foto) { cambio.foto = pedido.foto; res.fotos.push(String(fw[col.nombre])); }
+        if (pedido.notas != null && 'notas' in col) cambio.notas = posTexto_(pedido.notas, 200);
+        if (pedido.descripcion != null && 'descripcion' in col) cambio.descripcion = posTexto_(pedido.descripcion, 600);
+        if (pedido.mostrar) cambio.mostrar = pedido.mostrar;
+      }
       if (Object.keys(cambio).length) { posWebEscribirFila_(web, w, r, cambio); res.cambios++; }
       return;
     }
@@ -1059,7 +1072,7 @@ function posWebSincronizar_(ss, web, opciones) {
       presentacion: posTexto_(x.presentacion, 60) || posPresentacion_(f[I.PRES - 1]),
       notas: posTexto_(x.notas, 200), descripcion: posTexto_(x.descripcion, 600),
       precio_detalle_cs: precio, precio_detalle_usd: posUsd_(precio, tc), precio_mayor_cs: mayor, precio_mayor_usd: posUsd_(mayor, tc),
-      estado: stock > 0 ? 'Disponible' : 'Coming soon', foto: posTexto_(x.foto, 120), mostrar: 'Sí', orden: maxOrden[catalogo],
+      estado: stock > 0 ? 'Disponible' : (x.estado === 'Agotado' ? 'Agotado' : 'Coming soon'), foto: posTexto_(x.foto, 120), mostrar: 'Sí', orden: maxOrden[catalogo],
       sku_inventario: /^\d{1,15}$/.test(sku) ? Number(sku) : sku,
     };
     if ('etiqueta' in col) datos.etiqueta = '';
@@ -1192,9 +1205,9 @@ function posEntrada_(ss, ent, ahora) {
   if (props.getProperty('WEB_ID')) {
     try {
       var web = posWebHoja_();
-      var op = { extras: {}, fotos: {} };
+      var op = { extras: {}, cambios: {} };
       if (ent.nuevo) op.extras[posSku_(sku)] = { nombre: ent.nombreWeb, marca: ent.marcaWeb, presentacion: ent.presentacionWeb, notas: ent.notas, descripcion: ent.descripcion, foto: foto };
-      else if (foto) op.fotos[posSku_(sku)] = foto;
+      else if (foto) { op.cambios[posSku_(sku)] = { foto: foto }; op.extras[posSku_(sku)] = { foto: foto }; }
       var res = posWebSincronizar_(ss, web, op);
       posGuardarResumen_(res, ahora);
       var nuevo = res.agregados.filter(function (a) { return a.sku === posSku_(sku); })[0];
@@ -1202,6 +1215,68 @@ function posEntrada_(ss, ent, ahora) {
       if (res.cambios || foto) resultado.publicado = posGithubPublicar_(res.agregados.map(function (a) { return a.id; }));
     } catch (e) { avisos.push('No pude actualizar la hoja de la web (' + (e.message || e) + '). Se intentará sola en unos minutos.'); }
   } else avisos.push('La hoja de la web no está conectada: el perfume no se agregó a la web.');
+  return resultado;
+}
+
+/**
+ * Editar un perfume que ya está en el Inventario, sin registrar compra.
+ * editar = { ref, precio, mayor, genero ('Hombre'|'Mujer'), publicar (true|false), notas, descripcion, nombreWeb, estadoWeb, foto: { base64 } | null }
+ * Solo cambia lo que viene; el resto queda igual.
+ */
+function posEditar_(ss, ed, ahora) {
+  if (!ed || !ed.ref) throw new Error('Elige el perfume.');
+  var inv = posHoja_(ss, POS.INV);
+  if (inv.getMaxColumns() < WEB.PUBLICAR) inv.insertColumnsAfter(inv.getMaxColumns(), WEB.PUBLICAR - inv.getMaxColumns());
+  var n = POS.FIN_INV - POS.PRIMERA + 1;
+  var refs = inv.getRange(POS.PRIMERA, I.REF, n, 1).getValues(), fila = 0;
+  for (var k = 0; k < n; k++) if (String(refs[k][0]) && String(refs[k][0]) === String(ed.ref)) { fila = POS.PRIMERA + k; break; }
+  if (!fila) throw new Error('Ese perfume ya no está en el Inventario.');
+  var f = inv.getRange(fila, 1, 1, WEB.PUBLICAR).getValues()[0];
+  var sku = posSku_(f[I.SKU - 1]), r2 = function (x) { return Math.round(posNum_(x) * 100) / 100; };
+  var precio = ed.precio != null && ed.precio !== '' ? r2(ed.precio) : posNum_(f[I.PRECIO - 1]);
+  var mayor = ed.mayor != null && ed.mayor !== '' ? r2(ed.mayor) : posNum_(f[I.MAYOR - 1]);
+  if (!(precio > 0)) throw new Error('Falta el precio de venta al detalle.');
+  if (mayor && mayor > precio) throw new Error('El precio por mayor no puede ser más alto que el de detalle.');
+  var hechos = [];
+  if (Math.abs(posNum_(f[I.PRECIO - 1]) - precio) >= 0.005) { inv.getRange(fila, I.PRECIO).setValue(precio); hechos.push('precio al detalle'); }
+  if (mayor > 0 && Math.abs(posNum_(f[I.MAYOR - 1]) - mayor) >= 0.005) { inv.getRange(fila, I.MAYOR).setValue(mayor); hechos.push('precio por mayor'); }
+  var genero = posCatalogo_(ed.genero) === 'Caballeros' ? 'Hombre' : posCatalogo_(ed.genero) === 'Damas' ? 'Mujer' : '';
+  if (genero && String(f[I.GENERO - 1]) !== genero) { inv.getRange(fila, I.GENERO).setValue(genero); hechos.push('para ' + (genero === 'Hombre' ? 'Caballeros' : 'Damas')); }
+  if (ed.publicar === true || ed.publicar === false) {
+    var antes = posClaveTexto_(f[WEB.PUBLICAR - 1]) !== 'no', v = ed.publicar ? 'Sí' : 'No';
+    if (String(f[WEB.PUBLICAR - 1]) !== v) inv.getRange(fila, WEB.PUBLICAR).setValue(v);
+    if (antes !== ed.publicar) hechos.push(ed.publicar ? 'se muestra en la web' : 'ya no se muestra en la web');
+  }
+  var avisos = [], props = PropertiesService.getScriptProperties(), foto = '';
+  if (ed.foto && ed.foto.base64) {
+    if (!props.getProperty('GITHUB_TOKEN')) avisos.push('La foto no se subió: falta conectar GitHub (menú 🛒 Punto de venta en la hoja).');
+    else {
+      try {
+        var b64 = String(ed.foto.base64).replace(/^data:[^,]*,/, '');
+        if (b64.length > 8e6) throw new Error('la foto es muy pesada');
+        foto = posGithubFoto_(posGithubNombreFoto_(posSlug_(ed.nombreWeb || (posTexto_(f[I.MARCA - 1], 40) + ' ' + posTexto_(f[I.NOMBRE - 1], 60))) || 'perfume'), b64);
+        hechos.push('foto nueva');
+      } catch (e) { avisos.push('La foto no se subió (' + (e.message || e) + ').'); }
+    }
+  }
+  var resultado = { fila: fila, ref: String(ed.ref), sku: sku, hechos: hechos, avisos: avisos, web: null, publicado: false };
+  if (props.getProperty('WEB_ID')) {
+    try {
+      var web = posWebHoja_(), op = { extras: {}, cambios: {} }, c = {};
+      if (foto) c.foto = foto;
+      if (ed.notas != null) c.notas = ed.notas;
+      if (ed.descripcion != null) c.descripcion = ed.descripcion;
+      if (ed.publicar === true) c.mostrar = 'Sí';
+      if (ed.publicar === false) c.mostrar = 'No';
+      op.cambios[sku] = c;
+      op.extras[sku] = { notas: ed.notas, descripcion: ed.descripcion, foto: foto, estado: ed.estadoWeb };
+      var res = posWebSincronizar_(ss, web, op);
+      posGuardarResumen_(res, ahora);
+      var nuevo = res.agregados.filter(function (a) { return a.sku === sku; })[0];
+      resultado.web = { agregado: nuevo || null, pendiente: res.pendientes.filter(function (p) { return p.sku === sku; })[0] || null };
+      if (res.cambios || foto) resultado.publicado = posGithubPublicar_(res.agregados.map(function (a) { return a.id; }));
+    } catch (e) { avisos.push('No pude actualizar la hoja de la web (' + (e.message || e) + '). Se intentará sola en unos minutos.'); }
+  } else avisos.push('La hoja de la web no está conectada.');
   return resultado;
 }
 
