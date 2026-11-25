@@ -1,5 +1,5 @@
 {
- "actualizado": "2026-11-25T20:42:15.781Z",
+ "actualizado": "2026-11-25T20:44:01.970Z",
  "productos": [
   {
    "id": "H01",
@@ -286,8 +286,8 @@
    "descripcion": "",
    "precios": {
     "detalle": {
-     "cs": 1930,
-     "usd": 52.4
+     "cs": 1990,
+     "usd": 54.1
     },
     "mayor": {
      "cs": 1375,
