@@ -1,5 +1,5 @@
 {
- "actualizado": "2026-11-25T20:31:32.867Z",
+ "actualizado": "2026-11-25T20:37:01.194Z",
  "productos": [
   {
    "id": "H01",
@@ -520,12 +520,12 @@
    "descripcion": "",
    "precios": {
     "detalle": {
-     "cs": 1840,
-     "usd": 50
+     "cs": 1850,
+     "usd": 50.25
     },
     "mayor": {
-     "cs": 1240,
-     "usd": 33.65
+     "cs": 1345,
+     "usd": 36.55
     }
    },
    "estado": "disponible",
@@ -582,8 +582,8 @@
      "usd": 50.25
     },
     "mayor": {
-     "cs": 1255,
-     "usd": 34.1
+     "cs": 1380,
+     "usd": 37.5
     }
    },
    "estado": "coming_soon",
@@ -612,8 +612,8 @@
      "usd": 40.6
     },
     "mayor": {
-     "cs": 1095,
-     "usd": 29.85
+     "cs": 1185,
+     "usd": 32.2
     }
    },
    "estado": "agotado",
