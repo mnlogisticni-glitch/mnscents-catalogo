@@ -1,5 +1,5 @@
 {
- "actualizado": "2026-11-25T20:44:01.970Z",
+ "actualizado": "2026-11-25T20:53:58.066Z",
  "productos": [
   {
    "id": "H01",
@@ -499,8 +499,8 @@
      "usd": 38
     },
     "mayor": {
-     "cs": 780,
-     "usd": 21.2
+     "cs": 880,
+     "usd": 23.9
     }
    },
    "estado": "disponible",
@@ -790,8 +790,8 @@
      "usd": 38
     },
     "mayor": {
-     "cs": 780,
-     "usd": 21.2
+     "cs": 880,
+     "usd": 23.9
     }
    },
    "estado": "disponible",
@@ -821,8 +821,8 @@
      "usd": 38
     },
     "mayor": {
-     "cs": 780,
-     "usd": 21.2
+     "cs": 880,
+     "usd": 23.9
     }
    },
    "estado": "disponible",
