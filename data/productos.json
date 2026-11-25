@@ -1,5 +1,5 @@
 {
- "actualizado": "2026-11-25T20:38:03.112Z",
+ "actualizado": "2026-11-25T20:38:26.174Z",
  "productos": [
   {
    "id": "H01",
@@ -140,8 +140,8 @@
      "usd": 40.6
     },
     "mayor": {
-     "cs": 1150,
-     "usd": 31.25
+     "cs": 1165,
+     "usd": 31.65
     }
    },
    "estado": "disponible",
@@ -225,8 +225,8 @@
      "usd": 38
     },
     "mayor": {
-     "cs": 970,
-     "usd": 26.3
+     "cs": 1005,
+     "usd": 27.3
     }
    },
    "estado": "agotado",
