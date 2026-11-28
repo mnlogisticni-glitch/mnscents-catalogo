@@ -1,5 +1,5 @@
 {
- "actualizado": "2026-11-26T17:55:55.798Z",
+ "actualizado": "2026-11-28T01:17:49.900Z",
  "productos": [
   {
    "id": "H01",
@@ -59,7 +59,6 @@
    "etiqueta": null,
    "foto": "khamrah-qahwa.webp",
    "orden": 2,
-   "top": 3,
    "sku": "6290360593661"
   },
   {
@@ -89,7 +88,7 @@
    "etiqueta": null,
    "foto": "afnan-9pm.webp",
    "orden": 3,
-   "top": 1,
+   "top": 2,
    "sku": "6290171002338"
   },
   {
@@ -144,11 +143,12 @@
      "usd": 31.65
     }
    },
-   "estado": "disponible",
-   "existencias": 1,
+   "estado": "agotado",
+   "existencias": 0,
    "etiqueta": null,
    "foto": "club-de-nuit-intense-man.webp",
    "orden": 5,
+   "top": 3,
    "sku": "6085010044712"
   },
   {
@@ -204,7 +204,7 @@
     }
    },
    "estado": "disponible",
-   "existencias": 4,
+   "existencias": 3,
    "etiqueta": null,
    "foto": "nautica-voyage.webp",
    "orden": 7,
@@ -264,11 +264,11 @@
     }
    },
    "estado": "disponible",
-   "existencias": 8,
+   "existencias": 7,
    "etiqueta": null,
    "foto": "9am-dive.webp",
    "orden": 9,
-   "top": 2,
+   "top": 1,
    "sku": "6290171072836"
   },
   {
@@ -444,7 +444,7 @@
     }
    },
    "estado": "disponible",
-   "existencias": 3,
+   "existencias": 2,
    "etiqueta": null,
    "foto": "asad-bourbon.webp",
    "orden": 15,
